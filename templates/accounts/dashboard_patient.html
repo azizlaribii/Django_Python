@@ -1,134 +1,280 @@
 {% extends 'base.html' %}
+{% block title %}Mon Espace Santé — SantéConnect{% endblock %}
 
-{% block title %}Mon Dossier Patient - SantéConnect{% endblock %}
+{% block extra_css %}
+<style>
+.dash-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:18px; margin-bottom:28px; }
+.kpi-card { background:#fff; border-radius:16px; padding:20px 22px; box-shadow:0 2px 12px rgba(0,0,0,.06); border:1px solid #e2e8f0; display:flex; align-items:center; gap:16px; transition:transform .2s,box-shadow .2s; }
+.kpi-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,.1); }
+.kpi-icon { font-size:2rem; width:54px; height:54px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.kpi-val { font-size:2rem; font-weight:800; line-height:1; }
+.kpi-lbl { font-size:.8rem; color:#64748b; margin-top:2px; }
+.section-card { background:#fff; border-radius:16px; padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.06); border:1px solid #e2e8f0; margin-bottom:22px; }
+.section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+.section-title { font-size:1.05rem; font-weight:700; color:#0f172a; }
+.badge-statut { padding:3px 10px; border-radius:20px; font-size:.75rem; font-weight:600; }
+.badge-planifie { background:#dbeafe; color:#1d4ed8; }
+.badge-termine { background:#dcfce7; color:#15803d; }
+.badge-encours { background:#fef3c7; color:#b45309; }
+.badge-annule { background:#fee2e2; color:#dc2626; }
+.badge-active { background:#dcfce7; color:#15803d; }
+.badge-disponible { background:#dcfce7; color:#15803d; }
+.badge-urgente { background:#fee2e2; color:#dc2626; }
+.badge-haute { background:#fef3c7; color:#b45309; }
+.badge-normale { background:#f1f5f9; color:#475569; }
+.item-row { display:flex; justify-content:space-between; align-items:flex-start; padding:14px 0; border-bottom:1px solid #f1f5f9; gap:12px; }
+.item-row:last-child { border-bottom:none; padding-bottom:0; }
+.item-title { font-weight:600; color:#0f172a; font-size:.9rem; }
+.item-meta { font-size:.8rem; color:#64748b; margin-top:2px; }
+.btn-action { padding:5px 12px; border-radius:8px; font-size:.78rem; font-weight:600; cursor:pointer; border:none; transition:all .15s; }
+.btn-view { background:#eff6ff; color:#3b82f6; }
+.btn-view:hover { background:#dbeafe; }
+.hero-banner { background:linear-gradient(135deg,#0ea5e9 0%,#0369a1 100%); color:#fff; border-radius:20px; padding:28px 32px; margin-bottom:28px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; }
+.hero-info h1 { font-size:1.8rem; font-weight:800; margin-bottom:6px; }
+.hero-info p { opacity:.85; font-size:.95rem; }
+.hero-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.btn-white { background:#fff; color:#0369a1; padding:10px 20px; border-radius:10px; font-weight:700; font-size:.875rem; text-decoration:none; border:none; cursor:pointer; transition:all .2s; }
+.btn-white:hover { background:#f0f9ff; transform:translateY(-1px); }
+.btn-outline-white { background:rgba(255,255,255,.15); color:#fff; padding:10px 20px; border-radius:10px; font-weight:600; font-size:.875rem; text-decoration:none; border:1.5px solid rgba(255,255,255,.4); cursor:pointer; transition:all .2s; }
+.btn-outline-white:hover { background:rgba(255,255,255,.25); }
+.medecin-card { background:linear-gradient(135deg,#f0fdf4,#dcfce7); border:1.5px solid #bbf7d0; border-radius:14px; padding:18px; }
+.tabs { display:flex; gap:6px; margin-bottom:18px; background:#f8fafc; padding:4px; border-radius:12px; }
+.tab-btn { padding:8px 16px; border-radius:9px; font-size:.85rem; font-weight:600; cursor:pointer; border:none; background:transparent; color:#64748b; transition:all .2s; }
+.tab-btn.active { background:#fff; color:#0f172a; box-shadow:0 1px 4px rgba(0,0,0,.1); }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+.empty-state { text-align:center; padding:40px 20px; color:#94a3b8; }
+.empty-state .empty-icon { font-size:3rem; margin-bottom:12px; }
+.blood-badge { background:#fee2e2; color:#dc2626; font-weight:700; padding:3px 10px; border-radius:8px; font-size:.82rem; }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container">
-    <!-- Header Banner -->
-    <div class="glass-card" style="padding: 24px; margin-bottom: 28px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 249, 255, 0.8) 100%); border-left: 6px solid var(--patient-color);">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-            <div>
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                    <span class="badge-role PATIENT">👤 Mon Espace Santé Personnel</span>
-                    <span style="background: #fee2e2; color: #dc2626; font-weight: 700; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem;">
-                        🩸 Groupe Sanguin : {{ profile.groupe_sanguin|default:"Non renseigné" }}
-                    </span>
-                </div>
-                <h1 style="font-size: 1.85rem; color: #0c4a6e;">
-                    Bonjour, {{ user.get_full_name|default:user.username }}
-                </h1>
-                <p style="color: #0369a1; font-size: 0.95rem; margin-top: 4px;">
-                    {% if profile.numero_securite_sociale %}Identifiant Sécu : <strong>{{ profile.numero_securite_sociale }}</strong> • {% endif %}
-                    {% if user.phone %}Tél : {{ user.phone }} • {% endif %}
-                    {% if profile.personne_contact %}Contact d'urgence : <strong>{{ profile.personne_contact }}</strong>{% endif %}
-                </p>
-            </div>
 
-            <div style="display: flex; gap: 10px;">
-                <a href="{% url 'profile' %}" class="btn btn-secondary btn-sm" id="btn-patient-edit-profile">
-                    ⚙️ Mettre à jour mon dossier
-                </a>
-                <button type="button" class="btn btn-primary btn-sm" onclick="alert('Module de prise de rendez-vous en ligne...')">
-                    📅 Prendre Rendez-vous
-                </button>
-            </div>
+  <!-- HERO BANNER -->
+  <div class="hero-banner">
+    <div class="hero-info">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span style="background:rgba(255,255,255,.2);padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:600;">👤 Mon Espace Santé</span>
+        {% if profile.groupe_sanguin %}
+          <span class="blood-badge" style="background:rgba(239,68,68,.3);color:#fff;">🩸 {{ profile.groupe_sanguin }}</span>
+        {% endif %}
+      </div>
+      <h1>Bonjour, {{ user.get_full_name|default:user.username }} 👋</h1>
+      <p>
+        {% if profile.numero_securite_sociale %}N° Sécu : <strong>{{ profile.numero_securite_sociale }}</strong> &bull; {% endif %}
+        {% if user.phone %}📞 {{ user.phone }} &bull; {% endif %}
+        Dossier <strong>#{{ dossier.numero_dossier }}</strong>
+      </p>
+    </div>
+    <div class="hero-actions">
+      <a href="{% url 'patient_dossier' %}" class="btn-white">📁 Mon Dossier Complet</a>
+      <a href="{% url 'profile' %}" class="btn-outline-white">⚙️ Modifier mon profil</a>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="dash-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#eff6ff;color:#3b82f6;">💊</div>
+      <div><div class="kpi-val" style="color:#3b82f6;">{{ stats.prescriptions }}</div><div class="kpi-lbl">Prescriptions actives</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#f0fdf4;color:#22c55e;">🔬</div>
+      <div><div class="kpi-val" style="color:#22c55e;">{{ stats.lab_results }}</div><div class="kpi-lbl">Résultats laboratoire</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#fef3c7;color:#f59e0b;">📅</div>
+      <div><div class="kpi-val" style="color:#f59e0b;">{{ stats.upcoming_appointments }}</div><div class="kpi-lbl">Examens planifiés</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#f5f3ff;color:#8b5cf6;">📝</div>
+      <div><div class="kpi-val" style="color:#8b5cf6;">{{ stats.observations }}</div><div class="kpi-lbl">Observations médicales</div></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:24px;">
+
+    <!-- BLOC GAUCHE : Dossier -->
+    <div>
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">📋 Mon Dossier Médical</span>
+          <a href="{% url 'patient_dossier' %}" class="btn-action btn-view">Voir tout →</a>
         </div>
+
+        <!-- TABS -->
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab('examens', this)">🩺 Examens</button>
+          <button class="tab-btn" onclick="switchTab('labo', this)">🔬 Labo</button>
+          <button class="tab-btn" onclick="switchTab('ordonnances', this)">💊 Ordonnances</button>
+          <button class="tab-btn" onclick="switchTab('observations', this)">📝 Notes</button>
+        </div>
+
+        <!-- EXAMENS -->
+        <div id="tab-examens" class="tab-content active">
+          {% if examens %}
+            {% for ex in examens %}
+            <div class="item-row">
+              <div style="flex:1;">
+                <div class="item-title">{{ ex.titre }}</div>
+                <div class="item-meta">{{ ex.get_type_examen_display }} &bull; {{ ex.date_examen|date:"d M Y" }}
+                  {% if ex.medecin %}• Dr. {{ ex.medecin.get_full_name }}{% endif %}
+                </div>
+              </div>
+              <span class="badge-statut badge-{{ ex.statut|lower }}">{{ ex.get_statut_display }}</span>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state"><div class="empty-icon">🩺</div><p>Aucun examen planifié.</p></div>
+          {% endif %}
+        </div>
+
+        <!-- LABO -->
+        <div id="tab-labo" class="tab-content">
+          {% if resultats %}
+            {% for res in resultats %}
+            <div class="item-row">
+              <div style="flex:1;">
+                <div class="item-title">{{ res.type_analyse }}</div>
+                <div class="item-meta">[{{ res.reference }}] &bull; {{ res.date_prescription|date:"d M Y" }}
+                  {% if res.laboratoire %}• {{ res.laboratoire.lab_profile.nom_laboratoire|default:res.laboratoire.username }}{% endif %}
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge-statut badge-{{ res.priorite|lower }}">{{ res.get_priorite_display }}</span>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state"><div class="empty-icon">🔬</div><p>Aucune analyse prescrite.</p></div>
+          {% endif %}
+        </div>
+
+        <!-- ORDONNANCES -->
+        <div id="tab-ordonnances" class="tab-content">
+          {% if prescriptions %}
+            {% for p in prescriptions %}
+            <div class="item-row">
+              <div style="flex:1;">
+                <div class="item-title">{{ p.medicament }}</div>
+                <div class="item-meta">{{ p.posologie }} &bull; {{ p.date_prescription|date:"d M Y" }}
+                  {% if p.medecin %}• Dr. {{ p.medecin.get_full_name }}{% endif %}
+                </div>
+              </div>
+              <span class="badge-statut badge-{{ p.statut|lower }}">{{ p.get_statut_display }}</span>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state"><div class="empty-icon">💊</div><p>Aucune prescription active.</p></div>
+          {% endif %}
+        </div>
+
+        <!-- OBSERVATIONS -->
+        <div id="tab-observations" class="tab-content">
+          {% if observations %}
+            {% for obs in observations %}
+            <div class="item-row">
+              <div style="flex:1;">
+                <div class="item-title">{{ obs.titre }}</div>
+                <div class="item-meta">{{ obs.date_observation|date:"d M Y" }}
+                  {% if obs.medecin %}• Dr. {{ obs.medecin.get_full_name }}{% endif %}
+                </div>
+                <div style="font-size:.82rem;color:#475569;margin-top:4px;">{{ obs.contenu|truncatechars:100 }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state"><div class="empty-icon">📝</div><p>Aucune observation médicale.</p></div>
+          {% endif %}
+        </div>
+      </div>
     </div>
 
-    <!-- Patient KPIs -->
-    <div class="stats-row">
-        <div class="stat-widget">
-            <div class="stat-info">
-                <h4>Mes Ordonnances Actives</h4>
-                <div class="stat-number" style="color: var(--patient-color);">{{ stats.prescriptions }}</div>
-            </div>
-            <div class="stat-icon" style="color: var(--patient-color); background: var(--patient-bg);">💊</div>
+    <!-- BLOC DROITE -->
+    <div>
+      <!-- Médecin Traitant -->
+      <div class="section-card" style="margin-bottom:20px;">
+        <div class="section-header">
+          <span class="section-title">🩺 Médecin Traitant</span>
         </div>
-        <div class="stat-widget">
-            <div class="stat-info">
-                <h4>Résultats Biologiques</h4>
-                <div class="stat-number" style="color: var(--lab-color);">{{ stats.lab_results }}</div>
+        {% if medecin_traitant %}
+          <div class="medecin-card">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+              <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#059669,#10b981);display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🩺</div>
+              <div>
+                <div style="font-weight:700;color:#064e3b;font-size:1rem;">Dr. {{ medecin_traitant.medecin.get_full_name }}</div>
+                {% with medecin_traitant.medecin.doctor_profile as dp %}
+                  {% if dp %}<div style="font-size:.82rem;color:#059669;">{{ dp.specialite }}</div>{% endif %}
+                  {% if dp.cabinet_name %}<div style="font-size:.78rem;color:#64748b;margin-top:2px;">📍 {{ dp.cabinet_name }}</div>{% endif %}
+                  {% if dp.horaires %}<div style="font-size:.78rem;color:#64748b;">🕐 {{ dp.horaires }}</div>{% endif %}
+                {% endwith %}
+              </div>
             </div>
-            <div class="stat-icon" style="color: var(--lab-color); background: var(--lab-bg);">🔬</div>
-        </div>
-        <div class="stat-widget">
-            <div class="stat-info">
-                <h4>Rendez-vous à Venir</h4>
-                <div class="stat-number" style="color: var(--doctor-color);">{{ stats.upcoming_appointments }}</div>
-            </div>
-            <div class="stat-icon" style="color: var(--doctor-color); background: var(--doctor-bg);">📅</div>
-        </div>
-    </div>
-
-    <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; margin-top: 24px;">
-        <!-- Medical Records & Lab Results -->
-        <div class="glass-card" style="padding: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
-                <div>
-                    <h3 style="font-size: 1.2rem; color: #0f172a;">📁 Historique Médical & Analyses</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-muted);">Vos comptes-rendus d'analyses et ordonnances numérisées</p>
-                </div>
-            </div>
-
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Intitulé du Document</th>
-                            <th>Praticien / Laboratoire</th>
-                            <th style="text-align: right;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for doc in medical_records %}
-                            <tr>
-                                <td style="font-size: 0.85rem; color: #64748b;">{{ doc.date }}</td>
-                                <td><strong style="color: #0f172a;">{{ doc.titre }}</strong></td>
-                                <td>
-                                    {% if doc.type == 'Laboratoire' %}
-                                        <span style="color: var(--lab-color); font-weight: 600; font-size: 0.85rem;">🔬 {{ doc.emetteur }}</span>
-                                    {% else %}
-                                        <span style="color: var(--doctor-color); font-weight: 600; font-size: 0.85rem;">🩺 {{ doc.emetteur }}</span>
-                                    {% endif %}
-                                </td>
-                                <td style="text-align: right;">
-                                    <button type="button" class="btn btn-secondary btn-sm" onclick="alert('Téléchargement du document sécurisé : {{ doc.titre }}')">
-                                        📥 Télécharger PDF
-                                    </button>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Next Appointment & Doctor Info -->
-        <div class="glass-card" style="padding: 24px;">
-            <h3 style="font-size: 1.2rem; color: #0f172a; margin-bottom: 16px;">📅 Prochain Rendez-vous</h3>
-            
-            {% if upcoming_appointment %}
-                <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 16px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                        <span style="background: #dbeafe; color: #1d4ed8; font-weight: 700; font-size: 0.8rem; padding: 3px 8px; border-radius: 6px;">
-                            {{ upcoming_appointment.date }} à {{ upcoming_appointment.heure }}
-                        </span>
-                        <span style="font-size: 0.8rem; color: #059669; font-weight: 600;">Confirmé</span>
-                    </div>
-                    <h4 style="font-size: 1.05rem; color: #0f172a; margin-bottom: 4px;">{{ upcoming_appointment.praticien }}</h4>
-                    <p style="font-size: 0.85rem; color: var(--doctor-color); font-weight: 600; margin-bottom: 6px;">{{ upcoming_appointment.specialite }}</p>
-                    <p style="font-size: 0.8rem; color: var(--text-muted);">📍 {{ upcoming_appointment.adresse }}</p>
-                </div>
+            {% if medecin_traitant.notes %}
+              <div style="font-size:.8rem;color:#374151;background:rgba(255,255,255,.7);padding:8px;border-radius:8px;">
+                {{ medecin_traitant.notes }}
+              </div>
             {% endif %}
+            <div style="margin-top:10px;font-size:.75rem;color:#6b7280;">Associé depuis le {{ medecin_traitant.date_association|date:"d M Y" }}</div>
+          </div>
+        {% else %}
+          <div class="empty-state" style="padding:20px;">
+            <div class="empty-icon">👨‍⚕️</div>
+            <p style="font-size:.85rem;">Aucun médecin traitant associé.</p>
+          </div>
+        {% endif %}
+      </div>
 
-            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px;">
-                <h4 style="font-size: 0.85rem; color: #92400e; margin-bottom: 4px;">ℹ️ Consignes pour votre examen</h4>
-                <p style="font-size: 0.8rem; color: #b45309;">
-                    Pour tout prélèvement sanguin prescrit, veuillez vous présenter à jeun depuis au moins 10 heures au laboratoire de votre choix.
-                </p>
-            </div>
+      <!-- Informations du dossier -->
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">📁 Informations du Dossier</span>
         </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          {% if dossier.allergies %}
+          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;">
+            <div style="font-size:.78rem;font-weight:700;color:#c2410c;margin-bottom:4px;">⚠️ Allergies connues</div>
+            <div style="font-size:.85rem;color:#7c2d12;">{{ dossier.allergies }}</div>
+          </div>
+          {% endif %}
+          {% if dossier.antecedents_familiaux %}
+          <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:12px;">
+            <div style="font-size:.78rem;font-weight:700;color:#7c3aed;margin-bottom:4px;">👨‍👩‍👧 Antécédents familiaux</div>
+            <div style="font-size:.85rem;color:#4c1d95;">{{ dossier.antecedents_familiaux }}</div>
+          </div>
+          {% endif %}
+          {% if profile.antecedents %}
+          <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px;">
+            <div style="font-size:.78rem;font-weight:700;color:#0369a1;margin-bottom:4px;">📋 Antécédents médicaux</div>
+            <div style="font-size:.85rem;color:#0c4a6e;">{{ profile.antecedents }}</div>
+          </div>
+          {% endif %}
+          {% if profile.personne_contact %}
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;">
+            <div style="font-size:.78rem;font-weight:700;color:#15803d;margin-bottom:4px;">🆘 Contact d'urgence</div>
+            <div style="font-size:.85rem;color:#14532d;">{{ profile.personne_contact }}</div>
+          </div>
+          {% endif %}
+          {% if not dossier.allergies and not dossier.antecedents_familiaux and not profile.antecedents and not profile.personne_contact %}
+            <div class="empty-state" style="padding:16px;"><div class="empty-icon">📁</div><p style="font-size:.85rem;">Complétez votre dossier via <a href="{% url 'profile' %}" style="color:#3b82f6;">votre profil</a>.</p></div>
+          {% endif %}
+        </div>
+      </div>
     </div>
+
+  </div>
 </div>
+
+{% block extra_js %}
+<script>
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+{% endblock %}
 {% endblock %}

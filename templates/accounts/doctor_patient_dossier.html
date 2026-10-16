@@ -1,0 +1,763 @@
+{% extends 'base.html' %}
+{% block title %}Dossier Patient — {{ patient.get_full_name }} — SantéConnect{% endblock %}
+
+{% block extra_css %}
+<style>
+.patient-hero { background:linear-gradient(135deg,#1e40af,#1d4ed8); color:#fff; border-radius:20px; padding:24px 28px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; }
+.patient-hero h1 { font-size:1.6rem; font-weight:800; margin-bottom:4px; }
+.patient-hero p { opacity:.85; font-size:.875rem; }
+.nav-tabs { display:flex; gap:4px; background:#f1f5f9; padding:4px; border-radius:14px; margin-bottom:22px; flex-wrap:wrap; }
+.tab-btn { padding:10px 16px; border-radius:10px; border:none; background:transparent; cursor:pointer; font-size:.85rem; font-weight:600; color:#64748b; transition:all .2s; }
+.tab-btn.active { background:#fff; color:#0f172a; box-shadow:0 2px 8px rgba(0,0,0,.1); }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+.card { background:#fff; border-radius:16px; padding:22px; box-shadow:0 2px 12px rgba(0,0,0,.06); border:1px solid #e2e8f0; }
+.card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.card-title { font-size:.95rem; font-weight:700; color:#0f172a; }
+table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
+.mt th { background:#f8fafc; color:#475569; font-weight:600; padding:10px 14px; text-align:left; border-bottom:2px solid #e2e8f0; }
+.mt td { padding:11px 14px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+.mt tr:hover td { background:#f9fafb; }
+.badge { display:inline-block; padding:3px 9px; border-radius:20px; font-size:.72rem; font-weight:600; }
+.badge-planifie { background:#dbeafe; color:#1d4ed8; }
+.badge-termine { background:#dcfce7; color:#15803d; }
+.badge-en_cours { background:#fef3c7; color:#b45309; }
+.badge-annule { background:#fee2e2; color:#dc2626; }
+.badge-active { background:#dcfce7; color:#15803d; }
+.badge-disponible,.badge-transmis { background:#dcfce7; color:#15803d; }
+.badge-urgente { background:#fee2e2; color:#dc2626; }
+.badge-haute { background:#fef3c7; color:#b45309; }
+.badge-normale { background:#f1f5f9; color:#475569; }
+.badge-en_attente { background:#e0e7ff; color:#4338ca; }
+.badge-terminee,.badge-annulee { background:#f1f5f9; color:#475569; }
+/* Boutons d'action tableau */
+.btn-edit { background:#fef3c7; color:#b45309; padding:4px 9px; border-radius:7px; font-size:.73rem; font-weight:700; border:none; cursor:pointer; }
+.btn-edit:hover { background:#fde68a; }
+.btn-del { background:#fee2e2; color:#dc2626; padding:4px 9px; border-radius:7px; font-size:.73rem; font-weight:700; border:none; cursor:pointer; }
+.btn-del:hover { background:#fecaca; }
+.btn-add { background:#1d4ed8; color:#fff; padding:8px 14px; border-radius:9px; font-size:.8rem; font-weight:700; border:none; cursor:pointer; }
+.btn-add:hover { background:#1e40af; }
+/* MODAL */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:1000; backdrop-filter:blur(4px); align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:#fff; border-radius:20px; padding:28px; width:100%; max-width:560px; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); animation:modalIn .25s ease; }
+@keyframes modalIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+.modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:12px; border-bottom:1px solid #e2e8f0; }
+.modal-title { font-size:1.05rem; font-weight:700; color:#0f172a; }
+.modal-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color:#64748b; }
+.modal-close:hover { color:#0f172a; }
+.form-group { margin-bottom:13px; }
+.form-group label { display:block; font-size:.8rem; font-weight:600; color:#374151; margin-bottom:4px; }
+.form-group .form-input, .form-group .form-select { width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:9px; font-size:.85rem; outline:none; transition:border-color .2s; font-family:inherit; box-sizing:border-box; }
+.form-group .form-input:focus, .form-group .form-select:focus { border-color:#1d4ed8; }
+.form-group textarea.form-input { resize:vertical; min-height:80px; }
+.form-row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.modal-footer { display:flex; justify-content:flex-end; gap:10px; margin-top:18px; padding-top:14px; border-top:1px solid #e2e8f0; }
+.btn-cancel { padding:9px 16px; border-radius:9px; border:1.5px solid #e2e8f0; background:#fff; cursor:pointer; font-weight:600; color:#64748b; font-size:.85rem; }
+.btn-save { background:#1d4ed8; color:#fff; padding:9px 18px; border-radius:9px; font-weight:700; border:none; cursor:pointer; font-size:.85rem; }
+.btn-save:hover { background:#1e40af; }
+.alert-success { background:#dcfce7; color:#15803d; padding:10px 16px; border-radius:9px; margin-bottom:14px; font-size:.85rem; display:none; }
+.alert-error { background:#fee2e2; color:#dc2626; padding:10px 16px; border-radius:9px; margin-bottom:14px; font-size:.85rem; display:none; }
+.info-box { background:#f8fafc; border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+.info-box-label { font-size:.72rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.05em; margin-bottom:3px; }
+.info-box-val { font-size:.875rem; color:#0f172a; }
+.empty-state { text-align:center; padding:40px 20px; color:#94a3b8; }
+.confirm-modal { background:#fff; border-radius:16px; padding:24px; max-width:380px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,.25); animation:modalIn .2s ease; }
+.workflow-bar { display:flex; align-items:center; gap:8px; margin-bottom:18px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px 16px; overflow-x:auto; }
+.wf-step { display:flex; align-items:center; gap:10px; flex:1; min-width:170px; }
+.wf-badge { width:26px; height:26px; border-radius:50%; background:#e2e8f0; color:#475569; font-weight:800; font-size:.76rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.wf-step.active .wf-badge { background:#ea580c; color:#fff; }
+.wf-step.current .wf-badge { background:#7c3aed; color:#fff; }
+.wf-step.done .wf-badge { background:#16a34a; color:#fff; }
+.wf-title { font-size:.78rem; font-weight:700; color:#0f172a; line-height:1.2; }
+.wf-sub { font-size:.7rem; color:#64748b; line-height:1.2; }
+.wf-sep { color:#cbd5e1; font-weight:700; display:flex; align-items:center; flex-shrink:0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <!-- PATIENT HERO -->
+  <div class="patient-hero">
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+        <a href="{% url 'doctor_dashboard' %}" style="background:rgba(255,255,255,.15);color:#fff;padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;text-decoration:none;border:1px solid rgba(255,255,255,.3);">← Retour</a>
+        <span style="background:rgba(255,255,255,.2);padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;">📁 Dossier #{{ dossier.numero_dossier }}</span>
+        {% with patient.patient_profile as pp %}
+          {% if pp.groupe_sanguin %}<span style="background:rgba(239,68,68,.4);color:#fff;padding:4px 10px;border-radius:20px;font-size:.78rem;font-weight:700;">🩸 {{ pp.groupe_sanguin }}</span>{% endif %}
+        {% endwith %}
+      </div>
+      <h1>{{ patient.get_full_name|default:patient.username }}</h1>
+      <p>
+        {% with patient.patient_profile as pp %}
+          {% if pp.date_naissance %}Né(e) le {{ pp.date_naissance|date:"d M Y" }} &bull; {% endif %}
+        {% endwith %}
+        {% if patient.phone %}📞 {{ patient.phone }} &bull; {% endif %}
+        {% if patient.email %}✉ {{ patient.email }}{% endif %}
+      </p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-add" onclick="openModal('modal-add-obs')">📝 Observation</button>
+        <button class="btn-add" onclick="openModal('modal-add-presc')" style="background:#059669;">💊 Prescription</button>
+        <button class="btn-add" onclick="openAddExamenModal()" style="background:#7c3aed;">🩺 Examen</button>
+        <button class="btn-add" onclick="openPrescrireModal()" style="background:#ea580c;">🔬 Prescrire Analyse</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="switchTab('resume',this)">📋 Résumé</button>
+    <button class="tab-btn" onclick="switchTab('examens',this)">🩺 Examens ({{ examens.count }})</button>
+    <button class="tab-btn" onclick="switchTab('analyses',this)">🔬 Analyses ({{ resultats.count }})</button>
+    <button class="tab-btn" onclick="switchTab('prescriptions',this)">💊 Prescriptions ({{ prescriptions.count }})</button>
+    <button class="tab-btn" onclick="switchTab('observations',this)">📝 Observations ({{ observations.count }})</button>
+  </div>
+
+  <!-- ─── RÉSUMÉ ─── -->
+  <div id="tab-resume" class="tab-content active">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+      <div class="card">
+        <div class="card-title" style="margin-bottom:14px;">👤 Informations Personnelles</div>
+        {% with patient.patient_profile as pp %}
+          <div class="info-box"><div class="info-box-label">Date de naissance</div><div class="info-box-val">{{ pp.date_naissance|date:"d M Y"|default:"Non renseignée" }}</div></div>
+          <div class="info-box"><div class="info-box-label">Groupe sanguin</div><div class="info-box-val" style="color:#dc2626;font-weight:700;">{{ pp.groupe_sanguin|default:"Non renseigné" }}</div></div>
+          <div class="info-box"><div class="info-box-label">N° Sécurité Sociale</div><div class="info-box-val">{{ pp.numero_securite_sociale|default:"—" }}</div></div>
+          <div class="info-box"><div class="info-box-label">Contact urgence</div><div class="info-box-val">{{ pp.personne_contact|default:"—" }}</div></div>
+          {% if pp.antecedents %}
+            <div class="info-box" style="background:#fef3c7;"><div class="info-box-label" style="color:#b45309;">Antécédents & Allergies</div><div class="info-box-val" style="font-size:.82rem;">{{ pp.antecedents }}</div></div>
+          {% endif %}
+        {% endwith %}
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:14px;">📁 Dossier Médical</div>
+        {% if dossier.allergies %}
+          <div class="info-box" style="background:#fff7ed;border:1px solid #fed7aa;"><div class="info-box-label" style="color:#c2410c;">⚠️ Allergies</div><div class="info-box-val" style="font-size:.82rem;">{{ dossier.allergies }}</div></div>
+        {% endif %}
+        {% if dossier.antecedents_familiaux %}
+          <div class="info-box"><div class="info-box-label">Antécédents familiaux</div><div class="info-box-val" style="font-size:.82rem;">{{ dossier.antecedents_familiaux }}</div></div>
+        {% endif %}
+        {% if dossier.notes_generales %}
+          <div class="info-box"><div class="info-box-label">Notes générales</div><div class="info-box-val" style="font-size:.82rem;">{{ dossier.notes_generales }}</div></div>
+        {% endif %}
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+          <div style="background:#f0fdf4;padding:10px 14px;border-radius:10px;text-align:center;flex:1;min-width:80px;">
+            <div style="font-size:1.4rem;font-weight:800;color:#059669;">{{ examens.count }}</div>
+            <div style="font-size:.72rem;color:#64748b;">Examens</div>
+          </div>
+          <div style="background:#eff6ff;padding:10px 14px;border-radius:10px;text-align:center;flex:1;min-width:80px;">
+            <div style="font-size:1.4rem;font-weight:800;color:#3b82f6;">{{ resultats.count }}</div>
+            <div style="font-size:.72rem;color:#64748b;">Analyses</div>
+          </div>
+          <div style="background:#fef3c7;padding:10px 14px;border-radius:10px;text-align:center;flex:1;min-width:80px;">
+            <div style="font-size:1.4rem;font-weight:800;color:#f59e0b;">{{ prescriptions.count }}</div>
+            <div style="font-size:.72rem;color:#64748b;">Ordonnances</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── EXAMENS ─── -->
+  <div id="tab-examens" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🩺 Examens Médicaux</span>
+        <button class="btn-add" style="background:#7c3aed;" onclick="openAddExamenModal()">+ Ajouter</button>
+      </div>
+      {% if examens %}
+        <div style="overflow-x:auto;">
+          <table class="mt">
+            <thead><tr><th>Date</th><th>Intitulé</th><th>Type</th><th>Statut</th><th>Résultat</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody>
+              {% for ex in examens %}
+              <tr>
+                <td style="white-space:nowrap;color:#64748b;">{{ ex.date_examen|date:"d M Y" }}{% if ex.heure_examen %}<br><small>{{ ex.heure_examen|time:"H:i" }}</small>{% endif %}</td>
+                <td><strong>{{ ex.titre }}</strong></td>
+                <td>{{ ex.get_type_examen_display }}</td>
+                <td><span class="badge badge-{{ ex.statut|lower }}">{{ ex.get_statut_display }}</span></td>
+                <td style="font-size:.8rem;max-width:160px;color:#475569;">{{ ex.resultat|default:"—"|truncatechars:60 }}</td>
+                <td style="text-align:right;white-space:nowrap;">
+                  <button class="btn-edit" data-id="{{ ex.id }}" onclick="editExamen(this.dataset.id)">✏️</button>
+                  <button class="btn-del" data-url="{% url 'delete_examen' ex.id %}" onclick="confirmDelete(this.dataset.url,'Supprimer cet examen ?')">🗑</button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty-state"><div style="font-size:3rem;">🩺</div><p>Aucun examen enregistré pour ce patient.</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ─── ANALYSES ─── -->
+  <div id="tab-analyses" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🔬 Résultats & Analyses de Laboratoire</span>
+        <button class="btn-add" style="background:#ea580c;" onclick="openPrescrireModal()">+ Prescrire une analyse</button>
+      </div>
+
+      {% if resultats %}
+        <div style="overflow-x:auto;">
+          <table class="mt">
+            <thead>
+              <tr>
+                <th>Réf.</th>
+                <th>Analyse</th>
+                <th>Laboratoire Partenaire</th>
+                <th>Date Presc.</th>
+                <th>Priorité</th>
+                <th>Statut</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for res in resultats %}
+              <tr>
+                <td><strong style="color:#6d28d9;">[{{ res.reference }}]</strong></td>
+                <td>
+                  <strong>{{ res.type_analyse }}</strong>
+                  {% if res.statut == 'DISPONIBLE' or res.statut == 'TRANSMIS' %}
+                    <div style="font-size:.76rem;color:#16a34a;margin-top:2px;">
+                      📊 <em>{{ res.valeurs|truncatechars:45 }}</em>
+                    </div>
+                  {% endif %}
+                </td>
+                <td style="font-size:.82rem;">
+                  {% if res.laboratoire %}
+                    🏥 <strong>{{ res.laboratoire.lab_profile.nom_laboratoire|default:res.laboratoire.username }}</strong>
+                  {% else %}
+                    <span style="color:#94a3b8;">Non assigné</span>
+                  {% endif %}
+                </td>
+                <td style="white-space:nowrap;color:#64748b;">{{ res.date_prescription|date:"d M Y" }}</td>
+                <td><span class="badge badge-{{ res.priorite|lower }}">{{ res.get_priorite_display }}</span></td>
+                <td>
+                  {% if res.statut == 'EN_ATTENTE' %}
+                    <span class="badge badge-en_attente">⏳ En attente</span>
+                  {% elif res.statut == 'EN_COURS' %}
+                    <span class="badge badge-en_cours">🔄 En cours</span>
+                  {% elif res.statut == 'DISPONIBLE' or res.statut == 'TRANSMIS' %}
+                    <span class="badge badge-disponible">✓ Résultats disponibles</span>
+                  {% else %}
+                    <span class="badge badge-{{ res.statut|lower }}">{{ res.get_statut_display }}</span>
+                  {% endif %}
+                </td>
+                <td style="text-align:right;white-space:nowrap;">
+                  {% if res.statut == 'DISPONIBLE' or res.statut == 'TRANSMIS' or res.valeurs %}
+                    <button class="btn-edit" style="background:#dcfce7;color:#15803d;padding:4px 9px;"
+                      data-ref="{{ res.reference }}"
+                      data-type="{{ res.type_analyse }}"
+                      data-lab="{% if res.laboratoire %}{{ res.laboratoire.lab_profile.nom_laboratoire|default:res.laboratoire.username }}{% else %}—{% endif %}"
+                      data-date="{{ res.date_realisation|default:res.date_prescription|date:'d M Y' }}"
+                      data-valeurs="{{ res.valeurs|default:'' }}"
+                      data-interp="{{ res.interpretation|default:'' }}"
+                      data-statut="{{ res.get_statut_display }}"
+                      onclick="viewResultatFromBtn(this)">👁️ Résultats</button>
+                  {% endif %}
+                  <button class="btn-edit" data-id="{{ res.id }}" onclick="editResultat(this.dataset.id)">✏️</button>
+                  <button class="btn-del" data-url="{% url 'delete_resultat' res.id %}" onclick="confirmDelete(this.dataset.url,'Supprimer cette analyse ?')">🗑</button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty-state"><div style="font-size:3rem;">🔬</div><p>Aucune analyse prescrite pour ce patient.</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ─── PRESCRIPTIONS ─── -->
+  <div id="tab-prescriptions" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">💊 Prescriptions & Ordonnances</span>
+        <button class="btn-add" style="background:#059669;" onclick="openModal('modal-add-presc')">+ Ajouter</button>
+      </div>
+      {% if prescriptions %}
+        <div style="display:grid;gap:12px;">
+          {% for p in prescriptions %}
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap;">
+                <strong style="color:#0f172a;">💊 {{ p.medicament }}</strong>
+                <span class="badge badge-{{ p.statut|lower }}">{{ p.get_statut_display }}</span>
+              </div>
+              <div style="font-size:.83rem;color:#475569;">{{ p.posologie }}</div>
+              {% if p.instructions %}<div style="font-size:.8rem;color:#64748b;margin-top:2px;">{{ p.instructions }}</div>{% endif %}
+              <div style="font-size:.75rem;color:#94a3b8;margin-top:5px;">
+                {{ p.date_prescription|date:"d M Y" }}{% if p.date_fin %} → {{ p.date_fin|date:"d M Y" }}{% endif %}
+              </div>
+            </div>
+            <div style="display:flex;gap:5px;flex-shrink:0;">
+              <button class="btn-edit" data-id="{{ p.id }}" onclick="editPrescription(this.dataset.id)">✏️</button>
+              <button class="btn-del" data-url="{% url 'delete_prescription' p.id %}" onclick="confirmDelete(this.dataset.url,'Supprimer cette prescription ?')">🗑</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state"><div style="font-size:3rem;">💊</div><p>Aucune prescription enregistrée.</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ─── OBSERVATIONS ─── -->
+  <div id="tab-observations" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📝 Observations Médicales</span>
+        <button class="btn-add" onclick="openModal('modal-add-obs')">+ Ajouter</button>
+      </div>
+      {% if observations %}
+        <div style="display:grid;gap:12px;">
+          {% for obs in observations %}
+          <div style="background:#f8fafc;border-left:4px solid #1d4ed8;border-radius:0 12px 12px 0;padding:14px;display:flex;justify-content:space-between;gap:10px;">
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+                <strong style="color:#0f172a;">{{ obs.titre }}</strong>
+                {% if obs.confidentiel %}<span style="background:#fef3c7;color:#b45309;padding:2px 7px;border-radius:6px;font-size:.7rem;font-weight:700;">🔒 Confidentiel</span>{% endif %}
+                <span style="font-size:.75rem;color:#64748b;">{{ obs.date_observation|date:"d M Y" }}</span>
+              </div>
+              <p style="font-size:.85rem;color:#374151;line-height:1.6;margin:0;">{{ obs.contenu }}</p>
+            </div>
+            <div style="display:flex;gap:5px;flex-shrink:0;">
+              <button class="btn-edit" data-id="{{ obs.id }}" onclick="editObservation(this.dataset.id)">✏️</button>
+              <button class="btn-del" data-url="{% url 'delete_observation' obs.id %}" onclick="confirmDelete(this.dataset.url,'Supprimer cette observation ?')">🗑</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state"><div style="font-size:3rem;">📝</div><p>Aucune observation médicale enregistrée.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- MODALES CRUD -->
+<!-- ═══════════════════════════════════════════════════ -->
+
+<!-- MODAL ADD / EDIT EXAMEN -->
+<div class="modal-overlay" id="modal-add-exam" onclick="closeModalOnOverlay(event,'modal-add-exam')">
+  <div class="modal-box">
+    <div class="modal-header"><span class="modal-title" id="exam-modal-title">🩺 Ajouter un Examen</span><button class="modal-close" onclick="closeModal('modal-add-exam')">✕</button></div>
+    <div class="alert-success" id="exam-success">✓ Examen enregistré !</div>
+    <div class="alert-error" id="exam-error"></div>
+    <input type="hidden" id="exam-id" value="">
+    <div class="form-group"><label>Intitulé de l'examen *</label><input class="form-input" type="text" id="exam-titre" placeholder="ex: Radiographie thoracique"></div>
+    <div class="form-row2">
+      <div class="form-group"><label>Type</label><select class="form-select" id="exam-type">
+        <option value="CONSULTATION">Consultation</option>
+        <option value="RADIOLOGIE">Radiologie</option>
+        <option value="BIOLOGIE">Biologie</option>
+        <option value="ECHOGRAPHIE">Échographie</option>
+        <option value="AUTRE">Autre</option>
+      </select></div>
+      <div class="form-group"><label>Statut</label><select class="form-select" id="exam-statut">
+        <option value="PLANIFIE">Planifié</option>
+        <option value="EN_COURS">En cours</option>
+        <option value="TERMINE">Terminé</option>
+        <option value="ANNULE">Annulé</option>
+      </select></div>
+    </div>
+    <div class="form-row2">
+      <div class="form-group"><label>Date *</label><input class="form-input" type="date" id="exam-date"></div>
+      <div class="form-group">
+        <label>Heure du rendez-vous / examen</label>
+        <input class="form-input" type="text" id="exam-heure" placeholder="HH:MM (ex: 14:30)" maxlength="5" autocomplete="off">
+      </div>
+    </div>
+    <div class="form-group"><label>Description / Motif</label><textarea class="form-input" id="exam-desc" rows="2"></textarea></div>
+    <div class="form-group"><label>Résultat / Compte-rendu</label><textarea class="form-input" id="exam-resultat" rows="3"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modal-add-exam')">Annuler</button>
+      <button class="btn-save" onclick="submitExamen()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ADD / EDIT ANALYSE -->
+<div class="modal-overlay" id="modal-add-analyse" onclick="closeModalOnOverlay(event,'modal-add-analyse')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="analyse-modal-title">🔬 Prescrire une Analyse Biologique</span>
+      <button class="modal-close" onclick="closeModal('modal-add-analyse')">✕</button>
+    </div>
+    <div class="alert-success" id="analyse-success">✓ Analyse prescrite avec succès !</div>
+    <div class="alert-error" id="analyse-error"></div>
+
+    <input type="hidden" id="analyse-id" value="">
+    <div class="form-group">
+      <label>Type d'analyse demandée *</label>
+      <input class="form-input" type="text" id="analyse-type" placeholder="ex: NFS, Bilan lipidique, Glycémie à jeun, PCR...">
+    </div>
+    <div class="form-group">
+      <label>Laboratoire destinataire *</label>
+      <select class="form-select" id="analyse-labo" style="font-weight:600;border-color:#3b82f6;">
+        <option value="">— Choisir le laboratoire partenaire —</option>
+        {% for lab in labs %}
+          <option value="{{ lab.id }}">🏥 {% with lab.lab_profile as lp %}{{ lp.nom_laboratoire|default:lab.username }}{% endwith %}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-row2">
+      <div class="form-group"><label>Priorité</label><select class="form-select" id="analyse-priorite">
+        <option value="NORMALE">Normale</option>
+        <option value="HAUTE">Haute</option>
+        <option value="URGENTE">Urgente</option>
+      </select></div>
+      <div class="form-group"><label>Date de prescription</label><input class="form-input" type="date" id="analyse-date-presc"></div>
+    </div>
+    <input type="hidden" id="analyse-date-real" value="">
+    <div class="form-group" id="analyse-statut-group" style="display:none;">
+      <label>Statut</label>
+      <select class="form-select" id="analyse-statut">
+        <option value="EN_ATTENTE">⏳ En attente</option>
+        <option value="EN_COURS">🔄 En cours d'analyse</option>
+        <option value="DISPONIBLE">✓ Résultats disponibles</option>
+        <option value="TRANSMIS">📤 Transmis</option>
+      </select>
+    </div>
+    <div id="analyse-result-fields" style="display:none;background:#f8fafc;padding:12px;border-radius:10px;border:1px dashed #cbd5e1;margin-top:10px;">
+      <div style="font-size:.78rem;font-weight:700;color:#6d28d9;margin-bottom:6px;">📊 Résultats saisis par le laboratoire</div>
+      <div class="form-group"><label>Valeurs & Résultats mesurés</label><textarea class="form-input" id="analyse-valeurs" rows="2" placeholder="Valeurs mesurées..."></textarea></div>
+      <div class="form-group"><label>Interprétation clinique</label><textarea class="form-input" id="analyse-interp" rows="2" placeholder="Interprétation clinique..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modal-add-analyse')">Annuler</button>
+      <button class="btn-save" style="background:#ea580c;" onclick="submitAnalyse()">✓ Enregistrer la Prescription</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VIEW RESULTAT LABO -->
+<div class="modal-overlay" id="modal-view-resultat" onclick="closeModalOnOverlay(event,'modal-view-resultat')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">📊 Compte-Rendu d'Analyse Biologique</span>
+      <button class="modal-close" onclick="closeModal('modal-view-resultat')">✕</button>
+    </div>
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span id="vr-ref" style="font-weight:800;color:#15803d;font-size:.9rem;"></span>
+        <span id="vr-statut" class="badge badge-disponible">✓ Résultats disponibles</span>
+      </div>
+      <h3 id="vr-type" style="font-size:1.1rem;font-weight:700;color:#0f172a;margin-bottom:4px;"></h3>
+      <div style="font-size:.82rem;color:#475569;">
+        Laboratoire : <strong id="vr-lab"></strong> &bull; Date : <span id="vr-date"></span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label style="font-weight:700;color:#0f172a;">📊 Valeurs & Données Mesurées :</label>
+      <div id="vr-valeurs" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:12px;font-size:.88rem;color:#1e293b;white-space:pre-wrap;min-height:50px;"></div>
+    </div>
+
+    <div class="form-group">
+      <label style="font-weight:700;color:#0f172a;">🧬 Interprétation Clinique du Biologiste :</label>
+      <div id="vr-interp" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:12px;font-size:.88rem;color:#1e293b;white-space:pre-wrap;min-height:40px;"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modal-view-resultat')">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ADD / EDIT PRESCRIPTION -->
+<div class="modal-overlay" id="modal-add-presc" onclick="closeModalOnOverlay(event,'modal-add-presc')">
+  <div class="modal-box">
+    <div class="modal-header"><span class="modal-title" id="presc-modal-title">💊 Nouvelle Prescription</span><button class="modal-close" onclick="closeModal('modal-add-presc')">✕</button></div>
+    <div class="alert-success" id="presc-success">✓ Prescription enregistrée !</div>
+    <div class="alert-error" id="presc-error"></div>
+    <input type="hidden" id="presc-id" value="">
+    <div class="form-group"><label>Médicament / Traitement *</label><input class="form-input" type="text" id="presc-med" placeholder="ex: Amoxicilline 500mg"></div>
+    <div class="form-group"><label>Posologie & Durée *</label><input class="form-input" type="text" id="presc-pos" placeholder="ex: 3 fois/jour pendant 7 jours"></div>
+    <div class="form-group"><label>Instructions particulières</label><textarea class="form-input" id="presc-inst" rows="2" placeholder="Prendre après les repas..."></textarea></div>
+    <div class="form-row2">
+      <div class="form-group"><label>Date de prescription</label><input class="form-input" type="date" id="presc-date"></div>
+      <div class="form-group"><label>Date de fin</label><input class="form-input" type="date" id="presc-fin"></div>
+    </div>
+    <div class="form-group"><label>Statut</label><select class="form-select" id="presc-statut">
+      <option value="ACTIVE">Active</option>
+      <option value="TERMINEE">Terminée</option>
+      <option value="ANNULEE">Annulée</option>
+    </select></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modal-add-presc')">Annuler</button>
+      <button class="btn-save" style="background:#059669;" onclick="submitPrescription()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ADD / EDIT OBSERVATION -->
+<div class="modal-overlay" id="modal-add-obs" onclick="closeModalOnOverlay(event,'modal-add-obs')">
+  <div class="modal-box">
+    <div class="modal-header"><span class="modal-title" id="obs-modal-title">📝 Nouvelle Observation</span><button class="modal-close" onclick="closeModal('modal-add-obs')">✕</button></div>
+    <div class="alert-success" id="obs-success">✓ Observation enregistrée !</div>
+    <div class="alert-error" id="obs-error"></div>
+    <input type="hidden" id="obs-id" value="">
+    <div class="form-group"><label>Titre *</label><input class="form-input" type="text" id="obs-titre" placeholder="ex: Contrôle tension artérielle"></div>
+    <div class="form-group"><label>Observation médicale *</label><textarea class="form-input" id="obs-contenu" rows="4" placeholder="Détails cliniques..."></textarea></div>
+    <div class="form-row2">
+      <div class="form-group"><label>Date</label><input class="form-input" type="date" id="obs-date"></div>
+      <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:2px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.85rem;color:#374151;">
+          <input type="checkbox" id="obs-conf" style="width:16px;height:16px;"> Confidentiel
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modal-add-obs')">Annuler</button>
+      <button class="btn-save" onclick="submitObservation()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRM DELETE -->
+<div class="modal-overlay" id="modal-confirm-delete" onclick="closeModalOnOverlay(event,'modal-confirm-delete')">
+  <div style="display:flex;align-items:center;justify-content:center;width:100%;">
+    <div class="confirm-modal">
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:2.5rem;">⚠️</div>
+        <h3 style="font-size:1rem;font-weight:700;color:#0f172a;margin:8px 0 4px;" id="confirm-msg">Confirmer la suppression</h3>
+        <p style="font-size:.85rem;color:#64748b;">Cette action est irréversible.</p>
+      </div>
+      <form id="confirm-delete-form" method="post">
+        {% csrf_token %}
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button type="button" class="btn-cancel" onclick="closeModal('modal-confirm-delete')">Annuler</button>
+          <button type="submit" class="btn-save" style="background:#dc2626;">🗑 Supprimer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+const PATIENT_ID = parseInt("{{ patient.id }}", 10);
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeModalOnOverlay(e, id) { if(e.target.classList.contains('modal-overlay')) closeModal(id); }
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+function showAlert(successId, errorId, ok, msg) {
+  const s = document.getElementById(successId);
+  const e = document.getElementById(errorId);
+  if(ok) { s.style.display='block'; e.style.display='none'; }
+  else { e.textContent=msg; e.style.display='block'; s.style.display='none'; }
+  setTimeout(() => { s.style.display='none'; e.style.display='none'; }, 3000);
+}
+
+function today() { return new Date().toISOString().split('T')[0]; }
+
+// ── CONFIRM DELETE ──────────────────────────────
+function confirmDelete(url, msg) {
+  document.getElementById('confirm-msg').textContent = msg;
+  document.getElementById('confirm-delete-form').action = url;
+  openModal('modal-confirm-delete');
+}
+
+// ── EXAMEN ──────────────────────────────────────
+function openAddExamenModal() {
+  document.getElementById('exam-id').value = '';
+  document.getElementById('exam-modal-title').textContent = '🩺 Ajouter un Examen';
+  document.getElementById('exam-titre').value = '';
+  document.getElementById('exam-type').value = 'CONSULTATION';
+  document.getElementById('exam-statut').value = 'PLANIFIE';
+  document.getElementById('exam-date').value = today();
+  document.getElementById('exam-heure').value = '';
+  document.getElementById('exam-desc').value = '';
+  document.getElementById('exam-resultat').value = '';
+  openModal('modal-add-exam');
+}
+
+async function editExamen(id) {
+  const data = await (await fetch(`/api/examen/${id}/`)).json();
+  document.getElementById('exam-id').value = id;
+  document.getElementById('exam-modal-title').textContent = '✏️ Modifier l\'Examen';
+  document.getElementById('exam-titre').value = data.titre || '';
+  document.getElementById('exam-type').value = data.type_examen || 'CONSULTATION';
+  document.getElementById('exam-statut').value = data.statut || 'PLANIFIE';
+  document.getElementById('exam-date').value = data.date_examen || '';
+  document.getElementById('exam-heure').value = data.heure_examen || '';
+  document.getElementById('exam-desc').value = data.description || '';
+  document.getElementById('exam-resultat').value = data.resultat || '';
+  openModal('modal-add-exam');
+}
+
+async function submitExamen() {
+  const id = document.getElementById('exam-id').value;
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('titre', document.getElementById('exam-titre').value);
+  fd.append('type_examen', document.getElementById('exam-type').value);
+  fd.append('statut', document.getElementById('exam-statut').value);
+  fd.append('date_examen', document.getElementById('exam-date').value);
+  let heureVal = (document.getElementById('exam-heure').value || '').trim().replace('h', ':').replace('H', ':');
+  fd.append('heure_examen', heureVal);
+  fd.append('description', document.getElementById('exam-desc').value);
+  fd.append('resultat', document.getElementById('exam-resultat').value);
+
+  const url = id ? `/docteur/examen/${id}/edit/` : `/docteur/patient/${PATIENT_ID}/examen/add/`;
+  const res = await fetch(url, {method:'POST', body:fd});
+  const data = await res.json();
+  showAlert('exam-success','exam-error', data.success, data.errors ? JSON.stringify(data.errors) : 'Erreur');
+  if(data.success) setTimeout(() => { closeModal('modal-add-exam'); location.reload(); }, 900);
+}
+
+// ── ANALYSE ──────────────────────────────────────
+function openPrescrireModal() {
+  document.getElementById('analyse-id').value = '';
+  document.getElementById('analyse-modal-title').textContent = '🔬 Prescrire une Analyse Biologique';
+  document.getElementById('analyse-type').value = '';
+  document.getElementById('analyse-priorite').value = 'NORMALE';
+  document.getElementById('analyse-statut').value = 'EN_ATTENTE';
+  document.getElementById('analyse-date-presc').value = today();
+  document.getElementById('analyse-labo').value = '';
+  document.getElementById('analyse-valeurs').value = '';
+  document.getElementById('analyse-interp').value = '';
+  document.getElementById('analyse-statut-group').style.display = 'none';
+  document.getElementById('analyse-result-fields').style.display = 'none';
+  openModal('modal-add-analyse');
+}
+
+function viewResultatFromBtn(btn) {
+  document.getElementById('vr-ref').textContent = btn.getAttribute('data-ref');
+  document.getElementById('vr-type').textContent = btn.getAttribute('data-type');
+  document.getElementById('vr-lab').textContent = btn.getAttribute('data-lab');
+  document.getElementById('vr-date').textContent = btn.getAttribute('data-date');
+  document.getElementById('vr-statut').textContent = btn.getAttribute('data-statut');
+  document.getElementById('vr-valeurs').textContent = btn.getAttribute('data-valeurs') || 'Aucune valeur chiffrée renseignée pour le moment.';
+  document.getElementById('vr-interp').textContent = btn.getAttribute('data-interp') || 'Aucune interprétation clinique pour le moment.';
+  openModal('modal-view-resultat');
+}
+
+async function editResultat(id) {
+  const data = await (await fetch(`/api/resultat/${id}/`)).json();
+  document.getElementById('analyse-id').value = id;
+  document.getElementById('analyse-modal-title').textContent = '✏️ Modifier l\'Analyse [' + data.reference + ']';
+  document.getElementById('analyse-type').value = data.type_analyse;
+  document.getElementById('analyse-priorite').value = data.priorite;
+  document.getElementById('analyse-statut').value = data.statut;
+  document.getElementById('analyse-date-presc').value = data.date_prescription;
+  document.getElementById('analyse-date-real').value = data.date_realisation;
+  document.getElementById('analyse-labo').value = data.laboratoire_id;
+  document.getElementById('analyse-valeurs').value = data.valeurs;
+  document.getElementById('analyse-interp').value = data.interpretation;
+  document.getElementById('analyse-statut-group').style.display = 'block';
+  document.getElementById('analyse-result-fields').style.display = 'block';
+  openModal('modal-add-analyse');
+}
+
+async function submitAnalyse() {
+  const id = document.getElementById('analyse-id').value;
+  const labId = document.getElementById('analyse-labo').value;
+  if (!labId && !id) {
+    showAlert('analyse-success','analyse-error', false, 'Veuillez sélectionner un laboratoire destinataire.');
+    return;
+  }
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('type_analyse', document.getElementById('analyse-type').value);
+  fd.append('priorite', document.getElementById('analyse-priorite').value);
+  fd.append('statut', document.getElementById('analyse-statut').value || 'EN_ATTENTE');
+  fd.append('date_prescription', document.getElementById('analyse-date-presc').value || today());
+  fd.append('date_realisation', document.getElementById('analyse-date-real').value);
+  fd.append('laboratoire', labId);
+  fd.append('valeurs', document.getElementById('analyse-valeurs').value);
+  fd.append('interpretation', document.getElementById('analyse-interp').value);
+
+  const url = id ? `/docteur/resultat/${id}/edit/` : `/docteur/patient/${PATIENT_ID}/resultat/add/`;
+  const res = await fetch(url, {method:'POST', body:fd});
+  const data = await res.json();
+  showAlert('analyse-success','analyse-error', data.success, data.errors ? JSON.stringify(data.errors) : 'Erreur');
+  if(data.success) setTimeout(() => { closeModal('modal-add-analyse'); location.reload(); }, 900);
+}
+
+// ── PRESCRIPTION ─────────────────────────────────
+async function editPrescription(id) {
+  const data = await (await fetch(`/api/prescription/${id}/`)).json();
+  document.getElementById('presc-id').value = id;
+  document.getElementById('presc-modal-title').textContent = '✏️ Modifier la Prescription';
+  document.getElementById('presc-med').value = data.medicament;
+  document.getElementById('presc-pos').value = data.posologie;
+  document.getElementById('presc-inst').value = data.instructions;
+  document.getElementById('presc-date').value = data.date_prescription;
+  document.getElementById('presc-fin').value = data.date_fin;
+  document.getElementById('presc-statut').value = data.statut;
+  openModal('modal-add-presc');
+}
+
+async function submitPrescription() {
+  const id = document.getElementById('presc-id').value;
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('medicament', document.getElementById('presc-med').value);
+  fd.append('posologie', document.getElementById('presc-pos').value);
+  fd.append('instructions', document.getElementById('presc-inst').value);
+  fd.append('date_prescription', document.getElementById('presc-date').value || today());
+  fd.append('date_fin', document.getElementById('presc-fin').value);
+  fd.append('statut', document.getElementById('presc-statut').value);
+
+  const url = id ? `/docteur/prescription/${id}/edit/` : `/docteur/patient/${PATIENT_ID}/prescription/add/`;
+  const res = await fetch(url, {method:'POST', body:fd});
+  const data = await res.json();
+  showAlert('presc-success','presc-error', data.success, data.errors ? JSON.stringify(data.errors) : 'Erreur');
+  if(data.success) setTimeout(() => { closeModal('modal-add-presc'); location.reload(); }, 900);
+}
+
+// ── OBSERVATION ──────────────────────────────────
+async function editObservation(id) {
+  const data = await (await fetch(`/api/observation/${id}/`)).json();
+  document.getElementById('obs-id').value = id;
+  document.getElementById('obs-modal-title').textContent = '✏️ Modifier l\'Observation';
+  document.getElementById('obs-titre').value = data.titre;
+  document.getElementById('obs-contenu').value = data.contenu;
+  document.getElementById('obs-date').value = data.date_observation;
+  document.getElementById('obs-conf').checked = data.confidentiel;
+  openModal('modal-add-obs');
+}
+
+async function submitObservation() {
+  const id = document.getElementById('obs-id').value;
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('titre', document.getElementById('obs-titre').value);
+  fd.append('contenu', document.getElementById('obs-contenu').value);
+  fd.append('date_observation', document.getElementById('obs-date').value || today());
+  if(document.getElementById('obs-conf').checked) fd.append('confidentiel', 'on');
+
+  const url = id ? `/docteur/observation/${id}/edit/` : `/docteur/patient/${PATIENT_ID}/observation/add/`;
+  const res = await fetch(url, {method:'POST', body:fd});
+  const data = await res.json();
+  showAlert('obs-success','obs-error', data.success, data.errors ? JSON.stringify(data.errors) : 'Erreur');
+  if(data.success) setTimeout(() => { closeModal('modal-add-obs'); location.reload(); }, 900);
+}
+
+// Init dates
+document.getElementById('exam-date').value = today();
+document.getElementById('analyse-date-presc').value = today();
+document.getElementById('presc-date').value = today();
+document.getElementById('obs-date').value = today();
+</script>
+{% endblock %}
+{% endblock %}
