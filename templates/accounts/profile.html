@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+
+{% block title %}Mon Profil Utilisateur - SantéConnect{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 720px; margin-top: 20px;">
+    <div class="glass-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+            <div>
+                <span class="badge-role {{ user.role }}" style="margin-bottom: 6px;">{{ user.get_role_display }}</span>
+                <h2 style="font-size: 1.6rem;">Mon Profil & Informations</h2>
+                <p style="color: var(--text-muted); font-size: 0.875rem;">Mettez à jour vos coordonnées et paramètres professionnels</p>
+            </div>
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary btn-sm">← Retour au Tableau de bord</a>
+        </div>
+
+        <form method="post" action="{% url 'profile' %}">
+            {% csrf_token %}
+
+            <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: #0f172a;">👤 Informations Personnelles</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Prénom</label>
+                    {{ user_form.first_name }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nom</label>
+                    {{ user_form.last_name }}
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Adresse Email</label>
+                    {{ user_form.email }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Numéro de Téléphone</label>
+                    {{ user_form.phone }}
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Ville</label>
+                    {{ user_form.city }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Adresse Postale</label>
+                    {{ user_form.address }}
+                </div>
+            </div>
+
+            <!-- Role Specific Fields -->
+            {% if role_form %}
+                <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                    {% if user.is_doctor %}
+                        <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--doctor-color);">🩺 Paramètres d'Exercice Médical</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div class="form-group">
+                                <label class="form-label">Spécialité Médicale</label>
+                                {{ role_form.specialite }}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Numéro d'Ordre</label>
+                                {{ role_form.numero_ordre }}
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div class="form-group">
+                                <label class="form-label">Nom du Cabinet / Clinique</label>
+                                {{ role_form.cabinet_name }}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Horaires de Consultation</label>
+                                {{ role_form.horaires }}
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Biographie / Présentation</label>
+                            {{ role_form.biographie }}
+                        </div>
+
+                    {% elif user.is_laboratory %}
+                        <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--lab-color);">🔬 Informations du Laboratoire</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div class="form-group">
+                                <label class="form-label">Nom de l'Établissement</label>
+                                {{ role_form.nom_laboratoire }}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Numéro d'Agrément</label>
+                                {{ role_form.numero_agrement }}
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Biologiste Responsable</label>
+                            {{ role_form.responsable }}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Analyses & Examens Pris en Charge</label>
+                            {{ role_form.services_offerts }}
+                        </div>
+
+                    {% elif user.is_patient %}
+                        <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--patient-color);">🩸 Dossier Médical & Urgences</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div class="form-group">
+                                <label class="form-label">Date de Naissance</label>
+                                {{ role_form.date_naissance }}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Groupe Sanguin</label>
+                                {{ role_form.groupe_sanguin }}
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div class="form-group">
+                                <label class="form-label">N° Sécurité Sociale / CIN</label>
+                                {{ role_form.numero_securite_sociale }}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Personne à Contacter en Cas d'Urgence</label>
+                                {{ role_form.personne_contact }}
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Antécédents Médicaux / Allergies Connnues</label>
+                            {{ role_form.antecedents }}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <div style="margin-top: 24px;">
+                <button type="submit" class="btn btn-primary" style="width: 100%;" id="btn-save-profile">
+                    Enregistrer les Modifications
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

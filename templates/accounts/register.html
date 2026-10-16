@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+
+{% block title %}Création de Compte - SantéConnect{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 680px; margin-top: 20px;">
+    <div class="glass-card">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div class="logo-icon" style="margin: 0 auto 14px; width: 44px; height: 44px; font-size: 1.35rem;">📝</div>
+            <h2 style="font-size: 1.75rem; margin-bottom: 6px;">Inscription sur SantéConnect</h2>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Choisissez votre statut et remplissez les informations correspondantes
+            </p>
+        </div>
+
+        <!-- Role Selector Tabs -->
+        <div style="display: flex; gap: 8px; margin-bottom: 24px; background: #f1f5f9; padding: 4px; border-radius: 12px;" id="role-tabs-container">
+            <button type="button" class="btn" style="flex: 1; font-size: 0.875rem;" id="tab-patient" onclick="switchRole('PATIENT')">
+                👤 Patient
+            </button>
+            <button type="button" class="btn" style="flex: 1; font-size: 0.875rem;" id="tab-docteur" onclick="switchRole('DOCTEUR')">
+                🩺 Docteur
+            </button>
+            <button type="button" class="btn" style="flex: 1; font-size: 0.875rem;" id="tab-laboratoire" onclick="switchRole('LABORATOIRE')">
+                🔬 Laboratoire
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'register' %}" id="register-form">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-error">
+                    {% for error in form.non_field_errors %}
+                        <span>{{ error }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <!-- Hidden / Synced Role Selector Field -->
+            <div style="display: none;">
+                {{ form.role }}
+            </div>
+
+            <!-- Base Account Credentials -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Nom d'utilisateur *</label>
+                    {{ form.username }}
+                    {% if form.username.errors %}<div class="form-error">{{ form.username.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email professionnel / personnel *</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}<div class="form-error">{{ form.email.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Prénom</label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}<div class="form-error">{{ form.first_name.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nom de famille</label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}<div class="form-error">{{ form.last_name.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Numéro de téléphone</label>
+                    {{ form.phone }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ville</label>
+                    {{ form.city }}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Adresse postale</label>
+                {{ form.address }}
+            </div>
+
+            <!-- Section Spécifique Docteur -->
+            <div id="section-doctor" style="display: none; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+                <h4 style="color: #166534; margin-bottom: 12px; font-size: 0.95rem;">🩺 Informations Médicales</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Spécialité Médicale</label>
+                        {{ form.specialite }}
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">N° d'Ordre des Médecins</label>
+                        {{ form.numero_ordre }}
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
+                    <label class="form-label">Nom du Cabinet / Clinique</label>
+                    {{ form.cabinet_name }}
+                </div>
+            </div>
+
+            <!-- Section Spécifique Laboratoire -->
+            <div id="section-lab" style="display: none; background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+                <h4 style="color: #6b21a8; margin-bottom: 12px; font-size: 0.95rem;">🔬 Informations de l'Établissement Biologique</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Nom du Laboratoire</label>
+                        {{ form.nom_laboratoire }}
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Numéro d'agrément officiel</label>
+                        {{ form.numero_agrement }}
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
+                    <label class="form-label">Biologiste / Responsable Légal</label>
+                    {{ form.responsable }}
+                </div>
+            </div>
+
+            <!-- Section Spécifique Patient -->
+            <div id="section-patient" style="display: block; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+                <h4 style="color: #075985; margin-bottom: 12px; font-size: 0.95rem;">👤 Informations Médicales de Base</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Date de naissance</label>
+                        {{ form.date_naissance }}
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Groupe Sanguin</label>
+                        {{ form.groupe_sanguin }}
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
+                    <label class="form-label">N° de Sécurité Sociale / CIN</label>
+                    {{ form.numero_securite_sociale }}
+                </div>
+            </div>
+
+            <!-- Password Fields -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px;">
+                <div class="form-group">
+                    <label class="form-label">Mot de passe *</label>
+                    {{ form.password }}
+                    {% if form.password.errors %}<div class="form-error">{{ form.password.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Confirmation *</label>
+                    {{ form.password_confirm }}
+                    {% if form.password_confirm.errors %}<div class="form-error">{{ form.password_confirm.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;" id="btn-submit-register">
+                Valider et Créer mon Compte →
+            </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-color); font-size: 0.9rem;">
+            <p style="color: var(--text-muted);">
+                Vous avez déjà un compte ?
+                <a href="{% url 'login' %}" style="font-weight: 600;" id="link-to-login">Connectez-vous</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function switchRole(role) {
+        const select = document.getElementById('role-selector');
+        if (select) select.value = role;
+
+        const secDoc = document.getElementById('section-doctor');
+        const secLab = document.getElementById('section-lab');
+        const secPat = document.getElementById('section-patient');
+
+        const tabDoc = document.getElementById('tab-docteur');
+        const tabLab = document.getElementById('tab-laboratoire');
+        const tabPat = document.getElementById('tab-patient');
+
+        // Reset tabs style
+        [tabDoc, tabLab, tabPat].forEach(t => {
+            t.className = 'btn';
+            t.style.background = 'transparent';
+            t.style.color = '#475569';
+        });
+
+        secDoc.style.display = 'none';
+        secLab.style.display = 'none';
+        secPat.style.display = 'none';
+
+        if (role === 'DOCTEUR') {
+            secDoc.style.display = 'block';
+            tabDoc.className = 'btn btn-success';
+        } else if (role === 'LABORATOIRE') {
+            secLab.style.display = 'block';
+            tabLab.className = 'btn btn-primary';
+            tabLab.style.background = 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)';
+        } else {
+            secPat.style.display = 'block';
+            tabPat.className = 'btn btn-primary';
+        }
+    }
+
+    // Initialize with role from URL param or default
+    document.addEventListener('DOMContentLoaded', function() {
+        const initialRole = "{{ default_role|default:'PATIENT' }}";
+        switchRole(initialRole);
+    });
+</script>
+{% endblock %}

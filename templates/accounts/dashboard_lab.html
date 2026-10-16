@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block title %}Espace Laboratoire - {{ profile.nom_laboratoire }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header Banner -->
+    <div class="glass-card" style="padding: 24px; margin-bottom: 28px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(245, 243, 255, 0.8) 100%); border-left: 6px solid var(--lab-color);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <span class="badge-role LABORATOIRE">🔬 Pôle Analyses & Biologie Médicale</span>
+                    {% if user.is_verified %}
+                        <span class="status-pill verified">✓ Agrément Officiel Validé par l'Admin</span>
+                    {% else %}
+                        <span class="status-pill pending">⏳ Agrément en cours de vérification par l'Admin</span>
+                    {% endif %}
+                </div>
+                <h1 style="font-size: 1.85rem; color: #4c1d95;">
+                    {{ profile.nom_laboratoire }}
+                </h1>
+                <p style="color: #6d28d9; font-size: 0.95rem; margin-top: 4px;">
+                    Responsable : <strong>{{ profile.responsable|default:user.get_full_name|default:user.username }}</strong> 
+                    {% if profile.numero_agrement %}• N° Agrément : {{ profile.numero_agrement }}{% endif %}
+                    {% if user.city %}• Ville : {{ user.city }}{% endif %}
+                </p>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <a href="{% url 'profile' %}" class="btn btn-secondary btn-sm" id="btn-lab-edit-profile">
+                    ⚙️ Paramètres Laboratoire
+                </a>
+                <button type="button" class="btn btn-primary btn-sm" style="background: var(--lab-color);" onclick="alert('Nouveau prélèvement enregistré !')" id="btn-lab-new-sample">
+                    + Enregistrer Prélèvement
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Laboratory KPIs -->
+    <div class="stats-row">
+        <div class="stat-widget">
+            <div class="stat-info">
+                <h4>Analyses Reçues Aujourd'hui</h4>
+                <div class="stat-number" style="color: var(--lab-color);">{{ stats.analyses_today }}</div>
+            </div>
+            <div class="stat-icon" style="color: var(--lab-color); background: var(--lab-bg);">🧪</div>
+        </div>
+        <div class="stat-widget">
+            <div class="stat-info">
+                <h4>En Cours de Traitement</h4>
+                <div class="stat-number" style="color: #d97706;">{{ stats.in_progress }}</div>
+            </div>
+            <div class="stat-icon" style="color: #d97706; background: #fef3c7;">⏳</div>
+        </div>
+        <div class="stat-widget">
+            <div class="stat-info">
+                <h4>Résultats Validés & Transmis</h4>
+                <div class="stat-number" style="color: var(--doctor-color);">{{ stats.completed }}</div>
+            </div>
+            <div class="stat-icon" style="color: var(--doctor-color); background: var(--doctor-bg);">✓</div>
+        </div>
+        <div class="stat-widget">
+            <div class="stat-info">
+                <h4>Médecins Prescripteurs</h4>
+                <div class="stat-number">{{ stats.active_doctors }}</div>
+            </div>
+            <div class="stat-icon" style="color: var(--primary); background: var(--primary-light);">👨‍⚕️</div>
+        </div>
+    </div>
+
+    <!-- Analyses Queue -->
+    <div class="glass-card" style="padding: 24px; margin-top: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <h3 style="font-size: 1.25rem; color: #0f172a;">File d'attente des Analyses & Échantillons Biologiques</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem;">Examens en attente de validation ou transmission au médecin prescripteur</p>
+            </div>
+            <span style="font-size: 0.8rem; background: #ede9fe; color: #6d28d9; padding: 4px 10px; border-radius: 6px; font-weight: 600;">
+                Flux en direct
+            </span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Réf. Échantillon</th>
+                        <th>Patient</th>
+                        <th>Médecin Prescripteur</th>
+                        <th>Type d'Examen Biologique</th>
+                        <th>Degré d'Urgence</th>
+                        <th>Statut</th>
+                        <th style="text-align: right;">Action Biologiste</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in pending_analyses %}
+                        <tr>
+                            <td><strong style="color: var(--lab-color);">{{ item.id }}</strong></td>
+                            <td><strong>{{ item.patient }}</strong></td>
+                            <td style="color: var(--doctor-color); font-weight: 500;">{{ item.medecin }}</td>
+                            <td>{{ item.type }}</td>
+                            <td>
+                                {% if item.priorite == 'Urgente' %}
+                                    <span style="background: #fee2e2; color: #dc2626; font-weight: 700; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">⚡ Urgente</span>
+                                {% elif item.priorite == 'Haute' %}
+                                    <span style="background: #ffedd5; color: #ea580c; font-weight: 600; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">Haute</span>
+                                {% else %}
+                                    <span style="background: #f1f5f9; color: #475569; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">Normale</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.statut == 'Prêt à envoyer' %}
+                                    <span style="color: #059669; font-weight: 600; font-size: 0.85rem;">✓ {{ item.statut }}</span>
+                                {% elif item.statut == 'En cours' %}
+                                    <span style="color: #0284c7; font-weight: 600; font-size: 0.85rem;">⏳ {{ item.statut }}</span>
+                                {% else %}
+                                    <span style="color: #d97706; font-weight: 600; font-size: 0.85rem;">● {{ item.statut }}</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: right;">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="alert('Formulaire de saisie des valeurs de laboratoire pour {{ item.id }}')">
+                                    Saisir Résultats
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

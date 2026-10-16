@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}Espace Médecin - Dr. {{ user.last_name|default:user.username }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header Banner -->
+    <div class="glass-card" style="padding: 24px; margin-bottom: 28px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(236, 253, 245, 0.8) 100%); border-left: 6px solid var(--doctor-color);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <span class="badge-role DOCTEUR">🩺 Espace Praticien</span>
+                    {% if user.is_verified %}
+                        <span class="status-pill verified">✓ Habilité & Certifié par l'Admin</span>
+                    {% else %}
+                        <span class="status-pill pending">⏳ Agrément en cours de vérification par l'Admin</span>
+                    {% endif %}
+                </div>
+                <h1 style="font-size: 1.85rem; color: #064e3b;">
+                    Bienvenue, Dr. {{ user.get_full_name|default:user.username }}
+                </h1>
+                <p style="color: #047857; font-size: 0.95rem; margin-top: 4px;">
+                    Spécialité : <strong>{{ profile.specialite }}</strong> 
+                    {% if profile.numero_ordre %}• N° Ordre : {{ profile.numero_ordre }}{% endif %}
+                    {% if profile.cabinet_name %}• {{ profile.cabinet_name }}{% endif %}
+                </p>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <a href="{% url 'profile' %}" class="btn btn-secondary btn-sm" id="btn-doc-edit-profile">
+                    ⚙️ Modifier mon profil & horaires
+                </a>
+                <button type="button" class="btn btn-success btn-sm" onclick="alert('Module de prescription ouvert !')" id="btn-doc-new-prescription">
+                    + Nouvelle Ordonnance
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Doctor KPIs -->
+    <div class="stats-row">
+        <div class="stat-widget">
+            <div class="stat-info">
+                <h4>Consultations Aujourd'hui</h4>
+                <div class="stat-number" style="color: var(--doctor-color);">{{ stats.consultations_today }}</div>
+            </div>
+            <div class="stat-icon" style="color: var(--doctor-color); background: var(--doctor-bg);">📅</div>
+        </div>
+        <div class="stat-widget">
+            <div class="stat-info">
+                <h4>Patients Suivis</h4>
+                <div class="stat-number">{{ stats.patients_count }}</div>
+            </div>
+            <div class="stat-icon" style="color: var(--patient-color); background: var(--patient-bg);">👥</div>
+        </div>
+        <div class="stat-widget">
+            <div class="stat-info">
+                <h4>Analyses Labo Demandées</h4>
+                <div class="stat-number" style="color: #7c3aed;">{{ stats.analyses_pending }}</div>
+            </div>
+            <div class="stat-icon" style="color: #7c3aed; background: #f5f3ff;">🧪</div>
+        </div>
+        <div class="stat-widget">
+            <div class="stat-info">
+                <h4>Ordonnances du Mois</h4>
+                <div class="stat-number">{{ stats.prescriptions_month }}</div>
+            </div>
+            <div class="stat-icon" style="color: #0284c7; background: #f0f9ff;">💊</div>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px; margin-top: 24px;">
+        <!-- Consultations du Jour -->
+        <div class="glass-card" style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                <h3 style="font-size: 1.15rem; color: #0f172a;">📋 Rendez-vous & Consultations du Jour</h3>
+                <span style="font-size: 0.8rem; background: #ecfdf5; color: #065f46; padding: 3px 8px; border-radius: 6px; font-weight: 600;">
+                    Aujourd'hui
+                </span>
+            </div>
+
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Heure</th>
+                            <th>Patient</th>
+                            <th>Motif</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in recent_patients %}
+                            <tr>
+                                <td><strong>{{ item.heure }}</strong></td>
+                                <td>{{ item.nom }}</td>
+                                <td style="color: var(--text-muted);">{{ item.motif }}</td>
+                                <td>
+                                    {% if item.statut == 'Terminé' %}
+                                        <span style="color: #059669; font-weight: 600; font-size: 0.8rem;">✓ {{ item.statut }}</span>
+                                    {% elif item.statut == 'En cours' %}
+                                        <span style="color: #0284c7; font-weight: 600; font-size: 0.8rem;">● {{ item.statut }}</span>
+                                    {% else %}
+                                        <span style="color: #d97706; font-weight: 600; font-size: 0.8rem;">⏳ {{ item.statut }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Demandes d'Analyses vers Laboratoires -->
+        <div class="glass-card" style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                <h3 style="font-size: 1.15rem; color: #0f172a;">🔬 Analyses Biologiques Demandées</h3>
+                <span class="badge-role LABORATOIRE" style="font-size: 0.75rem;">Transmission Labo</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                {% for req in lab_requests %}
+                    <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <strong style="font-size: 0.95rem; color: #0f172a;">{{ req.patient }}</strong>
+                            <span style="font-size: 0.775rem; background: #ede9fe; color: #6d28d9; padding: 2px 8px; border-radius: 4px; font-weight: 600;">
+                                {{ req.labo }}
+                            </span>
+                        </div>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">
+                            Examen : <strong>{{ req.analyse }}</strong>
+                        </p>
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
+                            <span style="color: #059669; font-weight: 600;">{{ req.statut }}</span>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="alert('Téléchargement du rapport...')">
+                                Consulter PDF
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

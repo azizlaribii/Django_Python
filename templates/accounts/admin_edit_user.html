@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+
+{% block title %}Modifier le compte de {{ target_user.get_full_name|default:target_user.username }} - Administration{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px; margin-top: 10px;">
+    <!-- Top breadcrumb & back button -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary btn-sm" id="btn-back-to-admin">
+            ← Retour au Tableau de bord Administrateur
+        </a>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <span class="badge-role {{ target_user.role }}">
+                {% if target_user.role == 'DOCTEUR' %}🩺 Docteur
+                {% elif target_user.role == 'LABORATOIRE' %}🔬 Laboratoire
+                {% elif target_user.role == 'PATIENT' %}👤 Patient
+                {% else %}👑 Administrateur
+                {% endif %}
+            </span>
+            <span style="font-size: 0.8rem; color: #64748b;">ID #{{ target_user.id }}</span>
+        </div>
+    </div>
+
+    <div class="glass-card" style="padding: 32px;">
+        <!-- Header -->
+        <div style="border-bottom: 1.5px solid var(--border-color); padding-bottom: 20px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                <div>
+                    <h1 style="font-size: 1.65rem; color: #0f172a; margin-bottom: 4px;">
+                        ✏️ Modification du compte : <span style="color: var(--primary);">{{ target_user.get_full_name|default:target_user.username }}</span>
+                    </h1>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">
+                        Identifiant : <strong>@{{ target_user.username }}</strong> • Inscrit le : {{ target_user.date_joined|date:"d/m/Y à H:i" }}
+                    </p>
+                </div>
+
+                {% if target_user != request.user %}
+                    <form method="post" action="{% url 'admin_delete_user' target_user.id %}" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer définitivement ce compte ({{ target_user.username }}) ? Cette action est irréversible.');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm" id="btn-delete-user" title="Supprimer définitivement ce compte">
+                            🗑️ Supprimer le compte
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <form method="post" action="{% url 'admin_edit_user' target_user.id %}" id="admin-user-edit-form">
+            {% csrf_token %}
+
+            {% if user_form.non_field_errors %}
+                <div class="alert alert-error">
+                    {% for err in user_form.non_field_errors %}
+                        <span>{{ err }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <!-- SECTION 1 : HABILITATIONS ADMINISTRATEUR -->
+            <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                <h3 style="font-size: 1.05rem; color: #0f172a; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+                    🛡️ Contrôle & Statuts Administrateur
+                </h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Rôle sur la plateforme</label>
+                        {{ user_form.role }}
+                        <small style="color: #64748b; font-size: 0.775rem;">Détermine l'espace auquel l'utilisateur a accès.</small>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Nouveau mot de passe (optionnel)</label>
+                        {{ user_form.new_password }}
+                        <small style="color: #64748b; font-size: 0.775rem;">Laissez vide si vous ne souhaitez pas modifier le mot de passe.</small>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 24px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid #e2e8f0;">
+                    <label style="display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; font-size: 0.95rem;">
+                        {{ user_form.is_active }}
+                        <span>✅ Compte Actif (Accès autorisé)</span>
+                    </label>
+
+                    <label style="display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; font-size: 0.95rem;">
+                        {{ user_form.is_verified }}
+                        <span>🩺 Compte Certifié / Agréé par l'Administration</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- SECTION 2 : COORDONNEES & IDENTITE -->
+            <div style="margin-bottom: 24px;">
+                <h3 style="font-size: 1.05rem; color: #0f172a; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+                    👤 Informations Personnelles & Coordonnées
+                </h3>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label class="form-label">Nom d'utilisateur (Identifiant de connexion) *</label>
+                        {{ user_form.username }}
+                        {% if user_form.username.errors %}<div class="form-error">{{ user_form.username.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Adresse Email *</label>
+                        {{ user_form.email }}
+                        {% if user_form.email.errors %}<div class="form-error">{{ user_form.email.errors.0 }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label class="form-label">Prénom</label>
+                        {{ user_form.first_name }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Nom de famille</label>
+                        {{ user_form.last_name }}
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label class="form-label">Téléphone</label>
+                        {{ user_form.phone }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Ville</label>
+                        {{ user_form.city }}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Adresse Postale</label>
+                    {{ user_form.address }}
+                </div>
+            </div>
+
+            <!-- SECTION 3 : DONNEES METIERS SPECIFIQUES -->
+            {% if role_form %}
+                <div style="padding-top: 20px; border-top: 1.5px solid var(--border-color); margin-bottom: 24px;">
+                    {% if target_user.role == 'DOCTEUR' %}
+                        <div style="background: #f0fdf4; border: 1.5px solid #a7f3d0; border-radius: 12px; padding: 20px;">
+                            <h3 style="font-size: 1.05rem; color: #047857; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+                                🩺 Détails Professionnels du Docteur
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Spécialité Médicale</label>
+                                    {{ role_form.specialite }}
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Numéro d'Ordre des Médecins</label>
+                                    {{ role_form.numero_ordre }}
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Nom du Cabinet / Clinique</label>
+                                    {{ role_form.cabinet_name }}
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Horaires de consultation</label>
+                                    {{ role_form.horaires }}
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Présentation / Biographie</label>
+                                {{ role_form.biographie }}
+                            </div>
+                        </div>
+
+                    {% elif target_user.role == 'LABORATOIRE' %}
+                        <div style="background: #faf5ff; border: 1.5px solid #ddd6fe; border-radius: 12px; padding: 20px;">
+                            <h3 style="font-size: 1.05rem; color: #6d28d9; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+                                🔬 Informations de l'Établissement Laboratoire
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Nom de la structure / Laboratoire</label>
+                                    {{ role_form.nom_laboratoire }}
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Numéro d'Agrément Officiel</label>
+                                    {{ role_form.numero_agrement }}
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Biologiste / Responsable Légal</label>
+                                {{ role_form.responsable }}
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Analyses & Examens Pris en Charge</label>
+                                {{ role_form.services_offerts }}
+                            </div>
+                        </div>
+
+                    {% elif target_user.role == 'PATIENT' %}
+                        <div style="background: #f0f9ff; border: 1.5px solid #bae6fd; border-radius: 12px; padding: 20px;">
+                            <h3 style="font-size: 1.05rem; color: #0284c7; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+                                👤 Dossier & Données Patient
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Date de Naissance</label>
+                                    {{ role_form.date_naissance }}
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Groupe Sanguin</label>
+                                    {{ role_form.groupe_sanguin }}
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label class="form-label">N° Sécurité Sociale / Identifiant Patient</label>
+                                    {{ role_form.numero_securite_sociale }}
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Contact en Cas d'Urgence</label>
+                                    {{ role_form.personne_contact }}
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Antécédents Médicaux & Allergies</label>
+                                {{ role_form.antecedents }}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <!-- BOUTONS D'ACTION CLAIRS -->
+            <div style="display: flex; gap: 14px; align-items: center; justify-content: flex-end; padding-top: 16px; border-top: 1.5px solid var(--border-color);">
+                <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary" id="btn-cancel-edit">
+                    Annuler
+                </a>
+                <button type="submit" class="btn btn-success btn-lg" id="btn-save-user-changes" style="font-size: 1rem; padding: 12px 28px;">
+                    💾 Enregistrer les Modifications
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

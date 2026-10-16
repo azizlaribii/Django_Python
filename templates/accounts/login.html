@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}Connexion - SantéConnect{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 500px; margin-top: 40px;">
+    <div class="glass-card">
+        <div style="text-align: center; margin-bottom: 28px;">
+            <div class="logo-icon" style="margin: 0 auto 16px; width: 48px; height: 48px; font-size: 1.5rem;">🔐</div>
+            <h2 style="font-size: 1.75rem; margin-bottom: 6px;">Connexion Sécurisée</h2>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Accédez à votre espace Docteur, Laboratoire, Patient ou Administrateur
+            </p>
+        </div>
+
+        <form method="post" action="{% url 'login' %}{% if request.GET.next %}?next={{ request.GET.next }}{% endif %}" id="login-form">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-error" style="margin-bottom: 18px;">
+                    {% for error in form.non_field_errors %}
+                        <span>{{ error }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label for="{{ form.username.id_for_label }}" class="form-label">Nom d'utilisateur</label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                    <div class="form-error">{{ form.username.errors.0 }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label for="{{ form.password.id_for_label }}" class="form-label" style="margin-bottom: 0;">Mot de passe</label>
+                </div>
+                {{ form.password }}
+                {% if form.password.errors %}
+                    <div class="form-error">{{ form.password.errors.0 }}</div>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;" id="btn-submit-login">
+                Se Connecter →
+            </button>
+        </form>
+
+        <!-- Quick 1-Click Demo Login Box -->
+        <div class="demo-accounts-box">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 0.825rem; font-weight: 700; color: #475569;">⚡ Comptes Démo (Remplissage en 1 clic) :</span>
+            </div>
+            <div class="demo-btn-group">
+                <button type="button" class="btn-demo" onclick="fillCredentials('admin', 'admin123')" id="btn-demo-admin">
+                    👑 Admin
+                </button>
+                <button type="button" class="btn-demo" onclick="fillCredentials('dr_moreau', 'docteur123')" id="btn-demo-doctor">
+                    🩺 Docteur
+                </button>
+                <button type="button" class="btn-demo" onclick="fillCredentials('labo_pasteur', 'labo123')" id="btn-demo-lab">
+                    🔬 Laboratoire
+                </button>
+                <button type="button" class="btn-demo" onclick="fillCredentials('patient_martin', 'patient123')" id="btn-demo-patient">
+                    👤 Patient
+                </button>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-color); font-size: 0.9rem;">
+            <p style="color: var(--text-muted);">
+                Vous n'avez pas encore de compte ?
+                <a href="{% url 'register' %}" style="font-weight: 600;" id="link-to-register">Créer un compte</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function fillCredentials(username, password) {
+        document.getElementById('login-username').value = username;
+        document.getElementById('login-password').value = password;
+        const submitBtn = document.getElementById('btn-submit-login');
+        submitBtn.style.transform = 'scale(1.02)';
+        setTimeout(() => { submitBtn.style.transform = 'none'; }, 200);
+    }
+</script>
+{% endblock %}

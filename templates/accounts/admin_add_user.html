@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+
+{% block title %}Ajouter un Nouvel Utilisateur - Administration{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 760px; margin-top: 15px;">
+    <!-- Top breadcrumb -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary btn-sm" id="btn-back-to-admin">
+            ← Retour au Tableau de bord Administrateur
+        </a>
+        <span class="badge-role ADMIN">👑 Pôle Administration</span>
+    </div>
+
+    <div class="glass-card" style="padding: 32px;">
+        <!-- Header -->
+        <div style="border-bottom: 1.5px solid var(--border-color); padding-bottom: 16px; margin-bottom: 24px;">
+            <h1 style="font-size: 1.7rem; color: #0f172a; margin-bottom: 4px;">
+                ➕ Créer un Nouvel Utilisateur
+            </h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Enregistrez un nouveau compte Docteur, Laboratoire, Patient ou Administrateur avec habilitations immédiates.
+            </p>
+        </div>
+
+        <!-- Role Selector Tabs -->
+        <div style="display: flex; gap: 8px; margin-bottom: 24px; background: #f1f5f9; padding: 5px; border-radius: 12px;" id="admin-role-tabs">
+            <button type="button" class="btn" style="flex: 1; font-size: 0.875rem;" id="admin-tab-doctor" onclick="setRole('DOCTEUR')">
+                🩺 Docteur
+            </button>
+            <button type="button" class="btn" style="flex: 1; font-size: 0.875rem;" id="admin-tab-lab" onclick="setRole('LABORATOIRE')">
+                🔬 Laboratoire
+            </button>
+            <button type="button" class="btn" style="flex: 1; font-size: 0.875rem;" id="admin-tab-patient" onclick="setRole('PATIENT')">
+                👤 Patient
+            </button>
+            <button type="button" class="btn" style="flex: 1; font-size: 0.875rem;" id="admin-tab-admin" onclick="setRole('ADMIN')">
+                👑 Admin
+            </button>
+        </div>
+
+        <form method="post" action="{% url 'admin_add_user' %}" id="admin-add-user-form">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-error">
+                    {% for err in form.non_field_errors %}
+                        <span>{{ err }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <!-- Hidden role select synced with tabs -->
+            <div style="display: none;">
+                {{ form.role }}
+            </div>
+
+            <!-- SECTION 1 : HABILITATIONS -->
+            <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+                <h4 style="color: #0f172a; margin-bottom: 12px; font-size: 0.95rem;">⚙️ Habilitations & Statut Initial</h4>
+                <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem;">
+                        {{ form.is_active }}
+                        <span>✅ Compte Actif (immédiatement utilisable)</span>
+                    </label>
+
+                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem;">
+                        {{ form.is_verified }}
+                        <span>🩺 Compte Certifié / Agréé par l'Admin</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- SECTION 2 : IDENTIFIANTS & MOT DE PASSE -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Nom d'utilisateur (Identifiant) *</label>
+                    {{ form.username }}
+                    {% if form.username.errors %}<div class="form-error">{{ form.username.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Adresse Email *</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}<div class="form-error">{{ form.email.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Mot de passe *</label>
+                    {{ form.password }}
+                    {% if form.password.errors %}<div class="form-error">{{ form.password.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Confirmer le mot de passe *</label>
+                    {{ form.password_confirm }}
+                    {% if form.password_confirm.errors %}<div class="form-error">{{ form.password_confirm.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+
+            <!-- SECTION 3 : COORDONNEES -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Prénom</label>
+                    {{ form.first_name }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nom</label>
+                    {{ form.last_name }}
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Numéro de téléphone</label>
+                    {{ form.phone }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ville</label>
+                    {{ form.city }}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Adresse postale</label>
+                {{ form.address }}
+            </div>
+
+            <!-- SECTION DOCTEUR -->
+            <div id="section-admin-doctor" style="display: none; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+                <h4 style="color: #166534; margin-bottom: 12px; font-size: 0.95rem;">🩺 Informations Médicales du Docteur</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Spécialité Médicale</label>
+                        {{ form.specialite }}
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">N° d'Ordre des Médecins</label>
+                        {{ form.numero_ordre }}
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
+                    <label class="form-label">Nom du Cabinet / Clinique</label>
+                    {{ form.cabinet_name }}
+                </div>
+            </div>
+
+            <!-- SECTION LABORATOIRE -->
+            <div id="section-admin-lab" style="display: none; background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+                <h4 style="color: #6b21a8; margin-bottom: 12px; font-size: 0.95rem;">🔬 Informations de l'Établissement Laboratoire</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Nom du Laboratoire</label>
+                        {{ form.nom_laboratoire }}
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Numéro d'agrément officiel</label>
+                        {{ form.numero_agrement }}
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
+                    <label class="form-label">Biologiste / Responsable Légal</label>
+                    {{ form.responsable }}
+                </div>
+            </div>
+
+            <!-- SECTION PATIENT -->
+            <div id="section-admin-patient" style="display: block; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+                <h4 style="color: #075985; margin-bottom: 12px; font-size: 0.95rem;">👤 Informations Dossier Patient</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Date de naissance</label>
+                        {{ form.date_naissance }}
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label">Groupe Sanguin</label>
+                        {{ form.groupe_sanguin }}
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
+                    <label class="form-label">N° de Sécurité Sociale / CIN</label>
+                    {{ form.numero_securite_sociale }}
+                </div>
+            </div>
+
+            <!-- BOUTONS D'ACTION -->
+            <div style="display: flex; gap: 14px; align-items: center; justify-content: flex-end; padding-top: 16px; border-top: 1.5px solid var(--border-color);">
+                <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary">
+                    Annuler
+                </a>
+                <button type="submit" class="btn btn-success btn-lg" id="btn-submit-add-user" style="padding: 12px 28px;">
+                    ➕ Créer et Activer le Compte
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function setRole(role) {
+        const select = document.getElementById('role-selector');
+        if (select) select.value = role;
+
+        const secDoc = document.getElementById('section-admin-doctor');
+        const secLab = document.getElementById('section-admin-lab');
+        const secPat = document.getElementById('section-admin-patient');
+
+        const tabDoc = document.getElementById('admin-tab-doctor');
+        const tabLab = document.getElementById('admin-tab-lab');
+        const tabPat = document.getElementById('admin-tab-patient');
+        const tabAdm = document.getElementById('admin-tab-admin');
+
+        [tabDoc, tabLab, tabPat, tabAdm].forEach(t => {
+            t.className = 'btn';
+            t.style.background = 'transparent';
+            t.style.color = '#475569';
+        });
+
+        secDoc.style.display = 'none';
+        secLab.style.display = 'none';
+        secPat.style.display = 'none';
+
+        if (role === 'DOCTEUR') {
+            secDoc.style.display = 'block';
+            tabDoc.className = 'btn btn-success';
+        } else if (role === 'LABORATOIRE') {
+            secLab.style.display = 'block';
+            tabLab.className = 'btn btn-primary';
+            tabLab.style.background = 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)';
+        } else if (role === 'PATIENT') {
+            secPat.style.display = 'block';
+            tabPat.className = 'btn btn-primary';
+        } else {
+            tabAdm.className = 'btn btn-danger';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const initial = "{{ default_role|default:'PATIENT' }}";
+        setRole(initial);
+    });
+</script>
+{% endblock %}

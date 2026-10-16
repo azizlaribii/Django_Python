@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}SantéConnect - Portail Médical Unifié{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="hero-pill">
+            <span>✨ Nouvelle Génération de Gestion Médicale</span>
+        </div>
+        <h1 class="hero-title">
+            L'écosystème unifié pour <br/>
+            <span class="hero-gradient">Docteurs, Laboratoires & Patients</span>
+        </h1>
+        <p class="hero-subtitle">
+            Une plateforme Django hautement sécurisée qui synchronise les praticiens de santé, les centres d'analyses biologiques et les patients sous la supervision active de l'administrateur.
+        </p>
+        
+        <div class="hero-actions">
+            {% if user.is_authenticated %}
+                <a href="{% url 'dashboard' %}" class="btn btn-primary btn-lg" id="btn-hero-dashboard">
+                    Accéder à mon espace ({{ user.get_role_display }}) →
+                </a>
+            {% else %}
+                <a href="{% url 'login' %}" class="btn btn-primary btn-lg" id="btn-hero-login">
+                    Se connecter à l'espace médical
+                </a>
+                <a href="{% url 'register' %}" class="btn btn-secondary btn-lg" id="btn-hero-register">
+                    Créer un nouveau compte
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Platform Stats -->
+    <div class="stats-row" style="max-width: 900px; margin: 0 auto 50px;">
+        <div class="stat-widget">
+            <div class="stat-info">
+                <h4>🩺 Docteurs actifs</h4>
+                <div class="stat-number">{{ stats.doctors|default:"12" }}</div>
+            </div>
+            <div class="stat-icon" style="color: var(--doctor-color);">👨‍⚕️</div>
+        </div>
+        <div class="stat-widget">
+            <div class="stat-info">
+                <h4>🔬 Laboratoires</h4>
+                <div class="stat-number">{{ stats.labs|default:"6" }}</div>
+            </div>
+            <div class="stat-icon" style="color: var(--lab-color);">🧪</div>
+        </div>
+        <div class="stat-widget">
+            <div class="stat-info">
+                <h4>👤 Patients inscrits</h4>
+                <div class="stat-number">{{ stats.patients|default:"85" }}</div>
+            </div>
+            <div class="stat-icon" style="color: var(--patient-color);">👥</div>
+        </div>
+    </div>
+
+    <!-- 3 Roles + Admin Feature Grid -->
+    <div style="text-align: center; margin-bottom: 24px;">
+        <h2 style="font-size: 2rem;">Des espaces dédiés et sur-mesure</h2>
+        <p style="color: var(--text-muted);">Chaque intervenant dispose d'outils adaptés à son exercice</p>
+    </div>
+
+    <div class="features-grid">
+        <!-- Card Docteur -->
+        <div class="feature-card card-doctor">
+            <div class="feature-icon-wrapper">🩺</div>
+            <span class="badge-role DOCTEUR" style="margin-bottom: 12px;">Espace Docteur</span>
+            <h3 style="font-size: 1.35rem; margin-bottom: 10px;">Médecins & Spécialistes</h3>
+            <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px;">
+                Consultez le dossier médical des patients, prescrivez des ordonnances et commandez directement des bilans auprès des laboratoires agréés.
+            </p>
+            <ul style="list-style: none; color: #475569; font-size: 0.9rem; line-height: 1.9; margin-bottom: 24px;">
+                <li>✓ Suivi des consultations quotidiennes</li>
+                <li>✓ Prescription numérique d'analyses</li>
+                <li>✓ Réception directe des résultats de labo</li>
+            </ul>
+            <a href="{% url 'register' %}?role=DOCTEUR" class="btn btn-outline btn-sm" id="btn-card-register-doctor">Inscription Docteur</a>
+        </div>
+
+        <!-- Card Laboratoire -->
+        <div class="feature-card card-lab">
+            <div class="feature-icon-wrapper">🔬</div>
+            <span class="badge-role LABORATOIRE" style="margin-bottom: 12px;">Espace Laboratoire</span>
+            <h3 style="font-size: 1.35rem; margin-bottom: 10px;">Laboratoires d'Analyses</h3>
+            <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px;">
+                Centralisez les demandes d'examens sanguins, biochimiques et microbiologiques. Validez et transmettez les comptes-rendus en toute conformité.
+            </p>
+            <ul style="list-style: none; color: #475569; font-size: 0.9rem; line-height: 1.9; margin-bottom: 24px;">
+                <li>✓ File d'attente des prélèvements</li>
+                <li>✓ Saisie des paramètres et conclusions</li>
+                <li>✓ Télétransmission cryptée aux praticiens</li>
+            </ul>
+            <a href="{% url 'register' %}?role=LABORATOIRE" class="btn btn-outline btn-sm" id="btn-card-register-lab">Inscription Laboratoire</a>
+        </div>
+
+        <!-- Card Patient -->
+        <div class="feature-card card-patient">
+            <div class="feature-icon-wrapper">👤</div>
+            <span class="badge-role PATIENT" style="margin-bottom: 12px;">Espace Patient</span>
+            <h3 style="font-size: 1.35rem; margin-bottom: 10px;">Patients & Ayants droit</h3>
+            <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px;">
+                Accédez à votre carnet de santé numérisé : retrouvez en temps réel les résultats de vos analyses biologiques et l'historique de vos ordonnances.
+            </p>
+            <ul style="list-style: none; color: #475569; font-size: 0.9rem; line-height: 1.9; margin-bottom: 24px;">
+                <li>✓ Téléchargement sécurisé des bilans</li>
+                <li>✓ Historique de santé et groupe sanguin</li>
+                <li>✓ Rendez-vous et suivi thérapeutique</li>
+            </ul>
+            <a href="{% url 'register' %}?role=PATIENT" class="btn btn-outline btn-sm" id="btn-card-register-patient">Inscription Patient</a>
+        </div>
+    </div>
+
+    <!-- Admin Banner -->
+    <div class="glass-card" style="margin-top: 48px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 24px;">
+        <div style="max-width: 650px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                <span class="badge-role ADMIN">Contrôle Administrateur</span>
+                <span style="font-size: 0.85rem; color: #64748b;">Supervision globale</span>
+            </div>
+            <h3 style="font-size: 1.4rem; margin-bottom: 8px;">Un pôle d'administration dédié pour gérer tous les comptes</h3>
+            <p style="color: var(--text-muted); font-size: 0.95rem;">
+                L'administrateur valide les certifications des médecins, vérifie les agréments des laboratoires, active/suspend les comptes et supervise l'intégrité de l'annuaire médical.
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'login' %}" class="btn btn-primary" id="btn-admin-access">Accéder à l'Administration →</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
