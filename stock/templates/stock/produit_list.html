@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Produits - Stocks médicaux{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% include 'stock/_header.html' with active='produits' %}
+
+    <form method="get" class="filters-bar">
+        <div class="form-group"><label class="form-label" for="f-q">Recherche</label>
+            <input type="text" id="f-q" name="q" value="{{ q }}" class="form-input" placeholder="Nom, référence, fournisseur..."></div>
+        <div class="form-group"><label class="form-label" for="f-cat">Catégorie</label>
+            <select id="f-cat" name="categorie" class="form-select">
+                <option value="">Toutes</option>
+                {% for c in categories %}<option value="{{ c.pk }}" {% if categorie_sel == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nom }}</option>{% endfor %}
+            </select></div>
+        <div class="form-group"><label class="form-label" for="f-statut">Statut</label>
+            <select id="f-statut" name="statut" class="form-select">
+                {% for val, label in statut_choices %}<option value="{{ val }}" {% if statut_sel == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select></div>
+        <button type="submit" class="btn btn-primary">Filtrer</button>
+        <a href="{% url 'stock:produit_list' %}" class="btn btn-secondary">Réinitialiser</a>
+    </form>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead><tr>
+                <th>Produit</th><th>Catégorie</th><th>Quantité</th><th>Seuil</th><th>Péremption</th><th>Statut</th><th>Actions</th>
+            </tr></thead>
+            <tbody>
+            {% for p in page_obj %}
+                <tr class="{% if p.est_expire or p.en_rupture %}row-danger{% endif %}">
+                    <td><a href="{% url 'stock:produit_detail' p.pk %}"><strong>{{ p.nom }}</strong></a><br><span class="muted">{{ p.reference }}</span></td>
+                    <td>{{ p.categorie.nom|default:"—" }}</td>
+                    <td><strong>{{ p.quantite }}</strong> <span class="muted">{{ p.get_unite_display|lower }}</span></td>
+                    <td>{{ p.seuil_alerte }}</td>
+                    <td>{% if p.date_peremption %}{{ p.date_peremption|date:"d/m/Y" }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                    <td>{% include 'stock/_pills.html' with produit=p %}</td>
+                    <td style="white-space:nowrap;">
+                        <a href="{% url 'stock:produit_detail' p.pk %}" class="btn btn-secondary btn-sm">Détail</a>
+                        {% if can_manage %}
+                            <a href="{% url 'stock:mouvement_create' p.pk 'entree' %}" class="btn-table-activate">+ Entrée</a>
+                            <a href="{% url 'stock:mouvement_create' p.pk 'sortie' %}" class="btn-table-suspend">− Sortie</a>
+                            <a href="{% url 'stock:produit_update' p.pk %}" class="btn-table-edit">Modifier</a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="empty-state" style="text-align:center;">Aucun produit ne correspond à votre recherche.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'stock/_pagination.html' %}
+    <div style="height:40px;"></div>
+</div>
+{% endblock %}

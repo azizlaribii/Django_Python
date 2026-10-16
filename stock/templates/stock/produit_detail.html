@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{{ produit.nom }} - Stocks médicaux{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% include 'stock/_header.html' with active='produits' %}
+
+    <div class="stock-grid-2">
+        <div class="stock-card">
+            <h3>{{ produit.nom }} {% include 'stock/_pills.html' %}</h3>
+            <dl class="def-list">
+                <dt>Référence</dt><dd>{{ produit.reference }}</dd>
+                <dt>Catégorie</dt><dd>{{ produit.categorie.nom|default:"—" }}</dd>
+                <dt>Unité</dt><dd>{{ produit.get_unite_display }}</dd>
+                <dt>Date de péremption</dt>
+                <dd>{% if produit.date_peremption %}{{ produit.date_peremption|date:"d/m/Y" }}
+                    {% if produit.est_expire %}<span class="status-pill danger">dépassée de {{ produit.jours_avant_peremption|cut:"-" }} j</span>{% endif %}
+                    {% else %}Sans date de péremption{% endif %}</dd>
+                <dt>Fournisseur</dt><dd>{{ produit.fournisseur|default:"—" }}</dd>
+                <dt>Emplacement</dt><dd>{{ produit.emplacement|default:"—" }}</dd>
+                <dt>Prix unitaire</dt><dd>{% if produit.prix_unitaire is not None %}{{ produit.prix_unitaire }} € <span class="muted">(valeur du stock : {{ produit.valeur_stock }} €)</span>{% else %}—{% endif %}</dd>
+                {% if produit.description %}<dt>Description</dt><dd>{{ produit.description }}</dd>{% endif %}
+            </dl>
+        </div>
+        <div class="stock-card">
+            <h3>Quantité disponible</h3>
+            <div class="qty-big" style="color:{% if produit.en_rupture %}#dc2626{% elif produit.stock_faible %}#b45309{% else %}#0f172a{% endif %};">
+                {{ produit.quantite }} <span style="font-size:1.1rem; font-weight:600; color:var(--text-muted);">{{ produit.get_unite_display|lower }}(s)</span>
+            </div>
+            <p class="muted" style="margin:8px 0 20px;">Seuil d’alerte : {{ produit.seuil_alerte }}</p>
+            {% if can_manage %}
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <a href="{% url 'stock:mouvement_create' produit.pk 'entree' %}" class="btn btn-success btn-sm">+ Entrée de stock</a>
+                <a href="{% url 'stock:mouvement_create' produit.pk 'sortie' %}" class="btn btn-secondary btn-sm">− Sortie de stock</a>
+                <a href="{% url 'stock:produit_update' produit.pk %}" class="btn btn-outline btn-sm">Modifier</a>
+                <a href="{% url 'stock:produit_delete' produit.pk %}" class="btn-table-delete">Supprimer</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="stock-card" style="margin-bottom:40px;">
+        <h3>Historique des mouvements <a href="{% url 'stock:mouvement_list' %}?q={{ produit.reference }}" class="btn btn-secondary btn-sm">Tout voir</a></h3>
+        {% if mouvements %}
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead><tr><th>Date</th><th>Mouvement</th><th>Motif</th><th>Lot</th><th>Stock après</th><th>Par</th><th>Commentaire</th></tr></thead>
+                <tbody>
+                {% for m in mouvements %}
+                    <tr>
+                        <td>{{ m.date|date:"d/m/Y H:i" }}</td>
+                        <td><span class="status-pill {% if m.type == 'ENTREE' %}verified{% else %}info{% endif %}">{% if m.type == 'ENTREE' %}+{% else %}−{% endif %}{{ m.quantite }}</span></td>
+                        <td>{{ m.get_motif_display }}</td>
+                        <td>{{ m.numero_lot|default:"—" }}</td>
+                        <td>{{ m.stock_apres }}</td>
+                        <td>{{ m.auteur }}</td>
+                        <td>{{ m.commentaire|default:"—" }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}<p class="empty-state">Aucun mouvement pour ce produit.</p>{% endif %}
+    </div>
+</div>
+{% endblock %}

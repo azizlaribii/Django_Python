@@ -1,0 +1,18 @@
+/* Compléments au design system SantéConnect pour le module Stocks */
+.status-pill.danger { background: #fee2e2; color: #b91c1c; }
+.status-pill.info { background: #e0f2fe; color: #0369a1; }
+.stock-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.row-danger { background: #fef2f2; }
+.data-table tbody tr.row-danger:hover { background: #fee2e2; }
+.stock-card { background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 24px; }
+.stock-card h3 { font-size: 1.05rem; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.stock-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 24px; margin-bottom: 28px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 20px; }
+.form-grid .full { grid-column: 1 / -1; }
+.filters-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 20px; }
+.filters-bar .form-group { margin-bottom: 0; flex: 1 1 180px; }
+.qty-big { font-size: 2.6rem; font-weight: 800; line-height: 1; }
+.def-list { display: grid; grid-template-columns: 170px 1fr; gap: 10px 16px; font-size: 0.925rem; }
+.def-list dt { color: var(--text-muted); font-weight: 600; }
+.muted { color: var(--text-muted); font-size: 0.8rem; }
+.empty-state { color: var(--text-muted); padding: 12px 0; font-size: 0.9rem; }
