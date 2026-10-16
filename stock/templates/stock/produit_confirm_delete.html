@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Supprimer {{ produit.nom }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 620px;">
+    <div class="glass-card" style="margin-bottom:40px;">
+        <h1 style="font-size:1.5rem; margin-bottom:12px;">Supprimer « {{ produit.nom }} » ?</h1>
+        <p style="color:var(--text-muted); margin-bottom:8px;">
+            Le produit disparaîtra du catalogue et des alertes. Son historique de mouvements est conservé pour la traçabilité.
+        </p>
+        {% if produit.quantite %}<div class="alert alert-warning">Il reste {{ produit.quantite }} {{ produit.get_unite_display|lower }}(s) en stock.</div>{% endif %}
+        <form method="post" style="display:flex; gap:10px; margin-top:16px;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Oui, supprimer</button>
+            <a href="{% url 'stock:produit_detail' produit.pk %}" class="btn btn-secondary">Annuler</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+<div class="glass-card" style="padding: 24px; margin-bottom: 20px; border-left: 6px solid var(--primary);">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+        <div>
+            <h1 style="font-size:1.75rem;">📦 Gestion des stocks médicaux</h1>
+            <p style="color:var(--text-muted); font-size:0.95rem; margin-top:4px;">
+                Produits, consommables, entrées / sorties, alertes et péremptions.
+                {% if not can_manage %}<span class="status-pill inactive" style="margin-left:6px;">Lecture seule</span>{% endif %}
+            </p>
+        </div>
+        {% if can_manage %}
+            <a href="{% url 'stock:produit_create' %}" class="btn btn-primary btn-sm" id="btn-new-product">+ Nouveau produit</a>
+        {% endif %}
+    </div>
+</div>
+<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:24px;">
+    <a href="{% url 'stock:dashboard' %}" class="btn btn-sm {% if active == 'dashboard' %}btn-primary{% else %}btn-secondary{% endif %}">📊 Tableau de bord</a>
+    <a href="{% url 'stock:produit_list' %}" class="btn btn-sm {% if active == 'produits' %}btn-primary{% else %}btn-secondary{% endif %}">🧪 Produits</a>
+    <a href="{% url 'stock:mouvement_list' %}" class="btn btn-sm {% if active == 'mouvements' %}btn-primary{% else %}btn-secondary{% endif %}">🔁 Mouvements</a>
+    <a href="{% url 'stock:categorie_list' %}" class="btn btn-sm {% if active == 'categories' %}btn-primary{% else %}btn-secondary{% endif %}">🏷️ Catégories</a>
+</div>

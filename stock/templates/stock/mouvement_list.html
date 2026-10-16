@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Mouvements - Stocks médicaux{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% include 'stock/_header.html' with active='mouvements' %}
+
+    <form method="get" class="filters-bar">
+        <div class="form-group"><label class="form-label" for="m-q">Produit</label>
+            <input type="text" id="m-q" name="q" value="{{ q }}" class="form-input" placeholder="Nom ou référence"></div>
+        <div class="form-group"><label class="form-label" for="m-type">Type</label>
+            <select id="m-type" name="type" class="form-select"><option value="">Tous</option>
+                {% for val, label in types %}<option value="{{ val }}" {% if type_sel == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select></div>
+        <div class="form-group"><label class="form-label" for="m-d1">Du</label><input type="date" id="m-d1" name="date_debut" value="{{ date_debut }}" class="form-input"></div>
+        <div class="form-group"><label class="form-label" for="m-d2">Au</label><input type="date" id="m-d2" name="date_fin" value="{{ date_fin }}" class="form-input"></div>
+        <button type="submit" class="btn btn-primary">Filtrer</button>
+        <a href="{% url 'stock:mouvement_list' %}" class="btn btn-secondary">Réinitialiser</a>
+    </form>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead><tr><th>Date</th><th>Produit</th><th>Mouvement</th><th>Motif</th><th>Lot</th><th>Stock après</th><th>Par</th><th>Commentaire</th></tr></thead>
+            <tbody>
+            {% for m in page_obj %}
+                <tr>
+                    <td style="white-space:nowrap;">{{ m.date|date:"d/m/Y H:i" }}</td>
+                    <td><a href="{% url 'stock:produit_detail' m.produit.pk %}">{{ m.produit.nom }}</a></td>
+                    <td><span class="status-pill {% if m.type == 'ENTREE' %}verified{% else %}info{% endif %}">{% if m.type == 'ENTREE' %}+{% else %}−{% endif %}{{ m.quantite }}</span></td>
+                    <td>{{ m.get_motif_display }}</td>
+                    <td>{{ m.numero_lot|default:"—" }}</td>
+                    <td>{{ m.stock_apres }}</td>
+                    <td>{{ m.auteur }}</td>
+                    <td>{{ m.commentaire|default:"—" }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="8" class="empty-state" style="text-align:center;">Aucun mouvement trouvé.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'stock/_pagination.html' %}
+    <div style="height:40px;"></div>
+</div>
+{% endblock %}
