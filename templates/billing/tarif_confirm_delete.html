@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'billing/billing.css' %}">
+
+<div class="billing-page">
+    <div class="card delete-box">
+        <div class="card-body">
+            <div class="delete-icon">⚠️</div>
+            <h2>Supprimer ce tarif ?</h2>
+            <p>Vous allez supprimer <strong>{{ tarif.libelle }}</strong>. Cette action est définitive.</p>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-danger">Oui, supprimer</button>
+                    <a href="{% url 'tarif_list' %}" class="btn btn-light">Annuler</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
