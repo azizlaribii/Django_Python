@@ -200,12 +200,16 @@ table.med-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
       <p>Planification, suivi des consignes pré-opératoires/pré-examens, validation patient et comptes-rendus.</p>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      {% if user.is_doctor %}
       <button class="btn-primary-purple" style="background:#fff;color:#6b21a8;" onclick="openAddExamenModal()">
         ➕ Planifier un Examen
       </button>
+      {% endif %}
+      {% if user.is_admin_user or user.is_doctor %}
       <a href="{% url 'dossiers_patients_list' %}" class="btn-primary-purple" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);">
         📁 Dossiers Patients
       </a>
+      {% endif %}
     </div>
   </div>
 
@@ -299,9 +303,15 @@ table.med-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
                     {{ ex.dossier.patient.first_name|first|upper }}{{ ex.dossier.patient.last_name|first|upper }}
                   </div>
                   <div>
+                    {% if user.is_admin_user or user.is_doctor %}
                     <a href="{% url 'doctor_patient_dossier' ex.dossier.patient.id %}" style="font-weight:700;color:#0f172a;text-decoration:none;">
                       {{ ex.dossier.patient.get_full_name|default:ex.dossier.patient.username }}
                     </a>
+                    {% else %}
+                    <span style="font-weight:700;color:#0f172a;">
+                      {{ ex.dossier.patient.get_full_name|default:ex.dossier.patient.username }}
+                    </span>
+                    {% endif %}
                     <div style="font-size:.74rem;color:#64748b;">
                       #{{ ex.dossier.numero_dossier }}
                       {% with ex.dossier.patient.patient_profile as pp %}
@@ -340,19 +350,32 @@ table.med-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
                 {% endif %}
               </td>
 
-              <!-- Préparation -->
+              <!-- Préparation & Score -->
               <td>
-                <div style="margin-bottom:3px;">
+                <div style="margin-bottom:4px;">
                   <span class="badge badge-prep-{{ ex.statut_preparation|lower }}">
-                    {% if ex.statut_preparation == 'A_FAIRE' %}🟠 À préparer par le patient
-                    {% elif ex.statut_preparation == 'VALIDEE' %}🟢 Préparation validée / Prêt
+                    {% if ex.statut_preparation == 'A_FAIRE' %}🟠 À préparer
+                    {% elif ex.statut_preparation == 'VALIDEE' %}🟢 Validée / Prêt
                     {% elif ex.statut_preparation == 'EN_COURS' %}🔄 En cours
                     {% else %}⚪ Non requise{% endif %}
                   </span>
                 </div>
+                {% with prog=ex.progression_etapes %}
+                  {% if prog.1 > 0 %}
+                    <div style="margin-bottom:6px;width:170px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:5px 8px;">
+                      <div style="display:flex;justify-content:space-between;font-size:.72rem;font-weight:700;margin-bottom:3px;">
+                        <span style="color:#0f172a;">Score : <strong>{{ ex.score_preparation }}%</strong></span>
+                        <span style="color:#64748b;">{{ prog.0 }}/{{ prog.1 }} étapes</span>
+                      </div>
+                      <div style="background:#e2e8f0;border-radius:999px;height:6px;overflow:hidden;">
+                        <div style="background:{% if ex.est_pret_pour_examen %}#10b981{% else %}#f59e0b{% endif %};height:100%;width:{{ ex.score_preparation }}%;border-radius:999px;"></div>
+                      </div>
+                    </div>
+                  {% endif %}
+                {% endwith %}
                 {% if ex.consignes_preparation %}
-                  <div style="font-size:.76rem;color:#475569;max-width:240px;line-height:1.3;" title="{{ ex.consignes_preparation }}">
-                    📋 <em>{{ ex.consignes_preparation|truncatechars:65 }}</em>
+                  <div style="font-size:.75rem;color:#475569;max-width:240px;line-height:1.3;" title="{{ ex.consignes_preparation }}">
+                    📋 <em>{{ ex.consignes_preparation|truncatechars:55 }}</em>
                   </div>
                 {% endif %}
               </td>
@@ -392,7 +415,9 @@ table.med-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
         <div style="font-size:3.5rem;margin-bottom:12px;">🩺</div>
         <h3 style="color:#0f172a;font-size:1.1rem;margin-bottom:6px;">Aucun examen trouvé</h3>
         <p style="font-size:.875rem;">{% if search_q %}Aucun résultat ne correspond à vos filtres.{% else %}Commencez par planifier un examen avec ses consignes de préparation.{% endif %}</p>
+        {% if user.is_doctor %}
         <button class="btn-primary-purple" style="margin-top:14px;" onclick="openAddExamenModal()">➕ Planifier un premier Examen</button>
+        {% endif %}
       </div>
     {% endif %}
 
@@ -403,6 +428,7 @@ table.med-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
 <!-- MODALES -->
 <!-- ═══════════════════════════════════════════════════ -->
 
+{% if user.is_doctor %}
 <!-- MODAL ADD EXAMEN -->
 <div class="modal-overlay" id="modal-add-examen" onclick="closeModalOnOverlay(event, 'modal-add-examen')">
   <div class="modal-box">
@@ -466,6 +492,32 @@ table.med-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
         <input type="text" class="form-input" id="add-exam-lieu" placeholder="ex: Cabinet Médical - Salle d'échographie / Hôpital Aile B">
       </div>
 
+      <!-- PROTOCOLE DE PREPARATION & SCORE SEUIL -->
+      <div style="background:#ede9fe;border:1.5px solid #c4b5fd;border-radius:12px;padding:14px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <label style="font-size:.85rem;font-weight:800;color:#5b21b6;margin:0;">⚡ Protocole de Préparation & Checklist Automatique</label>
+          <span style="font-size:.72rem;background:#fff;color:#6d28d9;padding:2px 8px;border-radius:6px;font-weight:700;">Score & Étapes</span>
+        </div>
+        <div class="form-row2" style="margin-bottom:6px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size:.78rem;color:#4c1d95;">Sélectionner un protocole clinique</label>
+            <select class="form-select" id="add-exam-protocole" onchange="onProtocoleSelect(this.value)">
+              <option value="">— Aucun protocole (Préparation libre) —</option>
+              {% for key, p in protocoles.items %}
+                <option value="{{ key }}" data-titre="{{ p.titre_par_defaut }}" data-type="{{ p.type_examen }}" data-seuil="{{ p.score_seuil }}" data-resume="{{ p.consignes_resume|escapejs }}">{{ p.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size:.78rem;color:#4c1d95;">Score seuil pour être Prêt (%)</label>
+            <input type="number" class="form-input" id="add-exam-score-seuil" value="100" min="10" max="100" step="5" placeholder="100">
+          </div>
+        </div>
+        <div id="protocole-preview-info" style="display:none;font-size:.78rem;color:#5b21b6;background:#fff;padding:8px 10px;border-radius:8px;border:1px solid #ddd6fe;margin-top:8px;">
+          ℹ️ Ce protocole initialisera automatiquement les étapes détaillées du régime et de la préparation avec calcul du score en temps réel.
+        </div>
+      </div>
+
       <!-- PREPARATION SECTION -->
       <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:14px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -515,6 +567,7 @@ table.med-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
     </form>
   </div>
 </div>
+{% endif %}
 
 <!-- MODAL EDIT EXAMEN -->
 <div class="modal-overlay" id="modal-edit-examen" onclick="closeModalOnOverlay(event, 'modal-edit-examen')">
@@ -617,6 +670,7 @@ table.med-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
     <p style="font-size:.85rem;color:#64748b;margin-bottom:18px;" id="del-exam-name"></p>
     <form id="form-delete-examen" method="post">
       {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'examens_list' %}">
       <div style="display:flex;gap:10px;justify-content:center;">
         <button type="button" class="btn-cancel" onclick="closeModal('modal-delete')">Annuler</button>
         <button type="submit" class="btn-save" style="background:#dc2626;">🗑 Supprimer définitivement</button>
@@ -653,7 +707,42 @@ function openAddExamenModal() {
   document.getElementById('add-exam-lieu').value = '';
   document.getElementById('add-exam-desc').value = '';
   document.getElementById('add-exam-resultat').value = '';
+  const protoSel = document.getElementById('add-exam-protocole');
+  if (protoSel) protoSel.value = '';
+  const seuilInp = document.getElementById('add-exam-score-seuil');
+  if (seuilInp) seuilInp.value = '100';
+  const prevInfo = document.getElementById('protocole-preview-info');
+  if (prevInfo) prevInfo.style.display = 'none';
   openModal('modal-add-examen');
+}
+
+function onProtocoleSelect(key) {
+  const select = document.getElementById('add-exam-protocole');
+  const opt = select.options[select.selectedIndex];
+  const preview = document.getElementById('protocole-preview-info');
+  if (key && opt) {
+    if (preview) preview.style.display = 'block';
+    const titreInput = document.getElementById('add-exam-titre');
+    if (opt.dataset.titre) {
+      titreInput.value = opt.dataset.titre;
+    }
+    const typeSelect = document.getElementById('add-exam-type');
+    if (opt.dataset.type) {
+      typeSelect.value = opt.dataset.type;
+    }
+    const prepInput = document.getElementById('add-exam-consignes');
+    if (opt.dataset.resume) {
+      prepInput.value = opt.dataset.resume;
+    }
+    const seuilInput = document.getElementById('add-exam-score-seuil');
+    if (opt.dataset.seuil) {
+      seuilInput.value = opt.dataset.seuil;
+    }
+    const prepStatus = document.getElementById('add-exam-statut-prep');
+    if (prepStatus) prepStatus.value = 'A_FAIRE';
+  } else {
+    if (preview) preview.style.display = 'none';
+  }
 }
 
 async function submitAddExamen() {
@@ -680,6 +769,15 @@ async function submitAddExamen() {
   fd.append('statut', document.getElementById('add-exam-statut').value);
   fd.append('description', document.getElementById('add-exam-desc').value);
   fd.append('resultat', document.getElementById('add-exam-resultat').value);
+
+  const protocole = document.getElementById('add-exam-protocole');
+  if (protocole && protocole.value) {
+    fd.append('protocole_type', protocole.value);
+  }
+  const seuil = document.getElementById('add-exam-score-seuil');
+  if (seuil && seuil.value) {
+    fd.append('score_seuil_validation', seuil.value);
+  }
 
   const res = await fetch('{% url "add_examen_global" %}', { method: 'POST', body: fd });
   const data = await res.json();

@@ -56,12 +56,12 @@ table.med-table { width:100%; border-collapse:collapse; font-size:.875rem; }
 
   <!-- NAVIGATION TABS -->
   <div class="nav-tabs-dossier">
-    <button class="ntab active" onclick="switchNTab('medecins',this)">👨‍⚕️ Médecins ({{ medecins.count }})</button>
-    <button class="ntab" onclick="switchNTab('examens',this)">🩺 Examens ({{ examens.count }})</button>
-    <button class="ntab" onclick="switchNTab('labo',this)">🔬 Labo ({{ resultats.count }})</button>
-    <button class="ntab" onclick="switchNTab('prescriptions',this)">💊 Ordonnances ({{ prescriptions.count }})</button>
-    <button class="ntab" onclick="switchNTab('observations',this)">📝 Observations ({{ observations.count }})</button>
-    <button class="ntab" onclick="switchNTab('infos',this)">📋 Dossier Général</button>
+    <button class="ntab active" data-tab="medecins" onclick="switchNTab('medecins',this)">👨‍⚕️ Médecins ({{ medecins.count }})</button>
+    <button class="ntab" data-tab="examens" onclick="switchNTab('examens',this)">🩺 Examens ({{ examens.count }})</button>
+    <button class="ntab" data-tab="labo" onclick="switchNTab('labo',this)">🔬 Labo ({{ resultats.count }})</button>
+    <button class="ntab" data-tab="prescriptions" onclick="switchNTab('prescriptions',this)">💊 Ordonnances ({{ prescriptions.count }})</button>
+    <button class="ntab" data-tab="observations" onclick="switchNTab('observations',this)">📝 Observations ({{ observations.count }})</button>
+    <button class="ntab" data-tab="infos" onclick="switchNTab('infos',this)">📋 Dossier Général</button>
   </div>
 
   <!-- MÉDECINS -->
@@ -106,16 +106,43 @@ table.med-table { width:100%; border-collapse:collapse; font-size:.875rem; }
       {% if examens %}
         <div class="table-wrap">
           <table class="med-table">
-            <thead><tr><th>Date</th><th>Intitulé</th><th>Type</th><th>Médecin</th><th>Statut</th><th>Résultat</th></tr></thead>
+            <thead><tr><th>Date & Heure</th><th>Examen</th><th>Type</th><th>Médecin</th><th>Préparation</th><th>Statut</th><th style="text-align:right;">Actions</th></tr></thead>
             <tbody>
               {% for ex in examens %}
               <tr>
-                <td style="white-space:nowrap;color:#64748b;">{{ ex.date_examen|date:"d M Y" }}{% if ex.heure_examen %}<br><small>{{ ex.heure_examen|time:"H:i" }}</small>{% endif %}</td>
-                <td><strong style="color:#0f172a;">{{ ex.titre }}</strong></td>
-                <td><span class="badge badge-normale">{{ ex.get_type_examen_display }}</span></td>
-                <td>{% if ex.medecin %}Dr. {{ ex.medecin.get_full_name }}{% else %}—{% endif %}</td>
+                <td style="white-space:nowrap;color:#64748b;">{{ ex.date_examen|date:"d M Y" }}{% if ex.heure_examen %}<br><small style="color:#6366f1;font-weight:600;">🕐 {{ ex.heure_examen|time:"H:i" }}</small>{% endif %}</td>
+                <td>
+                  <strong style="color:#0f172a;">{{ ex.titre }}</strong>
+                  {% if ex.lieu_examen %}<div style="font-size:.74rem;color:#64748b;">📍 {{ ex.lieu_examen }}</div>{% endif %}
+                </td>
+                <td><span class="badge badge-normale" style="font-size:.73rem;">{{ ex.get_type_examen_display }}</span></td>
+                <td style="font-size:.84rem;">{% if ex.medecin %}Dr. {{ ex.medecin.get_full_name }}{% else %}—{% endif %}</td>
+                <td>
+                  <span class="badge {% if ex.statut_preparation == 'VALIDEE' %}badge-termine{% elif ex.statut_preparation == 'EN_COURS' %}badge-en_cours{% elif ex.statut_preparation == 'A_FAIRE' %}badge-en_attente{% else %}badge-normale{% endif %}" style="font-size:.72rem;">
+                    {% if ex.statut_preparation == 'VALIDEE' %}🟢 Prêt
+                    {% elif ex.statut_preparation == 'EN_COURS' %}🔄 En cours
+                    {% elif ex.statut_preparation == 'A_FAIRE' %}🟠 À préparer
+                    {% else %}—{% endif %}
+                  </span>
+                  {% with prog=ex.progression_etapes %}
+                    {% if prog.1 > 0 %}
+                      <div style="margin-top:4px;min-width:110px;">
+                        <div style="font-size:.7rem;color:#475569;margin-bottom:2px;">{{ ex.score_preparation }}% ({{ prog.0 }}/{{ prog.1 }})</div>
+                        <div style="background:#e2e8f0;border-radius:999px;height:5px;overflow:hidden;">
+                          <div style="background:{% if ex.est_pret_pour_examen %}#10b981{% else %}#f59e0b{% endif %};height:100%;width:{{ ex.score_preparation }}%;"></div>
+                        </div>
+                      </div>
+                    {% endif %}
+                  {% endwith %}
+                </td>
                 <td><span class="badge badge-{{ ex.statut|lower }}">{{ ex.get_statut_display }}</span></td>
-                <td style="font-size:.8rem;color:#475569;max-width:200px;">{{ ex.resultat|default:"—"|truncatechars:80 }}</td>
+                <td style="text-align:right;white-space:nowrap;">
+                  {% if ex.statut_preparation != 'NON_REQUISE' %}
+                    <a href="{% url 'examen_fiche_preparation' ex.id %}" class="btn-sm-action" style="background:#ede9fe;color:#6d28d9;font-weight:700;">✅ Ma Checklist</a>
+                  {% else %}
+                    <span style="font-size:.77rem;color:#94a3b8;font-style:italic;">Aucune préparation requise</span>
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -353,9 +380,24 @@ table.med-table { width:100%; border-collapse:collapse; font-size:.875rem; }
 function switchNTab(name, btn) {
   document.querySelectorAll('.ntab-content').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.ntab').forEach(b => b.classList.remove('active'));
-  document.getElementById('ntab-' + name).classList.add('active');
-  btn.classList.add('active');
+  const target = document.getElementById('ntab-' + name);
+  if (target) target.classList.add('active');
+  if (btn) {
+    btn.classList.add('active');
+  } else {
+    const defaultBtn = document.querySelector(`.ntab[data-tab="${name}"]`);
+    if (defaultBtn) defaultBtn.classList.add('active');
+  }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get('tab') || window.location.hash.replace('#', '');
+  if (tab && document.getElementById('ntab-' + tab)) {
+    const btn = document.querySelector(`.ntab[data-tab="${tab}"]`);
+    switchNTab(tab, btn);
+  }
+});
 
 function openModal(id) {
   const m = document.getElementById(id);

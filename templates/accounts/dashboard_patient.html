@@ -118,12 +118,40 @@
             {% for ex in examens %}
             <div class="item-row">
               <div style="flex:1;">
-                <div class="item-title">{{ ex.titre }}</div>
-                <div class="item-meta">{{ ex.get_type_examen_display }} &bull; {{ ex.date_examen|date:"d M Y" }}
-                  {% if ex.medecin %}• Dr. {{ ex.medecin.get_full_name }}{% endif %}
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px;">
+                  <span class="item-title">{{ ex.titre }}</span>
+                  {% if ex.statut_preparation == 'VALIDEE' %}
+                    <span style="background:#dcfce7;color:#15803d;font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:10px;">🟢 Prêt</span>
+                  {% elif ex.statut_preparation == 'EN_COURS' %}
+                    <span style="background:#fef3c7;color:#b45309;font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:10px;">🔄 En cours</span>
+                  {% elif ex.statut_preparation == 'A_FAIRE' %}
+                    <span style="background:#fff7ed;color:#c2410c;font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:10px;">🟠 À préparer</span>
+                  {% endif %}
                 </div>
+                <div class="item-meta">{{ ex.get_type_examen_display }} &bull; {{ ex.date_examen|date:"d M Y" }}
+                  {% if ex.heure_examen %}&bull; 🕐 {{ ex.heure_examen|time:"H:i" }}{% endif %}
+                  {% if ex.medecin %}&bull; Dr. {{ ex.medecin.get_full_name }}{% endif %}
+                </div>
+                {% with prog=ex.progression_etapes %}
+                  {% if prog.1 > 0 %}
+                    <div style="margin-top:6px;">
+                      <div style="display:flex;justify-content:space-between;font-size:.71rem;font-weight:700;color:#475569;margin-bottom:3px;">
+                        <span>Préparation : {{ ex.score_preparation }}%</span>
+                        <span>{{ prog.0 }}/{{ prog.1 }} étapes</span>
+                      </div>
+                      <div style="background:#e2e8f0;border-radius:999px;height:7px;overflow:hidden;">
+                        <div style="background:{% if ex.est_pret_pour_examen %}#10b981{% else %}#f59e0b{% endif %};height:100%;width:{{ ex.score_preparation }}%;border-radius:999px;transition:width .5s;"></div>
+                      </div>
+                    </div>
+                  {% endif %}
+                {% endwith %}
               </div>
-              <span class="badge-statut badge-{{ ex.statut|lower }}">{{ ex.get_statut_display }}</span>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+                <span class="badge-statut badge-{{ ex.statut|lower }}">{{ ex.get_statut_display }}</span>
+                {% if ex.statut_preparation != 'NON_REQUISE' %}
+                  <a href="{% url 'examen_fiche_preparation' ex.id %}" class="btn-action" style="background:#ede9fe;color:#6d28d9;font-size:.74rem;padding:4px 10px;border-radius:8px;text-decoration:none;font-weight:700;">✅ Ma Checklist</a>
+                {% endif %}
+              </div>
             </div>
             {% endfor %}
           {% else %}

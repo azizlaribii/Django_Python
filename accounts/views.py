@@ -13,7 +13,9 @@ from .models import (
     User, DoctorProfile, LaboratoryProfile, PatientProfile,
     AssociationMedecinPatient, DossierMedical, ExamenMedical,
     ResultatLaboratoire, Prescription, ObservationMedicale,
+    EtapePreparationExamen,
 )
+from .protocoles import PROTOCOLES_PREPARATION, appliquer_protocole_examen
 from .forms import (
     LoginForm,
     RegisterForm,
@@ -52,6 +54,8 @@ def is_patient_check(user):
 
 def get_or_create_dossier(patient_user):
     """Crée ou récupère le dossier médical d'un patient."""
+    if not patient_user or getattr(patient_user, 'role', None) != User.Role.PATIENT:
+        return None
     dossier, _ = DossierMedical.objects.get_or_create(patient=patient_user)
     return dossier
 
@@ -147,7 +151,7 @@ def dashboard_router(request):
 @login_required
 def patient_dashboard(request):
     """Tableau de bord dédié aux patients."""
-    if not (request.user.is_patient or request.user.is_admin_user):
+    if not request.user.is_patient:
         messages.warning(request, "Accès réservé aux patients.")
         return redirect('dashboard')
 
@@ -155,7 +159,7 @@ def patient_dashboard(request):
     dossier = get_or_create_dossier(request.user)
 
     # Récupération des données réelles
-    examens = ExamenMedical.objects.filter(dossier=dossier).order_by('-date_examen')[:5]
+    examens = ExamenMedical.objects.filter(dossier=dossier).order_by('-date_creation', '-id')[:5]
     resultats = ResultatLaboratoire.objects.filter(
         dossier=dossier, statut__in=['DISPONIBLE', 'TRANSMIS'],
     ).order_by('-date_prescription')[:5]
@@ -194,13 +198,13 @@ def patient_dashboard(request):
 @login_required
 def patient_dossier(request):
     """Vue complète du dossier médical du patient connecté."""
-    if not (request.user.is_patient or request.user.is_admin_user):
+    if not request.user.is_patient:
         return redirect('dashboard')
 
     profile, _ = PatientProfile.objects.get_or_create(user=request.user)
     dossier = get_or_create_dossier(request.user)
 
-    examens = ExamenMedical.objects.filter(dossier=dossier).order_by('-date_examen')
+    examens = ExamenMedical.objects.filter(dossier=dossier).select_related('medecin').prefetch_related('etapes_preparation').order_by('-date_creation', '-id')
     resultats = ResultatLaboratoire.objects.filter(
         dossier=dossier, statut__in=['DISPONIBLE', 'TRANSMIS'],
     ).order_by('-date_prescription')
@@ -278,7 +282,7 @@ def doctor_dashboard(request):
     patients_ids = associations.values_list('patient_id', flat=True)
     examens_recents = ExamenMedical.objects.filter(
         medecin=request.user
-    ).select_related('dossier__patient').order_by('-date_examen')[:6]
+    ).select_related('dossier__patient').order_by('-date_creation', '-id')[:6]
 
     resultats_recents = ResultatLaboratoire.objects.filter(
         medecin_prescripteur=request.user
@@ -319,7 +323,10 @@ def doctor_patient_dossier(request, patient_id):
     if not (request.user.is_doctor or request.user.is_admin_user):
         return redirect('dashboard')
 
-    patient = get_object_or_404(User, id=patient_id, role=User.Role.PATIENT)
+    patient = User.objects.filter(id=patient_id, role=User.Role.PATIENT).first()
+    if not patient:
+        messages.error(request, "Patient introuvable ou le compte demandé n'est pas un patient.")
+        return redirect('dossiers_patients_list' if (request.user.is_admin_user or request.user.is_doctor) else 'dashboard')
 
     # Vérifier que ce médecin est associé à ce patient
     if request.user.is_doctor:
@@ -333,7 +340,7 @@ def doctor_patient_dossier(request, patient_id):
     profile, _ = PatientProfile.objects.get_or_create(user=patient)
     dossier = get_or_create_dossier(patient)
 
-    examens = ExamenMedical.objects.filter(dossier=dossier).order_by('-date_examen')
+    examens = ExamenMedical.objects.filter(dossier=dossier).order_by('-date_creation', '-id')
     resultats = ResultatLaboratoire.objects.filter(dossier=dossier).order_by('-date_prescription')
     prescriptions = Prescription.objects.filter(dossier=dossier).order_by('-date_prescription')
     observations = ObservationMedicale.objects.filter(dossier=dossier).order_by('-date_observation')
@@ -351,6 +358,8 @@ def doctor_patient_dossier(request, patient_id):
         'observations': observations,
         'medecins_assoc': medecins_assoc,
         'labs': labs,
+        'types_choices': ExamenMedical.TYPE_CHOICES,
+        'protocoles': PROTOCOLES_PREPARATION,
     })
 
 
@@ -420,8 +429,8 @@ def dissocier_patient(request, patient_id):
 @login_required
 @require_POST
 def add_examen(request, patient_id):
-    if not (request.user.is_doctor or request.user.is_admin_user):
-        return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
+    if not request.user.is_doctor:
+        return JsonResponse({'success': False, 'error': 'Action réservée aux médecins. L’administrateur peut uniquement consulter les examens.'}, status=403)
 
     patient = get_object_or_404(User, id=patient_id, role=User.Role.PATIENT)
     dossier = get_or_create_dossier(patient)
@@ -430,7 +439,20 @@ def add_examen(request, patient_id):
         examen = form.save(commit=False)
         examen.dossier = dossier
         examen.medecin = request.user
+
+        score_seuil = request.POST.get('score_seuil_validation')
+        if score_seuil:
+            try:
+                examen.score_seuil_validation = int(score_seuil)
+            except ValueError:
+                pass
         examen.save()
+
+        # Application automatique du protocole si sélectionné (ex: Coloscopie)
+        protocole = request.POST.get('protocole_type', '').strip()
+        if protocole and protocole in PROTOCOLES_PREPARATION:
+            appliquer_protocole_examen(examen, protocole)
+
         return JsonResponse({'success': True, 'message': 'Examen ajouté avec succès.'})
     return JsonResponse({'success': False, 'errors': form.errors})
 
@@ -453,13 +475,23 @@ def edit_examen(request, examen_id):
 @require_POST
 def delete_examen(request, examen_id):
     if not (request.user.is_doctor or request.user.is_admin_user):
-        return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
+        return redirect('dashboard')
 
     examen = get_object_or_404(ExamenMedical, id=examen_id)
-    patient_id = examen.dossier.patient.id
+    titre = examen.titre
     examen.delete()
-    messages.success(request, "Examen supprimé.")
-    return redirect('doctor_patient_dossier', patient_id=patient_id)
+    messages.success(request, f"L'examen « {titre} » a été supprimé.")
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True, 'message': 'Examen supprimé avec succès.'})
+
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER')
+    if next_url:
+        return redirect(next_url)
+
+    return redirect('examens_list')
 
 
 @login_required
@@ -1029,7 +1061,9 @@ def dossiers_patients_list(request):
     for p in patients:
         get_or_create_dossier(p)
 
-    dossiers_qs = DossierMedical.objects.select_related(
+    dossiers_qs = DossierMedical.objects.filter(
+        patient__role=User.Role.PATIENT
+    ).select_related(
         'patient', 'patient__patient_profile'
     ).prefetch_related(
         'patient__medecins_associes__medecin',
@@ -1065,10 +1099,10 @@ def dossiers_patients_list(request):
 
     docteurs = User.objects.filter(role=User.Role.DOCTEUR, is_active=True).order_by('last_name', 'first_name')
 
-    total_dossiers = DossierMedical.objects.count()
-    dossiers_avec_medecin = DossierMedical.objects.filter(patient__medecins_associes__isnull=False).distinct().count()
+    total_dossiers = DossierMedical.objects.filter(patient__role=User.Role.PATIENT).count()
+    dossiers_avec_medecin = DossierMedical.objects.filter(patient__role=User.Role.PATIENT, patient__medecins_associes__isnull=False).distinct().count()
     dossiers_sans_medecin = total_dossiers - dossiers_avec_medecin
-    dossiers_allergies = DossierMedical.objects.exclude(allergies='').exclude(allergies__isnull=True).count()
+    dossiers_allergies = DossierMedical.objects.filter(patient__role=User.Role.PATIENT).exclude(allergies='').exclude(allergies__isnull=True).count()
     examens_en_cours = ExamenMedical.objects.filter(statut__in=['PLANIFIE', 'EN_COURS']).count()
     analyses_en_cours = ResultatLaboratoire.objects.filter(statut__in=['EN_ATTENTE', 'EN_COURS']).count()
 
@@ -1272,8 +1306,8 @@ def examens_crud_list(request):
     - Recherche instantanée
     - Actions : Création, Modification, Fiche de préparation patient, Suppression, Validation préparation
     """
-    if not (request.user.is_doctor or request.user.is_laboratory or request.user.is_admin_user):
-        messages.warning(request, "Accès réservé au personnel médical et laboratoires.")
+    if not (request.user.is_doctor or request.user.is_admin_user):
+        messages.warning(request, "Accès réservé aux médecins et administrateurs.")
         return redirect('dashboard')
 
     search_q = request.GET.get('q', '').strip()
@@ -1287,7 +1321,7 @@ def examens_crud_list(request):
         'dossier__patient',
         'dossier__patient__patient_profile',
         'medecin'
-    ).order_by('-date_examen')
+    ).order_by('-date_creation', '-id')
 
     if search_q:
         examens_qs = examens_qs.filter(
@@ -1339,7 +1373,7 @@ def examens_crud_list(request):
     docteurs = User.objects.filter(role=User.Role.DOCTEUR, is_active=True).order_by('last_name', 'first_name')
 
     context = {
-        'examens': examens_qs,
+        'examens': examens_qs.prefetch_related('etapes_preparation'),
         'stats': stats,
         'search_q': search_q,
         'type_filter': type_filter,
@@ -1352,6 +1386,7 @@ def examens_crud_list(request):
         'prep_choices': prep_choices,
         'patients': patients,
         'docteurs': docteurs,
+        'protocoles': PROTOCOLES_PREPARATION,
     }
     return render(request, 'accounts/examens_list.html', context)
 
@@ -1360,8 +1395,8 @@ def examens_crud_list(request):
 @require_POST
 def add_examen_global(request):
     """Création d'un examen depuis la vue globale des examens."""
-    if not (request.user.is_doctor or request.user.is_admin_user):
-        return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
+    if not request.user.is_doctor:
+        return JsonResponse({'success': False, 'error': 'Action réservée aux médecins. L’administrateur peut uniquement consulter la liste des examens.'}, status=403)
 
     patient_id = request.POST.get('patient')
     if not patient_id:
@@ -1383,7 +1418,21 @@ def add_examen_global(request):
         examen = form.save(commit=False)
         examen.dossier = dossier
         examen.medecin = medecin
+
+        score_seuil = request.POST.get('score_seuil_validation')
+        if score_seuil:
+            try:
+                examen.score_seuil_validation = int(score_seuil)
+            except ValueError:
+                pass
+
         examen.save()
+
+        # Application automatique du protocole de préparation choisi (ex: Coloscopie)
+        protocole = request.POST.get('protocole_type', '').strip()
+        if protocole and protocole in PROTOCOLES_PREPARATION:
+            appliquer_protocole_examen(examen, protocole)
+
         return JsonResponse({
             'success': True,
             'message': f"L'examen '{examen.titre}' a été planifié avec succès pour {patient.get_full_name()}."
@@ -1393,23 +1442,27 @@ def add_examen_global(request):
 
 @login_required
 def examen_fiche_preparation(request, examen_id):
-    """Vue détaillée & imprimable de la fiche de préparation du patient."""
+    """Vue détaillée & imprimable de la fiche de préparation du patient avec checklist interactive."""
     examen = get_object_or_404(
-        ExamenMedical.objects.select_related('dossier__patient', 'dossier__patient__patient_profile', 'medecin'),
+        ExamenMedical.objects.select_related('dossier__patient', 'dossier__patient__patient_profile', 'medecin')
+        .prefetch_related('etapes_preparation__validee_par'),
         id=examen_id
     )
-    if not (request.user.is_doctor or request.user.is_admin_user or request.user.is_laboratory or request.user == examen.dossier.patient):
+    if not (request.user.is_doctor or request.user.is_admin_user or request.user == examen.dossier.patient):
         messages.error(request, "Accès refusé à cette fiche.")
         return redirect('dashboard')
 
     patient = examen.dossier.patient
     pp = getattr(patient, 'patient_profile', None)
+    etapes = examen.etapes_preparation.all().order_by('ordre', 'id')
 
     return render(request, 'accounts/examen_fiche_preparation.html', {
         'examen': examen,
         'patient': patient,
         'profile': pp,
         'dossier': examen.dossier,
+        'etapes': etapes,
+        'protocoles': PROTOCOLES_PREPARATION,
     })
 
 
@@ -1417,7 +1470,7 @@ def examen_fiche_preparation(request, examen_id):
 @require_POST
 def valider_preparation_examen(request, examen_id):
     """Action rapide pour marquer la préparation d'un examen comme VALIDEE."""
-    if not (request.user.is_doctor or request.user.is_admin_user or request.user.is_laboratory):
+    if not (request.user.is_doctor or request.user.is_admin_user):
         return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
 
     examen = get_object_or_404(ExamenMedical, id=examen_id)
@@ -1430,3 +1483,84 @@ def valider_preparation_examen(request, examen_id):
         'message': f"Préparation validée pour {examen.titre}.",
         'statut_display': examen.get_statut_preparation_display()
     })
+
+
+@login_required
+@require_POST
+def appliquer_protocole_a_examen(request, examen_id):
+    """Permet au médecin ou à l'administrateur d'appliquer un protocole prédéfini de préparation."""
+    if not (request.user.is_doctor or request.user.is_admin_user):
+        return JsonResponse({'success': False, 'error': 'Action réservée aux médecins et administrateurs.'}, status=403)
+
+    examen = get_object_or_404(ExamenMedical, id=examen_id)
+    protocole_key = request.POST.get('protocole_type', '').strip()
+
+    if protocole_key not in PROTOCOLES_PREPARATION:
+        return JsonResponse({'success': False, 'error': 'Protocole non reconnu.'}, status=400)
+
+    appliquer_protocole_examen(examen, protocole_key)
+
+    return JsonResponse({
+        'success': True,
+        'message': f"Protocole « {PROTOCOLES_PREPARATION[protocole_key]['nom']} » appliqué avec succès !",
+        'protocole_nom': PROTOCOLES_PREPARATION[protocole_key]['nom']
+    })
+
+
+@login_required
+@require_POST
+def toggle_etape_preparation(request, etape_id):
+    """Permet au patient ou au médecin de cocher/décocher une étape de préparation et recalcule le score."""
+    etape = get_object_or_404(
+        EtapePreparationExamen.objects.select_related('examen__dossier__patient'),
+        id=etape_id
+    )
+    examen = etape.examen
+
+    # Contrôle d'accès : le patient concerné, son médecin ou l'administrateur
+    if not (request.user == examen.dossier.patient or request.user.is_doctor or request.user.is_admin_user):
+        return JsonResponse({'success': False, 'error': 'Accès non autorisé.'}, status=403)
+
+    etape.est_validee = not etape.est_validee
+    if etape.est_validee:
+        etape.date_validation = timezone.now()
+        etape.validee_par = request.user
+    else:
+        etape.date_validation = None
+        etape.validee_par = None
+    etape.save()
+
+    # Recalcul automatique du score de préparation et mise à jour du statut_preparation
+    score = examen.recalculer_score_preparation(save=True)
+    validees, total = examen.progression_etapes
+    est_pret = examen.est_pret_pour_examen
+
+    if est_pret:
+        msg = f"🎉 Bravo ! Score seuil atteint ({score}% / {examen.score_seuil_validation}%). La préparation est validée : le patient est prêt pour l'examen !"
+    else:
+        msg = f"Étape mise à jour. Score de préparation actuel : {score}% (Seuil requis : {examen.score_seuil_validation}%)."
+
+    return JsonResponse({
+        'success': True,
+        'etape_id': etape.id,
+        'est_validee': etape.est_validee,
+        'date_validation': etape.date_validation.strftime('%d/%m/%Y à %H:%M') if etape.date_validation else None,
+        'score_preparation': score,
+        'score_seuil': examen.score_seuil_validation,
+        'statut_preparation': examen.statut_preparation,
+        'statut_display': examen.get_statut_preparation_display(),
+        'validees_count': validees,
+        'total_count': total,
+        'est_pret': est_pret,
+        'message': msg
+    })
+
+
+@login_required
+def get_protocole_details(request, protocole_id):
+    """Retourne les détails et étapes d'un protocole en JSON pour le formulaire d'ajout d'examen."""
+    proto = PROTOCOLES_PREPARATION.get(protocole_id)
+    if not proto:
+        return JsonResponse({'success': False, 'error': 'Protocole non trouvé.'}, status=404)
+    return JsonResponse({'success': True, 'protocole': proto})
+

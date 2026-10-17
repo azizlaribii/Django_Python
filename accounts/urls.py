@@ -71,4 +71,7 @@ urlpatterns = [
     path('examens/add/', views.add_examen_global, name='add_examen_global'),
     path('examens/<int:examen_id>/fiche/', views.examen_fiche_preparation, name='examen_fiche_preparation'),
     path('examens/<int:examen_id>/valider-preparation/', views.valider_preparation_examen, name='valider_preparation_examen'),
+    path('examens/<int:examen_id>/appliquer-protocole/', views.appliquer_protocole_a_examen, name='appliquer_protocole_a_examen'),
+    path('examens/etape/<int:etape_id>/toggle/', views.toggle_etape_preparation, name='toggle_etape_preparation'),
+    path('api/protocole/<str:protocole_id>/', views.get_protocole_details, name='api_protocole_details'),
 ]

@@ -342,14 +342,43 @@ class ExamenMedical(models.Model):
         ('ANNULE', 'Annulé'),
     ]
     TYPE_CHOICES = [
-        ('CONSULTATION', 'Consultation'),
-        ('RADIOLOGIE', 'Radiologie / Rayons X'),
-        ('BIOLOGIE', 'Biologie / Bilan'),
-        ('ECHOGRAPHIE', 'Échographie'),
-        ('SCANNER_IRM', 'Scanner / IRM'),
-        ('CARDIOLOGIE', 'Cardiologie / ECG'),
-        ('ENDOSCOPIE', 'Endoscopie'),
-        ('AUTRE', 'Autre'),
+        # ── ENDOSCOPIES DIGESTIVES
+        ('COLOSCOPIE', 'Coloscopie'),
+        ('FIBROSCOPIE', 'Fibroscopie / Gastroscopie (FOGD)'),
+        ('RECTO_SIGMO', 'Recto-sigmoïdoscopie'),
+        ('COLONOSCOPIE_VIRTUELLE', 'Coloscopie virtuelle (Colonoscanner)'),
+        # ── IMAGERIE PAR ÉCHOGRAPHIE
+        ('ECHO_ABDOMINALE', 'Échographie abdomino-pelvienne'),
+        ('ECHO_THYROIDE', 'Échographie thyroïdienne'),
+        ('ECHO_CARDIAQUE', 'Échocardiographie'),
+        ('ECHO_OBSTETRICALE', 'Échographie obstétricale'),
+        ('ECHO_MAMMAIRE', 'Échographie mammaire'),
+        ('ECHO_MUSCULO', 'Échographie musculo-squelettique'),
+        # ── SCANNER / TDM
+        ('SCANNER_TAP', 'Scanner thoraco-abdomino-pelvien (TAP) injecté'),
+        ('SCANNER_CEREBRAL', 'Scanner cérébral'),
+        ('SCANNER_RACHIS', 'Scanner du rachis'),
+        ('SCANNER_SINUS', 'Scanner des sinus'),
+        # ── IRM
+        ('IRM_CEREBRALE', 'IRM cérébrale'),
+        ('IRM_RACHIS', 'IRM du rachis / colonne vertébrale'),
+        ('IRM_PELVIENNE', 'IRM pelvienne'),
+        ('IRM_GENOU', 'IRM du genou / articulations'),
+        # ── RADIOLOGIE CONVENTIONNELLE
+        ('RADIO_THORAX', 'Radiographie pulmonaire / thorax'),
+        ('RADIO_OSSEUSE', 'Radiographie osseuse'),
+        ('MAMMOGRAPHIE', 'Mammographie'),
+        # ── CARDIOLOGIE
+        ('ECG', 'ECG / Électrocardiogramme'),
+        ('HOLTER_ECG', 'Holter ECG (24h)'),
+        ('HOLTER_PA', 'Holter tensionnel (MAPA 24h)'),
+        ('CORONAROGRAPHIE', 'Coronarographie'),
+        # ── AUTRES SPÉCIALITÉS
+        ('EFR', 'EFR — Épreuves fonctionnelles respiratoires'),
+        ('CYSTOSCOPIE', 'Cystoscopie'),
+        ('BIOPSIE', 'Biopsie'),
+        ('PONCTION', 'Ponction / Aspiration'),
+        ('AUTRE', 'Autre examen médical'),
     ]
 
     dossier = models.ForeignKey(
@@ -366,7 +395,7 @@ class ExamenMedical(models.Model):
         limit_choices_to={'role': User.Role.DOCTEUR},
         verbose_name="Médecin prescripteur"
     )
-    type_examen = models.CharField(max_length=20, choices=TYPE_CHOICES, default='CONSULTATION', verbose_name="Type")
+    type_examen = models.CharField(max_length=30, choices=TYPE_CHOICES, default='AUTRE', verbose_name="Type")
     titre = models.CharField(max_length=200, verbose_name="Intitulé de l'examen")
     description = models.TextField(blank=True, verbose_name="Description / Motif")
     date_examen = models.DateField(verbose_name="Date de l'examen")
@@ -376,15 +405,96 @@ class ExamenMedical(models.Model):
     statut_preparation = models.CharField(max_length=20, choices=STATUT_PREPARATION_CHOICES, default='NON_REQUISE', verbose_name="Statut de la préparation")
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='PLANIFIE', verbose_name="Statut")
     resultat = models.TextField(blank=True, verbose_name="Résultat / Compte-rendu")
+    score_preparation = models.PositiveIntegerField(default=0, verbose_name="Score de préparation (%)")
+    score_seuil_validation = models.PositiveIntegerField(default=100, verbose_name="Score seuil de validation (%)")
+    protocole_type = models.CharField(max_length=50, blank=True, default='', verbose_name="Protocole prédéfini")
     date_creation = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = "Examen Médical"
         verbose_name_plural = "Examens Médicaux"
-        ordering = ['-date_examen']
+        ordering = ['-date_creation', '-id']
 
     def __str__(self):
         return f"{self.titre} — {self.dossier.patient.get_full_name()} ({self.date_examen})"
+
+    def recalculer_score_preparation(self, save=True):
+        """Recalcule automatiquement le score de préparation et met à jour le statut."""
+        etapes = self.etapes_preparation.all()
+        if not etapes.exists():
+            return self.score_preparation
+
+        total_points = sum(e.points for e in etapes)
+        if total_points == 0:
+            total_points = etapes.count()
+            points_valides = sum(1 for e in etapes if e.est_validee)
+        else:
+            points_valides = sum(e.points for e in etapes if e.est_validee)
+
+        nouveau_score = min(100, round((points_valides / total_points) * 100))
+        self.score_preparation = nouveau_score
+
+        # Mise à jour automatique du statut selon le score seuil fixé par le médecin
+        if nouveau_score >= self.score_seuil_validation:
+            self.statut_preparation = 'VALIDEE'
+        elif nouveau_score > 0:
+            self.statut_preparation = 'EN_COURS'
+        else:
+            self.statut_preparation = 'A_FAIRE'
+
+        if save:
+            self.save(update_fields=['score_preparation', 'statut_preparation'])
+
+        return nouveau_score
+
+    @property
+    def est_pret_pour_examen(self):
+        """Indique si le patient a atteint le score seuil requis."""
+        return self.score_preparation >= self.score_seuil_validation
+
+    @property
+    def progression_etapes(self):
+        """Retourne (nb_validees, total_etapes)"""
+        etapes = self.etapes_preparation.all()
+        total = etapes.count()
+        validees = sum(1 for e in etapes if e.est_validee)
+        return validees, total
+
+
+# ─────────────────────────────────────────────────────────────
+# ÉTAPES DE PRÉPARATION DE L'EXAMEN (CHECKLIST PATIENT)
+# ─────────────────────────────────────────────────────────────
+class EtapePreparationExamen(models.Model):
+    examen = models.ForeignKey(
+        ExamenMedical,
+        on_delete=models.CASCADE,
+        related_name='etapes_preparation',
+        verbose_name="Examen médical"
+    )
+    titre = models.CharField(max_length=255, verbose_name="Intitulé de l'étape")
+    description = models.TextField(blank=True, default='', verbose_name="Consignes détaillées")
+    delai = models.CharField(max_length=100, blank=True, default='', verbose_name="Délai / Quand (ex: J-3, J-1 soir, Jour J matin)")
+    points = models.PositiveIntegerField(default=20, verbose_name="Poids / Points de l'étape")
+    est_validee = models.BooleanField(default=False, verbose_name="Validée par le patient")
+    date_validation = models.DateTimeField(null=True, blank=True, verbose_name="Date de validation")
+    validee_par = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='etapes_validees',
+        verbose_name="Validé par"
+    )
+    ordre = models.PositiveIntegerField(default=0, verbose_name="Ordre d'affichage")
+
+    class Meta:
+        verbose_name = "Étape de Préparation"
+        verbose_name_plural = "Étapes de Préparation"
+        ordering = ['ordre', 'id']
+
+    def __str__(self):
+        return f"{self.delai} - {self.titre} ({'✓' if self.est_validee else '○'})"
+
 
 
 # ─────────────────────────────────────────────────────────────
