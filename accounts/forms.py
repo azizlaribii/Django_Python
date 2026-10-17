@@ -303,15 +303,46 @@ class ExamenMedicalForm(forms.ModelForm):
 
     class Meta:
         model = ExamenMedical
-        fields = ['titre', 'type_examen', 'description', 'date_examen', 'heure_examen', 'statut', 'resultat']
+        fields = [
+            'titre', 'type_examen', 'description', 'date_examen', 'heure_examen',
+            'lieu_examen', 'consignes_preparation', 'statut_preparation', 'statut', 'resultat'
+        ]
         widgets = {
-            'titre': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'ex: Radiographie thoracique'}),
+            'titre': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'ex: Échographie abdominale / Radiographie'}),
             'type_examen': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={'class': 'form-input', 'rows': 2, 'placeholder': 'Motif ou description'}),
             'date_examen': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
+            'lieu_examen': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'ex: Salle d\'imagerie 2 / Service Radiologie'}),
+            'consignes_preparation': forms.Textarea(attrs={
+                'class': 'form-input',
+                'rows': 3,
+                'placeholder': 'ex: À jeun strict depuis 6h. Boire 1L d\'eau 1h avant sans uriner. Apporter anciens clichés.'
+            }),
+            'statut_preparation': forms.Select(attrs={'class': 'form-select'}),
             'statut': forms.Select(attrs={'class': 'form-select'}),
             'resultat': forms.Textarea(attrs={'class': 'form-input', 'rows': 3, 'placeholder': 'Compte-rendu du résultat'}),
         }
+
+
+class ExamenMedicalFullForm(ExamenMedicalForm):
+    patient = forms.ModelChoiceField(
+        queryset=User.objects.filter(role=User.Role.PATIENT, is_active=True),
+        label="Patient",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    medecin = forms.ModelChoiceField(
+        queryset=User.objects.filter(role=User.Role.DOCTEUR, is_active=True),
+        required=False,
+        label="Médecin prescripteur / réalisateur",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta(ExamenMedicalForm.Meta):
+        fields = [
+            'patient', 'medecin', 'titre', 'type_examen', 'description',
+            'date_examen', 'heure_examen', 'lieu_examen', 'consignes_preparation',
+            'statut_preparation', 'statut', 'resultat'
+        ]
 
 
 class ResultatLaboratoireForm(forms.ModelForm):
@@ -387,3 +418,56 @@ class DossierMedicalForm(forms.ModelForm):
             'allergies': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
             'antecedents_familiaux': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
         }
+
+
+class NouveauPatientDossierForm(forms.Form):
+    username = forms.CharField(label="Nom d'utilisateur / Identifiant", widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'ex: jean_dupont'}))
+    first_name = forms.CharField(label="Prénom", widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'ex: Jean'}))
+    last_name = forms.CharField(label="Nom", widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'ex: Dupont'}))
+    email = forms.EmailField(label="Email", required=False, widget=forms.EmailInput(attrs={'class': 'form-input', 'placeholder': 'jean.dupont@email.com'}))
+    phone = forms.CharField(label="Téléphone", required=False, widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': '06 12 34 56 78'}))
+    city = forms.CharField(label="Ville", required=False, widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Paris'}))
+    address = forms.CharField(label="Adresse", required=False, widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': '12 rue de la Paix'}))
+
+    date_naissance = forms.DateField(label="Date de naissance", required=False, widget=forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}))
+    groupe_sanguin = forms.ChoiceField(choices=PatientProfile.BLOOD_GROUPS, required=False, label="Groupe sanguin", widget=forms.Select(attrs={'class': 'form-select'}))
+    numero_securite_sociale = forms.CharField(label="N° Sécurité Sociale", required=False, widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': '1 85 03 75 123 456 78'}))
+    personne_contact = forms.CharField(label="Contact d'urgence", required=False, widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Nom et Téléphone du contact'}))
+    antecedents = forms.CharField(label="Antécédents médicaux personnels", required=False, widget=forms.Textarea(attrs={'class': 'form-input', 'rows': 2, 'placeholder': 'Antécédents du patient...'}))
+
+    allergies = forms.CharField(label="Allergies connues", required=False, widget=forms.Textarea(attrs={'class': 'form-input', 'rows': 2, 'placeholder': 'ex: Pénicilline, arachides, aspirine...'}))
+    antecedents_familiaux = forms.CharField(label="Antécédents familiaux", required=False, widget=forms.Textarea(attrs={'class': 'form-input', 'rows': 2, 'placeholder': 'ex: Diabète type 2, HTA, cardiopathie...'}))
+    notes_generales = forms.CharField(label="Notes générales du dossier", required=False, widget=forms.Textarea(attrs={'class': 'form-input', 'rows': 2, 'placeholder': 'Notes de suivi initiales...'}))
+
+    medecin_traitant = forms.ModelChoiceField(
+        queryset=User.objects.filter(role=User.Role.DOCTEUR, is_active=True),
+        required=False,
+        label="Médecin traitant assigné",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+
+class PatientDossierEditForm(forms.Form):
+    first_name = forms.CharField(label="Prénom", widget=forms.TextInput(attrs={'class': 'form-input'}))
+    last_name = forms.CharField(label="Nom", widget=forms.TextInput(attrs={'class': 'form-input'}))
+    email = forms.EmailField(label="Email", required=False, widget=forms.EmailInput(attrs={'class': 'form-input'}))
+    phone = forms.CharField(label="Téléphone", required=False, widget=forms.TextInput(attrs={'class': 'form-input'}))
+    city = forms.CharField(label="Ville", required=False, widget=forms.TextInput(attrs={'class': 'form-input'}))
+    address = forms.CharField(label="Adresse", required=False, widget=forms.TextInput(attrs={'class': 'form-input'}))
+
+    date_naissance = forms.DateField(label="Date de naissance", required=False, widget=forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}))
+    groupe_sanguin = forms.ChoiceField(choices=PatientProfile.BLOOD_GROUPS, required=False, label="Groupe sanguin", widget=forms.Select(attrs={'class': 'form-select'}))
+    numero_securite_sociale = forms.CharField(label="N° Sécurité Sociale", required=False, widget=forms.TextInput(attrs={'class': 'form-input'}))
+    personne_contact = forms.CharField(label="Contact d'urgence", required=False, widget=forms.TextInput(attrs={'class': 'form-input'}))
+    antecedents = forms.CharField(label="Antécédents personnels", required=False, widget=forms.Textarea(attrs={'class': 'form-input', 'rows': 2}))
+
+    allergies = forms.CharField(label="Allergies connues", required=False, widget=forms.Textarea(attrs={'class': 'form-input', 'rows': 2}))
+    antecedents_familiaux = forms.CharField(label="Antécédents familiaux", required=False, widget=forms.Textarea(attrs={'class': 'form-input', 'rows': 2}))
+    notes_generales = forms.CharField(label="Notes générales", required=False, widget=forms.Textarea(attrs={'class': 'form-input', 'rows': 2}))
+
+    medecin_traitant = forms.ModelChoiceField(
+        queryset=User.objects.filter(role=User.Role.DOCTEUR, is_active=True),
+        required=False,
+        label="Médecin traitant",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )

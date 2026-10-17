@@ -1,0 +1,782 @@
+{% extends 'base.html' %}
+{% block title %}Gestion des Dossiers Patients — SantéConnect{% endblock %}
+
+{% block extra_css %}
+<style>
+.dossier-hero {
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #fff;
+  border-radius: 20px;
+  padding: 26px 30px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.25);
+}
+.dossier-hero h1 { font-size: 1.7rem; font-weight: 800; margin-bottom: 4px; }
+.dossier-hero p { opacity: .9; font-size: .9rem; }
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px 18px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.04);
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: transform .2s, box-shadow .2s;
+}
+.kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+.kpi-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.35rem; flex-shrink: 0;
+}
+.kpi-val { font-size: 1.75rem; font-weight: 800; line-height: 1; }
+.kpi-lbl { font-size: .78rem; color: #64748b; margin-top: 3px; font-weight: 600; }
+
+.card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 2px 14px rgba(0,0,0,.05);
+  border: 1px solid #e2e8f0;
+}
+
+.filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+  background: #f8fafc;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  align-items: center;
+}
+.filter-input {
+  flex: 1;
+  min-width: 220px;
+  padding: 9px 14px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: .875rem;
+  outline: none;
+  background: #fff;
+}
+.filter-input:focus { border-color: #0284c7; }
+.filter-select {
+  padding: 9px 12px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: .85rem;
+  outline: none;
+  background: #fff;
+  font-weight: 500;
+  color: #334155;
+}
+.filter-select:focus { border-color: #0284c7; }
+
+.table-wrap { overflow-x: auto; }
+table.med-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.med-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+}
+.med-table td {
+  padding: 14px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+.med-table tr:hover td { background: #f0f9ff; }
+
+/* Badges */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: .74rem; font-weight: 700; }
+.badge-blood { background: #fee2e2; color: #dc2626; font-weight: 800; border: 1px solid #fecaca; }
+.badge-traitant { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.badge-no-traitant { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+.badge-allergy { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; font-size: .72rem; }
+
+/* Buttons */
+.btn-primary-blue {
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #fff;
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-size: .85rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+  transition: all .2s;
+}
+.btn-primary-blue:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(2, 132, 199, 0.35); }
+
+.btn-act { padding: 6px 10px; border-radius: 8px; font-size: .76rem; font-weight: 700; border: none; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+.btn-act-dossier { background: #0284c7; color: #fff; }
+.btn-act-dossier:hover { background: #0369a1; }
+.btn-act-edit { background: #fef3c7; color: #b45309; }
+.btn-act-edit:hover { background: #fde68a; }
+.btn-act-assoc { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+.btn-act-assoc:hover { background: #d1fae5; }
+.btn-act-exam { background: #ede9fe; color: #6d28d9; }
+.btn-act-exam:hover { background: #ddd6fe; }
+.btn-act-del { background: #fee2e2; color: #dc2626; }
+.btn-act-del:hover { background: #fecaca; }
+
+/* MODALS */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, .55); z-index: 1000; backdrop-filter: blur(4px); align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal-box { background: #fff; border-radius: 20px; padding: 26px 30px; width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.25); animation: modalIn .2s ease; }
+@keyframes modalIn { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; }
+.modal-title { font-size: 1.15rem; font-weight: 800; color: #0f172a; }
+.modal-close { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #64748b; }
+.modal-close:hover { color: #0f172a; }
+
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: .8rem; font-weight: 700; color: #374151; margin-bottom: 5px; }
+.form-group .form-input, .form-group .form-select {
+  width: 100%; padding: 9px 13px; border: 1.5px solid #cbd5e1; border-radius: 9px; font-size: .875rem;
+  outline: none; box-sizing: border-box; font-family: inherit; transition: border-color .15s;
+}
+.form-group .form-input:focus, .form-group .form-select:focus { border-color: #0284c7; }
+.form-group textarea.form-input { resize: vertical; min-height: 70px; }
+.form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+.btn-cancel { padding: 9px 16px; border-radius: 9px; border: 1.5px solid #cbd5e1; background: #fff; cursor: pointer; font-weight: 600; color: #64748b; }
+.btn-save { background: #0284c7; color: #fff; padding: 9px 20px; border-radius: 9px; font-weight: 700; border: none; cursor: pointer; }
+.btn-save:hover { background: #0369a1; }
+
+.alert-success { background: #dcfce7; color: #15803d; padding: 10px 16px; border-radius: 9px; margin-bottom: 14px; font-size: .85rem; display: none; }
+.alert-error { background: #fee2e2; color: #dc2626; padding: 10px 16px; border-radius: 9px; margin-bottom: 14px; font-size: .85rem; display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <!-- HERO -->
+  <div class="dossier-hero">
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="background:rgba(255,255,255,.2);padding:3px 12px;border-radius:20px;font-size:.78rem;font-weight:700;">📁 Gestion Médicale</span>
+        <span style="background:rgba(255,255,255,.15);padding:3px 10px;border-radius:20px;font-size:.75rem;">Dossiers Patients</span>
+      </div>
+      <h1>Dossiers Médicaux des Patients</h1>
+      <p>Recherche instantanée, modification complète des antécédents, association médecin traitant et vue globale 360°.</p>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn-primary-blue" style="background:#fff;color:#0369a1;" onclick="openNewPatientModal()">
+        ➕ Nouveau Dossier Patient
+      </button>
+      <a href="{% url 'examens_list' %}" class="btn-primary-blue" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);">
+        🩺 Gestion des Examens
+      </a>
+    </div>
+  </div>
+
+  <!-- KPIS -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#e0f2fe;color:#0284c7;">📁</div>
+      <div><div class="kpi-val" style="color:#0284c7;">{{ stats.total }}</div><div class="kpi-lbl">Total Dossiers</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#dcfce7;color:#15803d;">🩺</div>
+      <div><div class="kpi-val" style="color:#15803d;">{{ stats.avec_medecin }}</div><div class="kpi-lbl">Avec Médecin Traitant</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#fff7ed;color:#c2410c;">⚠️</div>
+      <div><div class="kpi-val" style="color:#c2410c;">{{ stats.sans_medecin }}</div><div class="kpi-lbl">Sans Médecin Traitant</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#fee2e2;color:#dc2626;">🛡️</div>
+      <div><div class="kpi-val" style="color:#dc2626;">{{ stats.allergies }}</div><div class="kpi-lbl">Dossiers avec Allergies</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#f3e8ff;color:#7c3aed;">🧪</div>
+      <div><div class="kpi-val" style="color:#7c3aed;">{{ stats.examens_en_cours }}</div><div class="kpi-lbl">Examens en cours</div></div>
+    </div>
+  </div>
+
+  <!-- MAIN CARD -->
+  <div class="card">
+
+    <!-- FILTERS BAR -->
+    <form method="get" class="filters-bar" id="filters-form">
+      <input type="text" name="q" value="{{ search_q }}" placeholder="🔍 Rechercher par nom, prénom, N° dossier, N° sécu, téléphone, ville..." class="filter-input">
+      
+      <select name="groupe" class="filter-select" onchange="this.form.submit()">
+        <option value="ALL">Tous les Groupes Sanguins</option>
+        {% for code, label in blood_groups %}
+          <option value="{{ code }}" {% if groupe_filter == code %}selected{% endif %}>🩸 Groupe {{ label }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="medecin" class="filter-select" onchange="this.form.submit()">
+        <option value="ALL">Tous les Médecins</option>
+        <option value="NONE" {% if medecin_filter == 'NONE' %}selected{% endif %}>⚠️ Sans médecin traitant</option>
+        {% for d in docteurs %}
+          <option value="{{ d.id }}" {% if medecin_filter == d.id|stringformat:"s" %}selected{% endif %}>Dr. {{ d.get_full_name|default:d.username }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="allergies" class="filter-select" onchange="this.form.submit()">
+        <option value="ALL">Toutes les Allergies</option>
+        <option value="YES" {% if allergies_filter == 'YES' %}selected{% endif %}>⚠️ Avec allergies signalées</option>
+        <option value="NO" {% if allergies_filter == 'NO' %}selected{% endif %}>Sans allergie connue</option>
+      </select>
+
+      <button type="submit" class="btn-primary-blue" style="padding:9px 14px;">Filtrer</button>
+      {% if search_q or groupe_filter != 'ALL' or medecin_filter != 'ALL' or allergies_filter != 'ALL' %}
+        <a href="{% url 'dossiers_patients_list' %}" style="color:#dc2626;font-size:.85rem;font-weight:700;text-decoration:none;padding:8px;">✕ Réinitialiser</a>
+      {% endif %}
+    </form>
+
+    <!-- TABLE DOSSIERS -->
+    {% if dossiers %}
+      <div class="table-wrap">
+        <table class="med-table">
+          <thead>
+            <tr>
+              <th>Dossier</th>
+              <th>Patient & Coordonnées</th>
+              <th>Groupe Sanguin</th>
+              <th>Médecin Traitant Associé</th>
+              <th>Profil Clinique & Alertes</th>
+              <th>Dernière MÀJ</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in dossiers %}
+            <tr>
+              <!-- N° Dossier -->
+              <td>
+                <a href="{% url 'doctor_patient_dossier' d.patient.id %}" style="font-weight:800;color:#0284c7;text-decoration:none;font-size:.9rem;">
+                  #{{ d.numero_dossier }}
+                </a>
+                <div style="font-size:.72rem;color:#94a3b8;">Créé le {{ d.date_creation|date:"d/m/Y" }}</div>
+              </td>
+
+              <!-- Patient -->
+              <td>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0;">
+                    {{ d.patient.first_name|first|upper }}{{ d.patient.last_name|first|upper }}
+                  </div>
+                  <div>
+                    <a href="{% url 'doctor_patient_dossier' d.patient.id %}" style="font-weight:700;color:#0f172a;text-decoration:none;">
+                      {{ d.patient.get_full_name|default:d.patient.username }}
+                    </a>
+                    <div style="font-size:.75rem;color:#64748b;">
+                      {% with d.patient.patient_profile as pp %}
+                        {% if pp.date_naissance %}Né(e) le {{ pp.date_naissance|date:"d M Y" }} &bull; {% endif %}
+                      {% endwith %}
+                      {% if d.patient.phone %}📞 {{ d.patient.phone }}{% elif d.patient.email %}✉ {{ d.patient.email }}{% endif %}
+                    </div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Groupe sanguin -->
+              <td>
+                {% with d.patient.patient_profile as pp %}
+                  {% if pp.groupe_sanguin %}
+                    <span class="badge badge-blood">🩸 {{ pp.groupe_sanguin }}</span>
+                  {% else %}
+                    <span style="color:#94a3b8;font-size:.8rem;">Non renseigné</span>
+                  {% endif %}
+                {% endwith %}
+              </td>
+
+              <!-- Médecin Traitant -->
+              <td>
+                {% with d.patient.medecins_associes.all as assocs %}
+                  {% if assocs %}
+                    {% for a in assocs %}
+                      {% if a.est_medecin_traitant %}
+                        <div style="display:flex;align-items:center;gap:6px;">
+                          <span class="badge badge-traitant">🩺 Dr. {{ a.medecin.get_full_name }}</span>
+                          <button class="btn-act" style="background:transparent;color:#0284c7;padding:2px 4px;" title="Changer de médecin" onclick="openAssocierModal('{{ d.patient.id }}', '{{ d.patient.get_full_name|escapejs }}', '{{ a.medecin.id }}')">⚙️</button>
+                        </div>
+                        <div style="font-size:.73rem;color:#64748b;margin-top:2px;">{{ a.medecin.doctor_profile.specialite|default:'Médecin Traitant' }}</div>
+                      {% endif %}
+                    {% endfor %}
+                  {% else %}
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <span class="badge badge-no-traitant">⚠️ Non assigné</span>
+                      <button class="btn-act btn-act-assoc" onclick="openAssocierModal('{{ d.patient.id }}', '{{ d.patient.get_full_name|escapejs }}', '')">+ Associer</button>
+                    </div>
+                  {% endif %}
+                {% endwith %}
+              </td>
+
+              <!-- Profil clinique & alertes -->
+              <td>
+                {% if d.allergies %}
+                  <div class="badge badge-allergy" title="{{ d.allergies }}">
+                    ⚠️ Allergies : {{ d.allergies|truncatechars:25 }}
+                  </div>
+                {% endif %}
+                <div style="font-size:.75rem;color:#64748b;margin-top:4px;display:flex;gap:8px;">
+                  <span>🩺 {{ d.examens.count }} examen(s)</span>
+                  <span>🔬 {{ d.resultats_labo.count }} analyse(s)</span>
+                </div>
+              </td>
+
+              <!-- Date MÀJ -->
+              <td style="font-size:.78rem;color:#64748b;white-space:nowrap;">
+                {{ d.date_mise_a_jour|date:"d M Y H:i" }}
+              </td>
+
+              <!-- Actions -->
+              <td style="text-align:right;white-space:nowrap;">
+                <a href="{% url 'doctor_patient_dossier' d.patient.id %}" class="btn-act btn-act-dossier" title="Consulter la vue 360° du dossier">
+                  📁 Voir Dossier
+                </a>
+                <button class="btn-act btn-act-edit" title="Modifier les informations du patient et du dossier" onclick="openEditDossierModal('{{ d.patient.id }}')">
+                  ✏️ Modifier
+                </button>
+                <button class="btn-act btn-act-assoc" title="Associer ou changer de médecin traitant" onclick="openAssocierModal('{{ d.patient.id }}', '{{ d.patient.get_full_name|escapejs }}', '')">
+                  🩺 Associer
+                </button>
+                <button class="btn-act btn-act-del" title="Supprimer ce dossier" onclick="confirmDeleteDossier('{% url 'delete_patient_dossier' d.patient.id %}', '{{ d.patient.get_full_name|escapejs }}')">
+                  🗑
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="text-align:center;padding:50px 20px;color:#94a3b8;">
+        <div style="font-size:3.5rem;margin-bottom:12px;">📁</div>
+        <h3 style="color:#0f172a;font-size:1.1rem;margin-bottom:6px;">Aucun dossier médical trouvé</h3>
+        <p style="font-size:.875rem;">{% if search_q %}Aucun patient ne correspond à votre recherche.{% else %}Créez un premier dossier patient ci-dessous.{% endif %}</p>
+        <button class="btn-primary-blue" style="margin-top:14px;" onclick="openNewPatientModal()">➕ Créer un Dossier Patient</button>
+      </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- MODALES -->
+<!-- ═══════════════════════════════════════════════════ -->
+
+<!-- MODAL NOUVEAU PATIENT & DOSSIER -->
+<div class="modal-overlay" id="modal-new-patient" onclick="closeModalOnOverlay(event, 'modal-new-patient')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">➕ Nouveau Dossier Médical Patient</span>
+      <button class="modal-close" onclick="closeModal('modal-new-patient')">✕</button>
+    </div>
+    <div class="alert-success" id="new-patient-success">✓ Patient et dossier créés avec succès !</div>
+    <div class="alert-error" id="new-patient-error"></div>
+
+    <form id="form-new-patient" onsubmit="event.preventDefault(); submitNewPatient();">
+      <div style="font-weight:700;color:#0284c7;font-size:.85rem;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;">1. Identité du Patient</div>
+      <div class="form-row3">
+        <div class="form-group">
+          <label>Identifiant unique *</label>
+          <input type="text" class="form-input" id="np-username" placeholder="ex: j_dupont" required>
+        </div>
+        <div class="form-group">
+          <label>Prénom *</label>
+          <input type="text" class="form-input" id="np-first-name" placeholder="Jean" required>
+        </div>
+        <div class="form-group">
+          <label>Nom *</label>
+          <input type="text" class="form-input" id="np-last-name" placeholder="Dupont" required>
+        </div>
+      </div>
+
+      <div class="form-row3">
+        <div class="form-group">
+          <label>Date de naissance</label>
+          <input type="date" class="form-input" id="np-date-naissance">
+        </div>
+        <div class="form-group">
+          <label>Groupe sanguin</label>
+          <select class="form-select" id="np-groupe-sanguin">
+            {% for code, label in blood_groups %}
+              <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>N° Sécurité Sociale</label>
+          <input type="text" class="form-input" id="np-secu" placeholder="1 85 03 75...">
+        </div>
+      </div>
+
+      <div class="form-row2">
+        <div class="form-group">
+          <label>Téléphone</label>
+          <input type="text" class="form-input" id="np-phone" placeholder="06 12 34 56 78">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" class="form-input" id="np-email" placeholder="contact@email.com">
+        </div>
+      </div>
+
+      <div class="form-row2">
+        <div class="form-group">
+          <label>Ville</label>
+          <input type="text" class="form-input" id="np-city" placeholder="Paris">
+        </div>
+        <div class="form-group">
+          <label>Contact en cas d'urgence</label>
+          <input type="text" class="form-input" id="np-contact-urgence" placeholder="Nom & Téléphone du proche">
+        </div>
+      </div>
+
+      <div style="font-weight:700;color:#0284c7;font-size:.85rem;margin:16px 0 10px;text-transform:uppercase;letter-spacing:.05em;">2. Prise en Charge Médicale & Traitant</div>
+      <div class="form-group">
+        <label>Médecin Traitant Assigné</label>
+        <select class="form-select" id="np-medecin">
+          <option value="">— Aucun / Sélectionner plus tard —</option>
+          {% for d in docteurs %}
+            <option value="{{ d.id }}" {% if user.id == d.id %}selected{% endif %}>Dr. {{ d.get_full_name }} ({{ d.doctor_profile.specialite|default:'Médecin' }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="font-weight:700;color:#0284c7;font-size:.85rem;margin:16px 0 10px;text-transform:uppercase;letter-spacing:.05em;">3. Données Cliniques & Antécédents</div>
+      <div class="form-group">
+        <label style="color:#dc2626;">⚠️ Allergies connues (médicaments, substances, aliments)</label>
+        <textarea class="form-input" id="np-allergies" rows="2" placeholder="ex: Pénicilline, aspirine, latex, arachides..."></textarea>
+      </div>
+      <div class="form-row2">
+        <div class="form-group">
+          <label>Antécédents personnels</label>
+          <textarea class="form-input" id="np-antecedents" rows="2" placeholder="HTA, asthme, diabète..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Antécédents familiaux</label>
+          <textarea class="form-input" id="np-antecedents-fam" rows="2" placeholder="Cardiopathies, cancers..."></textarea>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes générales du dossier</label>
+        <textarea class="form-input" id="np-notes" rows="2" placeholder="Observations initiales..."></textarea>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" onclick="closeModal('modal-new-patient')">Annuler</button>
+        <button type="submit" class="btn-save">✓ Créer le Dossier Patient</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL MODIFIER DOSSIER & PATIENT -->
+<div class="modal-overlay" id="modal-edit-dossier" onclick="closeModalOnOverlay(event, 'modal-edit-dossier')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Modifier les Informations du Patient & Dossier</span>
+      <button class="modal-close" onclick="closeModal('modal-edit-dossier')">✕</button>
+    </div>
+    <div class="alert-success" id="edit-dossier-success">✓ Informations enregistrées !</div>
+    <div class="alert-error" id="edit-dossier-error"></div>
+    <input type="hidden" id="ed-patient-id">
+
+    <div style="background:#f0f9ff;border:1px solid #bae6fd;padding:10px 14px;border-radius:10px;margin-bottom:16px;font-size:.85rem;color:#0369a1;">
+      📁 Dossier : <strong id="ed-numero-dossier"></strong> &bull; Identifiant : <strong id="ed-username-display"></strong>
+    </div>
+
+    <div style="font-weight:700;color:#0284c7;font-size:.85rem;margin-bottom:10px;text-transform:uppercase;">1. État Civil & Coordonnées</div>
+    <div class="form-row2">
+      <div class="form-group"><label>Prénom *</label><input type="text" class="form-input" id="ed-first-name" required></div>
+      <div class="form-group"><label>Nom *</label><input type="text" class="form-input" id="ed-last-name" required></div>
+    </div>
+    <div class="form-row3">
+      <div class="form-group"><label>Date de naissance</label><input type="date" class="form-input" id="ed-date-naissance"></div>
+      <div class="form-group">
+        <label>Groupe sanguin</label>
+        <select class="form-select" id="ed-groupe-sanguin">
+          {% for code, label in blood_groups %}
+            <option value="{{ code }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group"><label>N° Sécurité Sociale</label><input type="text" class="form-input" id="ed-secu"></div>
+    </div>
+    <div class="form-row2">
+      <div class="form-group"><label>Téléphone</label><input type="text" class="form-input" id="ed-phone"></div>
+      <div class="form-group"><label>Email</label><input type="email" class="form-input" id="ed-email"></div>
+    </div>
+    <div class="form-row2">
+      <div class="form-group"><label>Ville</label><input type="text" class="form-input" id="ed-city"></div>
+      <div class="form-group"><label>Contact d'urgence</label><input type="text" class="form-input" id="ed-contact-urgence"></div>
+    </div>
+
+    <div style="font-weight:700;color:#0284c7;font-size:.85rem;margin:16px 0 10px;text-transform:uppercase;">2. Médecin Traitant</div>
+    <div class="form-group">
+      <label>Médecin Traitant Principal</label>
+      <select class="form-select" id="ed-medecin-traitant">
+        <option value="">— Aucun médecin assigné —</option>
+        {% for d in docteurs %}
+          <option value="{{ d.id }}">Dr. {{ d.get_full_name }} ({{ d.doctor_profile.specialite|default:'Docteur' }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="font-weight:700;color:#0284c7;font-size:.85rem;margin:16px 0 10px;text-transform:uppercase;">3. Données Cliniques du Dossier</div>
+    <div class="form-group">
+      <label style="color:#dc2626;">⚠️ Allergies connues</label>
+      <textarea class="form-input" id="ed-allergies" rows="2"></textarea>
+    </div>
+    <div class="form-row2">
+      <div class="form-group"><label>Antécédents personnels</label><textarea class="form-input" id="ed-antecedents" rows="2"></textarea></div>
+      <div class="form-group"><label>Antécédents familiaux</label><textarea class="form-input" id="ed-antecedents-fam" rows="2"></textarea></div>
+    </div>
+    <div class="form-group"><label>Notes générales de suivi</label><textarea class="form-input" id="ed-notes" rows="2"></textarea></div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" onclick="closeModal('modal-edit-dossier')">Annuler</button>
+      <button type="button" class="btn-save" onclick="submitEditDossier()">✓ Enregistrer les modifications</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ASSOCIER MEDECIN -->
+<div class="modal-overlay" id="modal-associer" onclick="closeModalOnOverlay(event, 'modal-associer')">
+  <div style="background:#fff;border-radius:18px;padding:26px 30px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div class="modal-header">
+      <span class="modal-title">🩺 Association Médecin ↔ Patient</span>
+      <button class="modal-close" onclick="closeModal('modal-associer')">✕</button>
+    </div>
+    <div class="alert-success" id="assoc-success">✓ Association mise à jour !</div>
+    <div class="alert-error" id="assoc-error"></div>
+    <input type="hidden" id="assoc-patient-id">
+
+    <div style="background:#f8fafc;padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:.88rem;">
+      Patient : <strong id="assoc-patient-name" style="color:#0f172a;"></strong>
+    </div>
+
+    <div class="form-group">
+      <label>Choisir le Médecin *</label>
+      <select class="form-select" id="assoc-medecin-select">
+        {% for d in docteurs %}
+          <option value="{{ d.id }}">Dr. {{ d.get_full_name }} — {{ d.doctor_profile.specialite|default:'Médecine' }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;">
+        <input type="checkbox" id="assoc-est-traitant" checked style="width:17px;height:17px;">
+        Désigner comme Médecin Traitant Principal
+      </label>
+    </div>
+
+    <div class="form-group">
+      <label>Notes de suivi ou motif d'association</label>
+      <textarea class="form-input" id="assoc-notes" rows="2" placeholder="ex: Suivi cardiologique semestriel..."></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" onclick="closeModal('modal-associer')">Annuler</button>
+      <button type="button" class="btn-save" onclick="submitAssocierModal()">✓ Enregistrer l'association</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRM DELETE -->
+<div class="modal-overlay" id="modal-delete-dossier" onclick="closeModalOnOverlay(event, 'modal-delete-dossier')">
+  <div style="background:#fff;border-radius:18px;padding:26px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:center;">
+    <div style="font-size:2.8rem;margin-bottom:8px;">⚠️</div>
+    <h3 style="font-size:1.1rem;font-weight:700;color:#0f172a;margin-bottom:6px;">Supprimer ce dossier patient ?</h3>
+    <p style="font-size:.85rem;color:#64748b;margin-bottom:18px;" id="del-patient-name"></p>
+    <form id="form-delete-dossier" method="post">
+      {% csrf_token %}
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button type="button" class="btn-cancel" onclick="closeModal('modal-delete-dossier')">Annuler</button>
+        <button type="submit" class="btn-save" style="background:#dc2626;">🗑 Supprimer définitivement</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeModalOnOverlay(e, id) { if(e.target.classList.contains('modal-overlay')) closeModal(id); }
+
+// ── NOUVEAU PATIENT ──
+function openNewPatientModal() {
+  document.getElementById('form-new-patient').reset();
+  openModal('modal-new-patient');
+}
+
+async function submitNewPatient() {
+  const username = document.getElementById('np-username').value.trim();
+  const first_name = document.getElementById('np-first-name').value.trim();
+  const last_name = document.getElementById('np-last-name').value.trim();
+
+  if (!username || !first_name || !last_name) {
+    showMsg('new-patient-error', 'Veuillez saisir l\'identifiant, prénom et nom.', false);
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('username', username);
+  fd.append('first_name', first_name);
+  fd.append('last_name', last_name);
+  fd.append('date_naissance', document.getElementById('np-date-naissance').value);
+  fd.append('groupe_sanguin', document.getElementById('np-groupe-sanguin').value);
+  fd.append('numero_securite_sociale', document.getElementById('np-secu').value);
+  fd.append('phone', document.getElementById('np-phone').value);
+  fd.append('email', document.getElementById('np-email').value);
+  fd.append('city', document.getElementById('np-city').value);
+  fd.append('personne_contact', document.getElementById('np-contact-urgence').value);
+  fd.append('medecin_traitant', document.getElementById('np-medecin').value);
+  fd.append('allergies', document.getElementById('np-allergies').value);
+  fd.append('antecedents', document.getElementById('np-antecedents').value);
+  fd.append('antecedents_familiaux', document.getElementById('np-antecedents-fam').value);
+  fd.append('notes_generales', document.getElementById('np-notes').value);
+
+  const res = await fetch('{% url "creer_patient_dossier" %}', { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.success) {
+    showMsg('new-patient-success', data.message || 'Dossier créé !', true);
+    setTimeout(() => { closeModal('modal-new-patient'); location.reload(); }, 900);
+  } else {
+    showMsg('new-patient-error', JSON.stringify(data.errors || data.error), false);
+  }
+}
+
+// ── EDIT DOSSIER ──
+async function openEditDossierModal(patientId) {
+  const res = await fetch(`/api/dossier/${patientId}/`);
+  const data = await res.json();
+
+  document.getElementById('ed-patient-id').value = data.id;
+  document.getElementById('ed-numero-dossier').textContent = data.numero_dossier;
+  document.getElementById('ed-username-display').textContent = data.username;
+  document.getElementById('ed-first-name').value = data.first_name || '';
+  document.getElementById('ed-last-name').value = data.last_name || '';
+  document.getElementById('ed-date-naissance').value = data.date_naissance || '';
+  document.getElementById('ed-groupe-sanguin').value = data.groupe_sanguin || 'O+';
+  document.getElementById('ed-secu').value = data.numero_securite_sociale || '';
+  document.getElementById('ed-phone').value = data.phone || '';
+  document.getElementById('ed-email').value = data.email || '';
+  document.getElementById('ed-city').value = data.city || '';
+  document.getElementById('ed-contact-urgence').value = data.personne_contact || '';
+  document.getElementById('ed-medecin-traitant').value = data.medecin_traitant_id || '';
+  document.getElementById('ed-allergies').value = data.allergies || '';
+  document.getElementById('ed-antecedents').value = data.antecedents || '';
+  document.getElementById('ed-antecedents-fam').value = data.antecedents_familiaux || '';
+  document.getElementById('ed-notes').value = data.notes_generales || '';
+
+  openModal('modal-edit-dossier');
+}
+
+async function submitEditDossier() {
+  const patientId = document.getElementById('ed-patient-id').value;
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('first_name', document.getElementById('ed-first-name').value);
+  fd.append('last_name', document.getElementById('ed-last-name').value);
+  fd.append('date_naissance', document.getElementById('ed-date-naissance').value);
+  fd.append('groupe_sanguin', document.getElementById('ed-groupe-sanguin').value);
+  fd.append('numero_securite_sociale', document.getElementById('ed-secu').value);
+  fd.append('phone', document.getElementById('ed-phone').value);
+  fd.append('email', document.getElementById('ed-email').value);
+  fd.append('city', document.getElementById('ed-city').value);
+  fd.append('personne_contact', document.getElementById('ed-contact-urgence').value);
+  fd.append('medecin_traitant', document.getElementById('ed-medecin-traitant').value);
+  fd.append('allergies', document.getElementById('ed-allergies').value);
+  fd.append('antecedents', document.getElementById('ed-antecedents').value);
+  fd.append('antecedents_familiaux', document.getElementById('ed-antecedents-fam').value);
+  fd.append('notes_generales', document.getElementById('ed-notes').value);
+
+  const res = await fetch(`/dossiers/${patientId}/edit/`, { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.success) {
+    showMsg('edit-dossier-success', 'Dossier mis à jour !', true);
+    setTimeout(() => { closeModal('modal-edit-dossier'); location.reload(); }, 800);
+  } else {
+    showMsg('edit-dossier-error', JSON.stringify(data.errors || data.error), false);
+  }
+}
+
+// ── ASSOCIER MEDECIN ──
+function openAssocierModal(patientId, patientName, currentDocId) {
+  document.getElementById('assoc-patient-id').value = patientId;
+  document.getElementById('assoc-patient-name').textContent = patientName;
+  if (currentDocId) {
+    document.getElementById('assoc-medecin-select').value = currentDocId;
+  }
+  openModal('modal-associer');
+}
+
+async function submitAssocierModal() {
+  const patientId = document.getElementById('assoc-patient-id').value;
+  const medecinId = document.getElementById('assoc-medecin-select').value;
+  const estTraitant = document.getElementById('assoc-est-traitant').checked;
+  const notes = document.getElementById('assoc-notes').value;
+
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('patient_id', patientId);
+  fd.append('medecin_id', medecinId);
+  fd.append('est_medecin_traitant', estTraitant ? 'true' : 'false');
+  fd.append('notes', notes);
+
+  const res = await fetch('{% url "associer_patient" %}', { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.success) {
+    showMsg('assoc-success', data.message || 'Association réussie !', true);
+    setTimeout(() => { closeModal('modal-associer'); location.reload(); }, 900);
+  } else {
+    showMsg('assoc-error', data.error || 'Erreur lors de l\'association.', false);
+  }
+}
+
+// ── CONFIRM DELETE ──
+function confirmDeleteDossier(url, name) {
+  document.getElementById('del-patient-name').textContent = name;
+  document.getElementById('form-delete-dossier').action = url;
+  openModal('modal-delete-dossier');
+}
+
+function showMsg(id, text, isSuccess) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3500);
+}
+</script>
+{% endblock %}
+{% endblock %}

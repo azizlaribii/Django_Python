@@ -329,6 +329,12 @@ class DossierMedical(models.Model):
 # EXAMEN MÉDICAL
 # ─────────────────────────────────────────────────────────────
 class ExamenMedical(models.Model):
+    STATUT_PREPARATION_CHOICES = [
+        ('NON_REQUISE', 'Non requise'),
+        ('A_FAIRE', 'À préparer par le patient'),
+        ('EN_COURS', 'Préparation en cours'),
+        ('VALIDEE', 'Préparation validée / Prêt'),
+    ]
     STATUT_CHOICES = [
         ('PLANIFIE', 'Planifié'),
         ('EN_COURS', 'En cours'),
@@ -337,9 +343,12 @@ class ExamenMedical(models.Model):
     ]
     TYPE_CHOICES = [
         ('CONSULTATION', 'Consultation'),
-        ('RADIOLOGIE', 'Radiologie'),
-        ('BIOLOGIE', 'Biologie'),
+        ('RADIOLOGIE', 'Radiologie / Rayons X'),
+        ('BIOLOGIE', 'Biologie / Bilan'),
         ('ECHOGRAPHIE', 'Échographie'),
+        ('SCANNER_IRM', 'Scanner / IRM'),
+        ('CARDIOLOGIE', 'Cardiologie / ECG'),
+        ('ENDOSCOPIE', 'Endoscopie'),
         ('AUTRE', 'Autre'),
     ]
 
@@ -362,6 +371,9 @@ class ExamenMedical(models.Model):
     description = models.TextField(blank=True, verbose_name="Description / Motif")
     date_examen = models.DateField(verbose_name="Date de l'examen")
     heure_examen = models.TimeField(null=True, blank=True, verbose_name="Heure")
+    lieu_examen = models.CharField(max_length=150, blank=True, default='', verbose_name="Lieu / Salle d'examen")
+    consignes_preparation = models.TextField(blank=True, default='', verbose_name="Consignes de préparation")
+    statut_preparation = models.CharField(max_length=20, choices=STATUT_PREPARATION_CHOICES, default='NON_REQUISE', verbose_name="Statut de la préparation")
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='PLANIFIE', verbose_name="Statut")
     resultat = models.TextField(blank=True, verbose_name="Résultat / Compte-rendu")
     date_creation = models.DateTimeField(auto_now_add=True)

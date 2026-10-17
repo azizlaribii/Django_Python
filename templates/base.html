@@ -28,15 +28,21 @@
 
                 {% if user.is_authenticated %}
                     <a href="{% url 'dashboard' %}" class="nav-item-link" id="nav-dashboard">Tableau de bord</a>
+                    {% if user.is_admin_user or user.is_doctor %}
+                        <a href="{% url 'dossiers_patients_list' %}" class="nav-item-link" id="nav-dossiers">📁 Dossiers Patients</a>
+                    {% endif %}
+                    {% if user.is_admin_user or user.is_doctor or user.is_laboratory %}
+                        <a href="{% url 'examens_list' %}" class="nav-item-link" id="nav-examens">🩺 Examens & Préparations</a>
+                    {% endif %}
                     {% if user.is_admin_user or user.is_laboratory or user.is_doctor %}
-    <a href="{% url 'stock:dashboard' %}" class="nav-item-link" id="nav-stock">📦 Stocks</a>
-{% endif %}
-                                        {% if user.is_admin_user or user.is_laboratory or user.is_doctor %}
-                                            <a href="{% url 'laboratoire:demande_list' %}" class="nav-item-link" id="nav-laboratoire">🔬 Analyses</a>
-                                        {% endif %}
-                                        {% if user.is_patient %}
-                                            <a href="{% url 'laboratoire:mes_resultats' %}" class="nav-item-link" id="nav-patient-results">🧪 Mes résultats</a>
-                                        {% endif %}
+                        <a href="{% url 'stock:dashboard' %}" class="nav-item-link" id="nav-stock">📦 Stocks</a>
+                    {% endif %}
+                    {% if user.is_admin_user or user.is_laboratory or user.is_doctor %}
+                        <a href="{% url 'laboratoire:demande_list' %}" class="nav-item-link" id="nav-laboratoire">🔬 Analyses</a>
+                    {% endif %}
+                    {% if user.is_patient %}
+                        <a href="{% url 'laboratoire:mes_resultats' %}" class="nav-item-link" id="nav-patient-results">🧪 Mes résultats</a>
+                    {% endif %}
                     
                     {% if user.is_admin_user or user.is_staff or user.is_superuser %}
                         <a href="{% url 'admin_dashboard' %}" class="nav-item-link" style="color: #dc2626; font-weight: 700;" id="nav-admin-hub">

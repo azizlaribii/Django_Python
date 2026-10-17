@@ -24,11 +24,14 @@ from .forms import (
     AdminUserEditForm,
     AdminCreateUserForm,
     ExamenMedicalForm,
+    ExamenMedicalFullForm,
     ResultatLaboratoireForm,
     PrescriptionForm,
     ObservationMedicaleForm,
     AssociationForm,
     DossierMedicalForm,
+    NouveauPatientDossierForm,
+    PatientDossierEditForm,
 )
 
 
@@ -357,25 +360,44 @@ def doctor_patient_dossier(request, patient_id):
 @login_required
 @require_POST
 def associer_patient(request):
-    """Associe un patient à un médecin."""
+    """Associe un patient à un médecin (ou change le médecin traitant)."""
     if not (request.user.is_doctor or request.user.is_admin_user):
         return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
 
     patient_id = request.POST.get('patient_id')
     notes = request.POST.get('notes', '')
-    est_traitant = request.POST.get('est_medecin_traitant', 'true') == 'true'
+    est_traitant = request.POST.get('est_medecin_traitant', 'true') in ['true', 'True', '1', True, 'on']
+    medecin_id = request.POST.get('medecin_id')
+
+    if medecin_id:
+        medecin = get_object_or_404(User, id=medecin_id, role=User.Role.DOCTEUR)
+    elif request.user.is_doctor:
+        medecin = request.user
+    else:
+        return JsonResponse({'success': False, 'error': 'Veuillez sélectionner un médecin.'}, status=400)
 
     patient = get_object_or_404(User, id=patient_id, role=User.Role.PATIENT)
+
+    if est_traitant:
+        AssociationMedecinPatient.objects.filter(patient=patient, est_medecin_traitant=True).exclude(medecin=medecin).update(est_medecin_traitant=False)
+
     assoc, created = AssociationMedecinPatient.objects.get_or_create(
-        medecin=request.user,
+        medecin=medecin,
         patient=patient,
         defaults={'notes': notes, 'est_medecin_traitant': est_traitant}
     )
-    if created:
-        get_or_create_dossier(patient)
-        return JsonResponse({'success': True, 'message': f'{patient.get_full_name()} associé avec succès.'})
-    else:
-        return JsonResponse({'success': False, 'error': 'Ce patient est déjà dans votre liste.'})
+    if not created:
+        assoc.est_medecin_traitant = est_traitant
+        if notes:
+            assoc.notes = notes
+        assoc.save()
+
+    get_or_create_dossier(patient)
+    role_libelle = "Médecin traitant principal" if est_traitant else "Médecin spécialiste / correspondant"
+    return JsonResponse({
+        'success': True,
+        'message': f"Dr. {medecin.get_full_name()} associé à {patient.get_full_name()} ({role_libelle})."
+    })
 
 
 @login_required
@@ -443,16 +465,29 @@ def delete_examen(request, examen_id):
 @login_required
 def get_examen_detail(request, examen_id):
     """Renvoie les détails d'un examen en JSON pour la modale."""
-    examen = get_object_or_404(ExamenMedical, id=examen_id)
+    examen = get_object_or_404(
+        ExamenMedical.objects.select_related('dossier__patient', 'medecin'),
+        id=examen_id
+    )
     data = {
         'id': examen.id,
         'titre': examen.titre,
         'type_examen': examen.type_examen,
+        'type_display': examen.get_type_examen_display(),
         'description': examen.description,
         'date_examen': examen.date_examen.strftime('%Y-%m-%d'),
         'heure_examen': examen.heure_examen.strftime('%H:%M') if examen.heure_examen else '',
+        'lieu_examen': examen.lieu_examen or '',
+        'consignes_preparation': examen.consignes_preparation or '',
+        'statut_preparation': examen.statut_preparation,
+        'statut_preparation_display': examen.get_statut_preparation_display(),
         'statut': examen.statut,
-        'resultat': examen.resultat,
+        'statut_display': examen.get_statut_display(),
+        'resultat': examen.resultat or '',
+        'patient_id': examen.dossier.patient.id,
+        'patient_name': examen.dossier.patient.get_full_name() or examen.dossier.patient.username,
+        'medecin_id': examen.medecin.id if examen.medecin else '',
+        'medecin_name': examen.medecin.get_full_name() if examen.medecin else 'Non assigné',
     }
     return JsonResponse(data)
 
@@ -965,4 +1000,433 @@ def admin_add_user(request):
     return render(request, 'accounts/admin_add_user.html', {
         'form': form,
         'default_role': default_role,
+    })
+
+
+# ─────────────────────────────────────────────────────────────
+# GESTION DES DOSSIERS PATIENTS
+# ─────────────────────────────────────────────────────────────
+@login_required
+def dossiers_patients_list(request):
+    """
+    Vue principale de gestion de tous les dossiers patients :
+    - Recherche avancée multi-critères
+    - Filtrage par groupe sanguin, médecin traitant, statut d'allergies
+    - Statistiques globales
+    - Liens vers vue globale 360°, modification, association médecin, planifier examen
+    """
+    if not (request.user.is_doctor or request.user.is_admin_user):
+        messages.warning(request, "Accès réservé aux praticiens et administrateurs.")
+        return redirect('dashboard')
+
+    search_q = request.GET.get('q', '').strip()
+    groupe_filter = request.GET.get('groupe', 'ALL')
+    medecin_filter = request.GET.get('medecin', 'ALL')
+    allergies_filter = request.GET.get('allergies', 'ALL')
+
+    # S'assurer que tous les patients ont un dossier médical
+    patients = User.objects.filter(role=User.Role.PATIENT, is_active=True)
+    for p in patients:
+        get_or_create_dossier(p)
+
+    dossiers_qs = DossierMedical.objects.select_related(
+        'patient', 'patient__patient_profile'
+    ).prefetch_related(
+        'patient__medecins_associes__medecin',
+        'examens',
+        'resultats_labo'
+    ).order_by('-date_mise_a_jour')
+
+    if search_q:
+        dossiers_qs = dossiers_qs.filter(
+            Q(patient__first_name__icontains=search_q) |
+            Q(patient__last_name__icontains=search_q) |
+            Q(patient__username__icontains=search_q) |
+            Q(patient__email__icontains=search_q) |
+            Q(patient__phone__icontains=search_q) |
+            Q(numero_dossier__icontains=search_q) |
+            Q(patient__patient_profile__numero_securite_sociale__icontains=search_q) |
+            Q(allergies__icontains=search_q)
+        )
+
+    if groupe_filter != 'ALL':
+        dossiers_qs = dossiers_qs.filter(patient__patient_profile__groupe_sanguin=groupe_filter)
+
+    if medecin_filter != 'ALL':
+        if medecin_filter == 'NONE':
+            dossiers_qs = dossiers_qs.filter(patient__medecins_associes__isnull=True)
+        else:
+            dossiers_qs = dossiers_qs.filter(patient__medecins_associes__medecin_id=medecin_filter)
+
+    if allergies_filter == 'YES':
+        dossiers_qs = dossiers_qs.exclude(allergies='').exclude(allergies__isnull=True)
+    elif allergies_filter == 'NO':
+        dossiers_qs = dossiers_qs.filter(Q(allergies='') | Q(allergies__isnull=True))
+
+    docteurs = User.objects.filter(role=User.Role.DOCTEUR, is_active=True).order_by('last_name', 'first_name')
+
+    total_dossiers = DossierMedical.objects.count()
+    dossiers_avec_medecin = DossierMedical.objects.filter(patient__medecins_associes__isnull=False).distinct().count()
+    dossiers_sans_medecin = total_dossiers - dossiers_avec_medecin
+    dossiers_allergies = DossierMedical.objects.exclude(allergies='').exclude(allergies__isnull=True).count()
+    examens_en_cours = ExamenMedical.objects.filter(statut__in=['PLANIFIE', 'EN_COURS']).count()
+    analyses_en_cours = ResultatLaboratoire.objects.filter(statut__in=['EN_ATTENTE', 'EN_COURS']).count()
+
+    stats = {
+        'total': total_dossiers,
+        'avec_medecin': dossiers_avec_medecin,
+        'sans_medecin': dossiers_sans_medecin,
+        'allergies': dossiers_allergies,
+        'examens_en_cours': examens_en_cours,
+        'analyses_en_cours': analyses_en_cours,
+    }
+
+    blood_groups = PatientProfile.BLOOD_GROUPS
+
+    return render(request, 'accounts/dossiers_list.html', {
+        'dossiers': dossiers_qs,
+        'stats': stats,
+        'search_q': search_q,
+        'groupe_filter': groupe_filter,
+        'medecin_filter': medecin_filter,
+        'allergies_filter': allergies_filter,
+        'docteurs': docteurs,
+        'blood_groups': blood_groups,
+    })
+
+
+@login_required
+@require_POST
+def creer_patient_dossier(request):
+    """Création complète d'un patient et de son dossier médical en 1 étape."""
+    if not (request.user.is_doctor or request.user.is_admin_user):
+        return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
+
+    form = NouveauPatientDossierForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({'success': False, 'errors': form.errors})
+
+    cd = form.cleaned_data
+    username = cd['username'].strip()
+    if User.objects.filter(username=username).exists():
+        return JsonResponse({'success': False, 'errors': {'username': ["Ce nom d'utilisateur est déjà utilisé."]}})
+
+    import random, string
+    default_pwd = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+    patient_user = User.objects.create_user(
+        username=username,
+        email=cd.get('email', ''),
+        password=default_pwd,
+        first_name=cd.get('first_name', ''),
+        last_name=cd.get('last_name', ''),
+        phone=cd.get('phone', ''),
+        city=cd.get('city', ''),
+        address=cd.get('address', ''),
+        role=User.Role.PATIENT,
+        is_verified=True,
+        is_active=True
+    )
+
+    pp, _ = PatientProfile.objects.get_or_create(user=patient_user)
+    pp.date_naissance = cd.get('date_naissance')
+    pp.groupe_sanguin = cd.get('groupe_sanguin') or 'O+'
+    pp.numero_securite_sociale = cd.get('numero_securite_sociale', '')
+    pp.personne_contact = cd.get('personne_contact', '')
+    pp.antecedents = cd.get('antecedents', '')
+    pp.save()
+
+    dossier = get_or_create_dossier(patient_user)
+    dossier.allergies = cd.get('allergies', '')
+    dossier.antecedents_familiaux = cd.get('antecedents_familiaux', '')
+    dossier.notes_generales = cd.get('notes_generales', '')
+    dossier.save()
+
+    doc = cd.get('medecin_traitant')
+    if not doc and request.user.is_doctor:
+        doc = request.user
+    if doc:
+        AssociationMedecinPatient.objects.get_or_create(
+            medecin=doc,
+            patient=patient_user,
+            defaults={'est_medecin_traitant': True, 'notes': 'Association initiale à la création du dossier.'}
+        )
+
+    messages.success(request, f"Dossier créé avec succès pour {patient_user.get_full_name()} (#{dossier.numero_dossier}) !")
+    return JsonResponse({
+        'success': True,
+        'message': f"Dossier créé avec succès pour {patient_user.get_full_name()} !",
+        'patient_id': patient_user.id
+    })
+
+
+@login_required
+def get_patient_dossier_data(request, patient_id):
+    """Renvoie les données complètes du patient et dossier en JSON pour pré-remplir la modale."""
+    if not (request.user.is_doctor or request.user.is_admin_user or request.user.id == patient_id):
+        return JsonResponse({'error': 'Non autorisé'}, status=403)
+
+    patient = get_object_or_404(User, id=patient_id, role=User.Role.PATIENT)
+    pp, _ = PatientProfile.objects.get_or_create(user=patient)
+    dossier = get_or_create_dossier(patient)
+
+    traitant_assoc = AssociationMedecinPatient.objects.filter(patient=patient, est_medecin_traitant=True).first()
+    medecin_id = traitant_assoc.medecin_id if traitant_assoc else ''
+
+    data = {
+        'id': patient.id,
+        'username': patient.username,
+        'first_name': patient.first_name,
+        'last_name': patient.last_name,
+        'full_name': patient.get_full_name() or patient.username,
+        'email': patient.email,
+        'phone': patient.phone or '',
+        'city': patient.city or '',
+        'address': patient.address or '',
+        'date_naissance': pp.date_naissance.strftime('%Y-%m-%d') if pp.date_naissance else '',
+        'groupe_sanguin': pp.groupe_sanguin or 'O+',
+        'numero_securite_sociale': pp.numero_securite_sociale or '',
+        'personne_contact': pp.personne_contact or '',
+        'antecedents': pp.antecedents or '',
+        'numero_dossier': dossier.numero_dossier,
+        'allergies': dossier.allergies or '',
+        'antecedents_familiaux': dossier.antecedents_familiaux or '',
+        'notes_generales': dossier.notes_generales or '',
+        'medecin_traitant_id': medecin_id,
+    }
+    return JsonResponse(data)
+
+
+@login_required
+@require_POST
+def edit_patient_dossier(request, patient_id):
+    """Modification complète des informations personnelles, du profil et du dossier."""
+    if not (request.user.is_doctor or request.user.is_admin_user):
+        return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
+
+    patient = get_object_or_404(User, id=patient_id, role=User.Role.PATIENT)
+    pp, _ = PatientProfile.objects.get_or_create(user=patient)
+    dossier = get_or_create_dossier(patient)
+
+    patient.first_name = request.POST.get('first_name', patient.first_name)
+    patient.last_name = request.POST.get('last_name', patient.last_name)
+    patient.email = request.POST.get('email', patient.email)
+    patient.phone = request.POST.get('phone', patient.phone)
+    patient.city = request.POST.get('city', patient.city)
+    patient.address = request.POST.get('address', patient.address)
+    patient.save()
+
+    date_naissance_str = request.POST.get('date_naissance')
+    if date_naissance_str:
+        from datetime import datetime
+        try:
+            pp.date_naissance = datetime.strptime(date_naissance_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    pp.groupe_sanguin = request.POST.get('groupe_sanguin', pp.groupe_sanguin)
+    pp.numero_securite_sociale = request.POST.get('numero_securite_sociale', pp.numero_securite_sociale)
+    pp.personne_contact = request.POST.get('personne_contact', pp.personne_contact)
+    pp.antecedents = request.POST.get('antecedents', pp.antecedents)
+    pp.save()
+
+    dossier.allergies = request.POST.get('allergies', dossier.allergies)
+    dossier.antecedents_familiaux = request.POST.get('antecedents_familiaux', dossier.antecedents_familiaux)
+    dossier.notes_generales = request.POST.get('notes_generales', dossier.notes_generales)
+    dossier.save()
+
+    medecin_id = request.POST.get('medecin_traitant')
+    if medecin_id:
+        doc = User.objects.filter(id=medecin_id, role=User.Role.DOCTEUR).first()
+        if doc:
+            AssociationMedecinPatient.objects.filter(patient=patient, est_medecin_traitant=True).exclude(medecin=doc).update(est_medecin_traitant=False)
+            assoc, _ = AssociationMedecinPatient.objects.get_or_create(medecin=doc, patient=patient)
+            assoc.est_medecin_traitant = True
+            assoc.save()
+
+    return JsonResponse({'success': True, 'message': 'Informations du dossier mises à jour avec succès.'})
+
+
+@login_required
+@require_POST
+def delete_patient_dossier(request, patient_id):
+    """Suppression d'un patient et de son dossier médical."""
+    if not (request.user.is_doctor or request.user.is_admin_user):
+        messages.error(request, "Action réservée aux praticiens et administrateurs.")
+        return redirect('dossiers_patients_list')
+
+    patient = get_object_or_404(User, id=patient_id, role=User.Role.PATIENT)
+    nom = patient.get_full_name() or patient.username
+    patient.delete()
+    messages.success(request, f"Le dossier médical de {nom} a été supprimé.")
+    return redirect('dossiers_patients_list')
+
+
+# ─────────────────────────────────────────────────────────────
+# GESTION DES EXAMENS ET PRÉPARATIONS (CRUD COMPLET)
+# ─────────────────────────────────────────────────────────────
+@login_required
+def examens_crud_list(request):
+    """
+    Page centrale de gestion des examens et de leur préparation :
+    - Liste complète de tous les examens avec consignes de préparation
+    - Filtres par statut, statut de préparation, type d'examen, médecin, patient
+    - Recherche instantanée
+    - Actions : Création, Modification, Fiche de préparation patient, Suppression, Validation préparation
+    """
+    if not (request.user.is_doctor or request.user.is_laboratory or request.user.is_admin_user):
+        messages.warning(request, "Accès réservé au personnel médical et laboratoires.")
+        return redirect('dashboard')
+
+    search_q = request.GET.get('q', '').strip()
+    type_filter = request.GET.get('type', 'ALL')
+    statut_filter = request.GET.get('statut', 'ALL')
+    prep_filter = request.GET.get('prep', 'ALL')
+    patient_filter = request.GET.get('patient', 'ALL')
+    medecin_filter = request.GET.get('medecin', 'ALL')
+
+    examens_qs = ExamenMedical.objects.select_related(
+        'dossier__patient',
+        'dossier__patient__patient_profile',
+        'medecin'
+    ).order_by('-date_examen')
+
+    if search_q:
+        examens_qs = examens_qs.filter(
+            Q(titre__icontains=search_q) |
+            Q(dossier__patient__first_name__icontains=search_q) |
+            Q(dossier__patient__last_name__icontains=search_q) |
+            Q(dossier__patient__username__icontains=search_q) |
+            Q(consignes_preparation__icontains=search_q) |
+            Q(description__icontains=search_q) |
+            Q(lieu_examen__icontains=search_q)
+        )
+
+    if type_filter != 'ALL':
+        examens_qs = examens_qs.filter(type_examen=type_filter)
+
+    if statut_filter != 'ALL':
+        examens_qs = examens_qs.filter(statut=statut_filter)
+
+    if prep_filter != 'ALL':
+        examens_qs = examens_qs.filter(statut_preparation=prep_filter)
+
+    if patient_filter != 'ALL':
+        examens_qs = examens_qs.filter(dossier__patient_id=patient_filter)
+
+    if medecin_filter != 'ALL':
+        examens_qs = examens_qs.filter(medecin_id=medecin_filter)
+
+    total_examens = ExamenMedical.objects.count()
+    planifies = ExamenMedical.objects.filter(statut='PLANIFIE').count()
+    en_cours = ExamenMedical.objects.filter(statut='EN_COURS').count()
+    termines = ExamenMedical.objects.filter(statut='TERMINE').count()
+    prep_a_faire = ExamenMedical.objects.filter(statut_preparation__in=['A_FAIRE', 'EN_COURS']).count()
+    prep_validees = ExamenMedical.objects.filter(statut_preparation='VALIDEE').count()
+
+    stats = {
+        'total': total_examens,
+        'planifies': planifies,
+        'en_cours': en_cours,
+        'termines': termines,
+        'prep_a_faire': prep_a_faire,
+        'prep_validees': prep_validees,
+    }
+
+    types_choices = ExamenMedical.TYPE_CHOICES
+    statut_choices = ExamenMedical.STATUT_CHOICES
+    prep_choices = ExamenMedical.STATUT_PREPARATION_CHOICES
+
+    patients = User.objects.filter(role=User.Role.PATIENT, is_active=True).order_by('last_name', 'first_name')
+    docteurs = User.objects.filter(role=User.Role.DOCTEUR, is_active=True).order_by('last_name', 'first_name')
+
+    context = {
+        'examens': examens_qs,
+        'stats': stats,
+        'search_q': search_q,
+        'type_filter': type_filter,
+        'statut_filter': statut_filter,
+        'prep_filter': prep_filter,
+        'patient_filter': patient_filter,
+        'medecin_filter': medecin_filter,
+        'types_choices': types_choices,
+        'statut_choices': statut_choices,
+        'prep_choices': prep_choices,
+        'patients': patients,
+        'docteurs': docteurs,
+    }
+    return render(request, 'accounts/examens_list.html', context)
+
+
+@login_required
+@require_POST
+def add_examen_global(request):
+    """Création d'un examen depuis la vue globale des examens."""
+    if not (request.user.is_doctor or request.user.is_admin_user):
+        return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
+
+    patient_id = request.POST.get('patient')
+    if not patient_id:
+        return JsonResponse({'success': False, 'errors': {'patient': ['Veuillez sélectionner un patient.']}})
+
+    patient = get_object_or_404(User, id=patient_id, role=User.Role.PATIENT)
+    dossier = get_or_create_dossier(patient)
+
+    medecin_id = request.POST.get('medecin')
+    if medecin_id:
+        medecin = get_object_or_404(User, id=medecin_id, role=User.Role.DOCTEUR)
+    elif request.user.is_doctor:
+        medecin = request.user
+    else:
+        medecin = None
+
+    form = ExamenMedicalForm(request.POST)
+    if form.is_valid():
+        examen = form.save(commit=False)
+        examen.dossier = dossier
+        examen.medecin = medecin
+        examen.save()
+        return JsonResponse({
+            'success': True,
+            'message': f"L'examen '{examen.titre}' a été planifié avec succès pour {patient.get_full_name()}."
+        })
+    return JsonResponse({'success': False, 'errors': form.errors})
+
+
+@login_required
+def examen_fiche_preparation(request, examen_id):
+    """Vue détaillée & imprimable de la fiche de préparation du patient."""
+    examen = get_object_or_404(
+        ExamenMedical.objects.select_related('dossier__patient', 'dossier__patient__patient_profile', 'medecin'),
+        id=examen_id
+    )
+    if not (request.user.is_doctor or request.user.is_admin_user or request.user.is_laboratory or request.user == examen.dossier.patient):
+        messages.error(request, "Accès refusé à cette fiche.")
+        return redirect('dashboard')
+
+    patient = examen.dossier.patient
+    pp = getattr(patient, 'patient_profile', None)
+
+    return render(request, 'accounts/examen_fiche_preparation.html', {
+        'examen': examen,
+        'patient': patient,
+        'profile': pp,
+        'dossier': examen.dossier,
+    })
+
+
+@login_required
+@require_POST
+def valider_preparation_examen(request, examen_id):
+    """Action rapide pour marquer la préparation d'un examen comme VALIDEE."""
+    if not (request.user.is_doctor or request.user.is_admin_user or request.user.is_laboratory):
+        return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
+
+    examen = get_object_or_404(ExamenMedical, id=examen_id)
+    nouveau_statut = request.POST.get('statut_preparation', 'VALIDEE')
+    examen.statut_preparation = nouveau_statut
+    examen.save()
+
+    return JsonResponse({
+        'success': True,
+        'message': f"Préparation validée pour {examen.titre}.",
+        'statut_display': examen.get_statut_preparation_display()
     })

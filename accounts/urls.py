@@ -59,5 +59,16 @@ urlpatterns = [
     path('docteur/patient/<int:patient_id>/observation/add/', views.add_observation, name='add_observation'),
     path('docteur/observation/<int:observation_id>/edit/', views.edit_observation, name='edit_observation'),
     path('docteur/observation/<int:observation_id>/delete/', views.delete_observation, name='delete_observation'),
-    path('api/observation/<int:observation_id>/', views.get_observation_detail, name='api_observation_detail'),
+    # ── GESTION DES DOSSIERS PATIENTS ───────────────────────────
+    path('dossiers/', views.dossiers_patients_list, name='dossiers_patients_list'),
+    path('dossiers/creer/', views.creer_patient_dossier, name='creer_patient_dossier'),
+    path('dossiers/<int:patient_id>/edit/', views.edit_patient_dossier, name='edit_patient_dossier'),
+    path('dossiers/<int:patient_id>/delete/', views.delete_patient_dossier, name='delete_patient_dossier'),
+    path('api/dossier/<int:patient_id>/', views.get_patient_dossier_data, name='api_patient_dossier_data'),
+
+    # ── GESTION DES EXAMENS & PRÉPARATIONS (CRUD COMPLET) ───────
+    path('examens/', views.examens_crud_list, name='examens_list'),
+    path('examens/add/', views.add_examen_global, name='add_examen_global'),
+    path('examens/<int:examen_id>/fiche/', views.examen_fiche_preparation, name='examen_fiche_preparation'),
+    path('examens/<int:examen_id>/valider-preparation/', views.valider_preparation_examen, name='valider_preparation_examen'),
 ]

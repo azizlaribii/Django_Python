@@ -1,0 +1,768 @@
+{% extends 'base.html' %}
+{% block title %}Gestion des Examens & Préparations — SantéConnect{% endblock %}
+
+{% block extra_css %}
+<style>
+.exam-hero {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  border-radius: 20px;
+  padding: 26px 30px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  box-shadow: 0 10px 25px -5px rgba(124, 58, 237, 0.25);
+}
+.exam-hero h1 { font-size: 1.7rem; font-weight: 800; margin-bottom: 4px; }
+.exam-hero p { opacity: .9; font-size: .9rem; }
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px 18px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.04);
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: transform .2s, box-shadow .2s;
+}
+.kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+.kpi-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.35rem; flex-shrink: 0;
+}
+.kpi-val { font-size: 1.75rem; font-weight: 800; line-height: 1; }
+.kpi-lbl { font-size: .78rem; color: #64748b; margin-top: 3px; font-weight: 600; }
+
+.card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 2px 14px rgba(0,0,0,.05);
+  border: 1px solid #e2e8f0;
+}
+
+.filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+  background: #f8fafc;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  align-items: center;
+}
+.filter-input {
+  flex: 1;
+  min-width: 220px;
+  padding: 9px 14px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: .875rem;
+  outline: none;
+  background: #fff;
+}
+.filter-input:focus { border-color: #6366f1; }
+.filter-select {
+  padding: 9px 12px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: .85rem;
+  outline: none;
+  background: #fff;
+  font-weight: 500;
+  color: #334155;
+}
+.filter-select:focus { border-color: #6366f1; }
+
+.table-wrap { overflow-x: auto; }
+table.med-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.med-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+}
+.med-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+.med-table tr:hover td { background: #faf5ff; }
+
+/* Badges */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: .74rem; font-weight: 700; }
+.badge-planifie { background: #dbeafe; color: #1d4ed8; }
+.badge-en_cours { background: #fef3c7; color: #b45309; }
+.badge-termine { background: #dcfce7; color: #15803d; }
+.badge-annule { background: #fee2e2; color: #dc2626; }
+
+.badge-prep-non_requise { background: #f1f5f9; color: #64748b; }
+.badge-prep-a_faire { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+.badge-prep-en_cours { background: #fef3c7; color: #b45309; }
+.badge-prep-validee { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+
+.badge-type { background: #f3e8ff; color: #6b21a8; font-weight: 600; padding: 2px 8px; border-radius: 6px; font-size: .72rem; }
+
+/* Buttons */
+.btn-primary-purple {
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  color: #fff;
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-size: .85rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+  transition: all .2s;
+}
+.btn-primary-purple:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(124, 58, 237, 0.35); }
+
+.btn-act { padding: 5px 9px; border-radius: 8px; font-size: .75rem; font-weight: 700; border: none; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+.btn-act-fiche { background: #ede9fe; color: #6d28d9; }
+.btn-act-fiche:hover { background: #ddd6fe; }
+.btn-act-validate { background: #dcfce7; color: #15803d; }
+.btn-act-validate:hover { background: #bbf7d0; }
+.btn-act-edit { background: #fef3c7; color: #b45309; }
+.btn-act-edit:hover { background: #fde68a; }
+.btn-act-del { background: #fee2e2; color: #dc2626; }
+.btn-act-del:hover { background: #fecaca; }
+
+/* MODALS */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, .55); z-index: 1000; backdrop-filter: blur(4px); align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal-box { background: #fff; border-radius: 20px; padding: 26px 30px; width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.25); animation: modalIn .2s ease; }
+@keyframes modalIn { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; }
+.modal-title { font-size: 1.15rem; font-weight: 800; color: #0f172a; }
+.modal-close { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #64748b; }
+.modal-close:hover { color: #0f172a; }
+
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: .8rem; font-weight: 700; color: #374151; margin-bottom: 5px; }
+.form-group .form-input, .form-group .form-select {
+  width: 100%; padding: 9px 13px; border: 1.5px solid #cbd5e1; border-radius: 9px; font-size: .875rem;
+  outline: none; box-sizing: border-box; font-family: inherit; transition: border-color .15s;
+}
+.form-group .form-input:focus, .form-group .form-select:focus { border-color: #6366f1; }
+.form-group textarea.form-input { resize: vertical; min-height: 75px; }
+.form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.preset-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.preset-pill {
+  background: #f1f5f9; color: #475569; font-size: .72rem; font-weight: 600;
+  padding: 3px 9px; border-radius: 12px; cursor: pointer; border: 1px solid #e2e8f0;
+  transition: all .15s;
+}
+.preset-pill:hover { background: #ede9fe; color: #6d28d9; border-color: #c4b5fd; }
+
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+.btn-cancel { padding: 9px 16px; border-radius: 9px; border: 1.5px solid #cbd5e1; background: #fff; cursor: pointer; font-weight: 600; color: #64748b; }
+.btn-save { background: #6366f1; color: #fff; padding: 9px 20px; border-radius: 9px; font-weight: 700; border: none; cursor: pointer; }
+.btn-save:hover { background: #4f46e5; }
+
+.alert-success { background: #dcfce7; color: #15803d; padding: 10px 16px; border-radius: 9px; margin-bottom: 14px; font-size: .85rem; display: none; }
+.alert-error { background: #fee2e2; color: #dc2626; padding: 10px 16px; border-radius: 9px; margin-bottom: 14px; font-size: .85rem; display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <!-- HERO -->
+  <div class="exam-hero">
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="background:rgba(255,255,255,.2);padding:3px 12px;border-radius:20px;font-size:.78rem;font-weight:700;">🩺 Module Clinique</span>
+        <span style="background:rgba(255,255,255,.15);padding:3px 10px;border-radius:20px;font-size:.75rem;">Consignes & Préparation</span>
+      </div>
+      <h1>Gestion des Examens & Préparations</h1>
+      <p>Planification, suivi des consignes pré-opératoires/pré-examens, validation patient et comptes-rendus.</p>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn-primary-purple" style="background:#fff;color:#6b21a8;" onclick="openAddExamenModal()">
+        ➕ Planifier un Examen
+      </button>
+      <a href="{% url 'dossiers_patients_list' %}" class="btn-primary-purple" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);">
+        📁 Dossiers Patients
+      </a>
+    </div>
+  </div>
+
+  <!-- KPIS -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#ede9fe;color:#7c3aed;">🩺</div>
+      <div><div class="kpi-val" style="color:#7c3aed;">{{ stats.total }}</div><div class="kpi-lbl">Total Examens</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#eff6ff;color:#2563eb;">📅</div>
+      <div><div class="kpi-val" style="color:#2563eb;">{{ stats.planifies }}</div><div class="kpi-lbl">Planifiés</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#fff7ed;color:#ea580c;">⚠️</div>
+      <div><div class="kpi-val" style="color:#ea580c;">{{ stats.prep_a_faire }}</div><div class="kpi-lbl">Préparations à faire</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#ecfdf5;color:#059669;">✅</div>
+      <div><div class="kpi-val" style="color:#059669;">{{ stats.prep_validees }}</div><div class="kpi-lbl">Préparations Validées</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#f1f5f9;color:#475569;">🏁</div>
+      <div><div class="kpi-val" style="color:#475569;">{{ stats.termines }}</div><div class="kpi-lbl">Examens Terminés</div></div>
+    </div>
+  </div>
+
+  <!-- MAIN CARD -->
+  <div class="card">
+
+    <!-- FILTERS BAR -->
+    <form method="get" class="filters-bar" id="filters-form">
+      <input type="text" name="q" value="{{ search_q }}" placeholder="🔍 Rechercher par patient, intitulé, lieu ou consignes..." class="filter-input">
+      
+      <select name="type" class="filter-select" onchange="this.form.submit()">
+        <option value="ALL">Tous les Types d'examen</option>
+        {% for code, label in types_choices %}
+          <option value="{{ code }}" {% if type_filter == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="prep" class="filter-select" onchange="this.form.submit()">
+        <option value="ALL">Toutes les Préparations</option>
+        {% for code, label in prep_choices %}
+          <option value="{{ code }}" {% if prep_filter == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="statut" class="filter-select" onchange="this.form.submit()">
+        <option value="ALL">Tous les Statuts</option>
+        {% for code, label in statut_choices %}
+          <option value="{{ code }}" {% if statut_filter == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="medecin" class="filter-select" onchange="this.form.submit()">
+        <option value="ALL">Tous les Médecins</option>
+        {% for d in docteurs %}
+          <option value="{{ d.id }}" {% if medecin_filter == d.id|stringformat:"s" %}selected{% endif %}>Dr. {{ d.get_full_name|default:d.username }}</option>
+        {% endfor %}
+      </select>
+
+      <button type="submit" class="btn-primary-purple" style="padding:9px 14px;">Filtrer</button>
+      {% if search_q or type_filter != 'ALL' or statut_filter != 'ALL' or prep_filter != 'ALL' or medecin_filter != 'ALL' %}
+        <a href="{% url 'examens_list' %}" style="color:#dc2626;font-size:.85rem;font-weight:700;text-decoration:none;padding:8px;">✕ Réinitialiser</a>
+      {% endif %}
+    </form>
+
+    <!-- EXAMS TABLE -->
+    {% if examens %}
+      <div class="table-wrap">
+        <table class="med-table">
+          <thead>
+            <tr>
+              <th>Patient & Dossier</th>
+              <th>Intitulé & Lieu</th>
+              <th>Date & Heure</th>
+              <th>Médecin</th>
+              <th>Préparation & Consignes</th>
+              <th>Statut Examen</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ex in examens %}
+            <tr>
+              <!-- Patient -->
+              <td>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;">
+                    {{ ex.dossier.patient.first_name|first|upper }}{{ ex.dossier.patient.last_name|first|upper }}
+                  </div>
+                  <div>
+                    <a href="{% url 'doctor_patient_dossier' ex.dossier.patient.id %}" style="font-weight:700;color:#0f172a;text-decoration:none;">
+                      {{ ex.dossier.patient.get_full_name|default:ex.dossier.patient.username }}
+                    </a>
+                    <div style="font-size:.74rem;color:#64748b;">
+                      #{{ ex.dossier.numero_dossier }}
+                      {% with ex.dossier.patient.patient_profile as pp %}
+                        {% if pp.groupe_sanguin %}&bull; <span style="color:#dc2626;font-weight:700;">🩸{{ pp.groupe_sanguin }}</span>{% endif %}
+                      {% endwith %}
+                    </div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Titre & Lieu -->
+              <td>
+                <div style="font-weight:700;color:#0f172a;">{{ ex.titre }}</div>
+                <div style="display:flex;gap:6px;align-items:center;margin-top:2px;flex-wrap:wrap;">
+                  <span class="badge-type">{{ ex.get_type_examen_display }}</span>
+                  {% if ex.lieu_examen %}
+                    <span style="font-size:.75rem;color:#64748b;">📍 {{ ex.lieu_examen }}</span>
+                  {% endif %}
+                </div>
+              </td>
+
+              <!-- Date & Heure -->
+              <td style="white-space:nowrap;">
+                <strong style="color:#0f172a;">{{ ex.date_examen|date:"d M Y" }}</strong>
+                {% if ex.heure_examen %}
+                  <div style="font-size:.76rem;color:#6366f1;font-weight:600;">🕐 {{ ex.heure_examen|time:"H:i" }}</div>
+                {% endif %}
+              </td>
+
+              <!-- Médecin -->
+              <td style="font-size:.84rem;color:#334155;">
+                {% if ex.medecin %}
+                  🩺 <strong>Dr. {{ ex.medecin.get_full_name }}</strong>
+                {% else %}
+                  <span style="color:#94a3b8;">Non assigné</span>
+                {% endif %}
+              </td>
+
+              <!-- Préparation -->
+              <td>
+                <div style="margin-bottom:3px;">
+                  <span class="badge badge-prep-{{ ex.statut_preparation|lower }}">
+                    {% if ex.statut_preparation == 'A_FAIRE' %}🟠 À préparer par le patient
+                    {% elif ex.statut_preparation == 'VALIDEE' %}🟢 Préparation validée / Prêt
+                    {% elif ex.statut_preparation == 'EN_COURS' %}🔄 En cours
+                    {% else %}⚪ Non requise{% endif %}
+                  </span>
+                </div>
+                {% if ex.consignes_preparation %}
+                  <div style="font-size:.76rem;color:#475569;max-width:240px;line-height:1.3;" title="{{ ex.consignes_preparation }}">
+                    📋 <em>{{ ex.consignes_preparation|truncatechars:65 }}</em>
+                  </div>
+                {% endif %}
+              </td>
+
+              <!-- Statut -->
+              <td>
+                <span class="badge badge-{{ ex.statut|lower }}">{{ ex.get_statut_display }}</span>
+                {% if ex.resultat %}
+                  <div style="font-size:.73rem;color:#15803d;font-weight:600;margin-top:2px;">✓ Compte-rendu saisi</div>
+                {% endif %}
+              </td>
+
+              <!-- Actions -->
+              <td style="text-align:right;white-space:nowrap;">
+                {% if ex.statut_preparation == 'A_FAIRE' or ex.statut_preparation == 'EN_COURS' %}
+                  <button class="btn-act btn-act-validate" title="Valider la préparation du patient" onclick="quickValidatePrep('{{ ex.id }}')">
+                    ✓ Valider
+                  </button>
+                {% endif %}
+                <a href="{% url 'examen_fiche_preparation' ex.id %}" class="btn-act btn-act-fiche" title="Fiche de préparation & convocation">
+                  📄 Fiche
+                </a>
+                <button class="btn-act btn-act-edit" title="Modifier cet examen" onclick="openEditExamenModal('{{ ex.id }}')">
+                  ✏️
+                </button>
+                <button class="btn-act btn-act-del" title="Supprimer" onclick="confirmDeleteExamen('{% url 'delete_examen' ex.id %}', '{{ ex.titre|escapejs }}')">
+                  🗑
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="text-align:center;padding:50px 20px;color:#94a3b8;">
+        <div style="font-size:3.5rem;margin-bottom:12px;">🩺</div>
+        <h3 style="color:#0f172a;font-size:1.1rem;margin-bottom:6px;">Aucun examen trouvé</h3>
+        <p style="font-size:.875rem;">{% if search_q %}Aucun résultat ne correspond à vos filtres.{% else %}Commencez par planifier un examen avec ses consignes de préparation.{% endif %}</p>
+        <button class="btn-primary-purple" style="margin-top:14px;" onclick="openAddExamenModal()">➕ Planifier un premier Examen</button>
+      </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- MODALES -->
+<!-- ═══════════════════════════════════════════════════ -->
+
+<!-- MODAL ADD EXAMEN -->
+<div class="modal-overlay" id="modal-add-examen" onclick="closeModalOnOverlay(event, 'modal-add-examen')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">🩺 Planifier un Examen & Préparation</span>
+      <button class="modal-close" onclick="closeModal('modal-add-examen')">✕</button>
+    </div>
+    <div class="alert-success" id="add-exam-success">✓ Examen planifié avec succès !</div>
+    <div class="alert-error" id="add-exam-error"></div>
+
+    <form id="form-add-examen" onsubmit="event.preventDefault(); submitAddExamen();">
+      <div class="form-row2">
+        <div class="form-group">
+          <label>Patient *</label>
+          <select class="form-select" id="add-exam-patient" required>
+            <option value="">— Choisir le patient —</option>
+            {% for p in patients %}
+              <option value="{{ p.id }}">{{ p.get_full_name|default:p.username }} ({{ p.username }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Médecin prescripteur / réalisateur</label>
+          <select class="form-select" id="add-exam-medecin">
+            <option value="">— Sélectionner —</option>
+            {% for d in docteurs %}
+              <option value="{{ d.id }}" {% if user.id == d.id %}selected{% endif %}>Dr. {{ d.get_full_name }} ({{ d.doctor_profile.specialite|default:'Docteur' }})</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row2">
+        <div class="form-group">
+          <label>Intitulé de l'examen *</label>
+          <input type="text" class="form-input" id="add-exam-titre" placeholder="ex: Échographie abdominale" required>
+        </div>
+        <div class="form-group">
+          <label>Type d'examen</label>
+          <select class="form-select" id="add-exam-type">
+            {% for code, label in types_choices %}
+              <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row2">
+        <div class="form-group">
+          <label>Date de l'examen *</label>
+          <input type="date" class="form-input" id="add-exam-date" required>
+        </div>
+        <div class="form-group">
+          <label>Heure</label>
+          <input type="text" class="form-input" id="add-exam-heure" placeholder="HH:MM (ex: 09:30)" maxlength="5">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Lieu / Salle d'examen</label>
+        <input type="text" class="form-input" id="add-exam-lieu" placeholder="ex: Cabinet Médical - Salle d'échographie / Hôpital Aile B">
+      </div>
+
+      <!-- PREPARATION SECTION -->
+      <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label style="font-size:.85rem;font-weight:700;color:#6b21a8;margin:0;">📋 Consignes de Préparation du Patient</label>
+          <select class="form-select" id="add-exam-statut-prep" style="width:auto;padding:4px 8px;font-size:.78rem;">
+            {% for code, label in prep_choices %}
+              <option value="{{ code }}" {% if code == 'A_FAIRE' %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <textarea class="form-input" id="add-exam-consignes" rows="3" placeholder="Instructions précises à suivre par le patient avant l'examen..."></textarea>
+        <div class="preset-pills">
+          <span style="font-size:.72rem;color:#64748b;font-weight:700;">Ajout rapide :</span>
+          <span class="preset-pill" onclick="appendPrep('add-exam-consignes', 'À jeun strict au moins 6 heures avant l\'examen (pas d\'aliments solides ni liquides sucrés).')">🥣 À jeun 6h</span>
+          <span class="preset-pill" onclick="appendPrep('add-exam-consignes', 'Boire 1 litre d\'eau plate 1 heure avant l\'examen et ne pas uriner (vessie pleine nécessaire).')">💧 Vessie pleine (1L)</span>
+          <span class="preset-pill" onclick="appendPrep('add-exam-consignes', 'Arrêt temporaire des anticoagulants 48h avant après accord de votre cardiologue.')">💊 Arrêt anticoagulant</span>
+          <span class="preset-pill" onclick="appendPrep('add-exam-consignes', 'Apporter l\'ordonnance, la carte vitale et vos anciens clichés radiologiques.')">📁 Apporter anciens clichés</span>
+          <span class="preset-pill" onclick="appendPrep('add-exam-consignes', 'Prévoir d\'être accompagné pour le retour à domicile (examen sédatif ou dilatation).')">🚗 Venir accompagné</span>
+        </div>
+      </div>
+
+      <div class="form-row2">
+        <div class="form-group">
+          <label>Statut de l'examen</label>
+          <select class="form-select" id="add-exam-statut">
+            <option value="PLANIFIE">Planifié</option>
+            <option value="EN_COURS">En cours</option>
+            <option value="TERMINE">Terminé</option>
+            <option value="ANNULE">Annulé</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Motif / Indication clinique</label>
+          <input type="text" class="form-input" id="add-exam-desc" placeholder="ex: Suspicion colique néphrétique">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Résultat / Compte-rendu (si déjà réalisé)</label>
+        <textarea class="form-input" id="add-exam-resultat" rows="2" placeholder="Conclusions cliniques..."></textarea>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" onclick="closeModal('modal-add-examen')">Annuler</button>
+        <button type="submit" class="btn-save">✓ Enregistrer & Planifier</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL EDIT EXAMEN -->
+<div class="modal-overlay" id="modal-edit-examen" onclick="closeModalOnOverlay(event, 'modal-edit-examen')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Modifier l'Examen & Préparation</span>
+      <button class="modal-close" onclick="closeModal('modal-edit-examen')">✕</button>
+    </div>
+    <div class="alert-success" id="edit-exam-success">✓ Examen mis à jour !</div>
+    <div class="alert-error" id="edit-exam-error"></div>
+    <input type="hidden" id="edit-exam-id">
+
+    <div class="form-group" style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:.85rem;">
+      Patient : <strong id="edit-exam-patient-display"></strong>
+    </div>
+
+    <div class="form-row2">
+      <div class="form-group">
+        <label>Intitulé de l'examen *</label>
+        <input type="text" class="form-input" id="edit-exam-titre" required>
+      </div>
+      <div class="form-group">
+        <label>Type d'examen</label>
+        <select class="form-select" id="edit-exam-type">
+          {% for code, label in types_choices %}
+            <option value="{{ code }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row2">
+      <div class="form-group">
+        <label>Date *</label>
+        <input type="date" class="form-input" id="edit-exam-date" required>
+      </div>
+      <div class="form-group">
+        <label>Heure</label>
+        <input type="text" class="form-input" id="edit-exam-heure" placeholder="HH:MM">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Lieu / Salle d'examen</label>
+      <input type="text" class="form-input" id="edit-exam-lieu">
+    </div>
+
+    <!-- PREPARATION SECTION -->
+    <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <label style="font-size:.85rem;font-weight:700;color:#6b21a8;margin:0;">📋 Consignes de Préparation du Patient</label>
+        <select class="form-select" id="edit-exam-statut-prep" style="width:auto;padding:4px 8px;font-size:.78rem;">
+          {% for code, label in prep_choices %}
+            <option value="{{ code }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <textarea class="form-input" id="edit-exam-consignes" rows="3"></textarea>
+      <div class="preset-pills">
+        <span style="font-size:.72rem;color:#64748b;font-weight:700;">Ajout rapide :</span>
+        <span class="preset-pill" onclick="appendPrep('edit-exam-consignes', 'À jeun strict au moins 6 heures avant.')">🥣 À jeun</span>
+        <span class="preset-pill" onclick="appendPrep('edit-exam-consignes', 'Boire 1L d\'eau 1h avant sans uriner.')">💧 Vessie pleine</span>
+        <span class="preset-pill" onclick="appendPrep('edit-exam-consignes', 'Apporter anciens clichés et ordonnance.')">📁 Anciens clichés</span>
+      </div>
+    </div>
+
+    <div class="form-row2">
+      <div class="form-group">
+        <label>Statut de l'examen</label>
+        <select class="form-select" id="edit-exam-statut">
+          <option value="PLANIFIE">Planifié</option>
+          <option value="EN_COURS">En cours</option>
+          <option value="TERMINE">Terminé</option>
+          <option value="ANNULE">Annulé</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Motif / Indication</label>
+        <input type="text" class="form-input" id="edit-exam-desc">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Résultat / Compte-rendu</label>
+      <textarea class="form-input" id="edit-exam-resultat" rows="3"></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" onclick="closeModal('modal-edit-examen')">Annuler</button>
+      <button type="button" class="btn-save" onclick="submitEditExamen()">✓ Sauvegarder les modifications</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRM DELETE -->
+<div class="modal-overlay" id="modal-delete" onclick="closeModalOnOverlay(event, 'modal-delete')">
+  <div style="background:#fff;border-radius:18px;padding:26px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:center;">
+    <div style="font-size:2.8rem;margin-bottom:8px;">⚠️</div>
+    <h3 style="font-size:1.1rem;font-weight:700;color:#0f172a;margin-bottom:6px;">Supprimer cet examen ?</h3>
+    <p style="font-size:.85rem;color:#64748b;margin-bottom:18px;" id="del-exam-name"></p>
+    <form id="form-delete-examen" method="post">
+      {% csrf_token %}
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button type="button" class="btn-cancel" onclick="closeModal('modal-delete')">Annuler</button>
+        <button type="submit" class="btn-save" style="background:#dc2626;">🗑 Supprimer définitivement</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeModalOnOverlay(e, id) { if(e.target.classList.contains('modal-overlay')) closeModal(id); }
+
+function today() { return new Date().toISOString().split('T')[0]; }
+
+function appendPrep(elementId, text) {
+  const el = document.getElementById(elementId);
+  if (el.value.trim().length > 0) {
+    el.value += '\n• ' + text;
+  } else {
+    el.value = '• ' + text;
+  }
+}
+
+// ── ADD EXAMEN ──
+function openAddExamenModal() {
+  document.getElementById('add-exam-date').value = today();
+  document.getElementById('add-exam-consignes').value = '';
+  document.getElementById('add-exam-titre').value = '';
+  document.getElementById('add-exam-heure').value = '';
+  document.getElementById('add-exam-lieu').value = '';
+  document.getElementById('add-exam-desc').value = '';
+  document.getElementById('add-exam-resultat').value = '';
+  openModal('modal-add-examen');
+}
+
+async function submitAddExamen() {
+  const patient = document.getElementById('add-exam-patient').value;
+  const titre = document.getElementById('add-exam-titre').value;
+  const date_examen = document.getElementById('add-exam-date').value;
+
+  if (!patient || !titre || !date_examen) {
+    showMsg('add-exam-error', 'Veuillez remplir les champs obligatoires (Patient, Intitulé, Date).', false);
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('patient', patient);
+  fd.append('medecin', document.getElementById('add-exam-medecin').value);
+  fd.append('titre', titre);
+  fd.append('type_examen', document.getElementById('add-exam-type').value);
+  fd.append('date_examen', date_examen);
+  fd.append('heure_examen', document.getElementById('add-exam-heure').value.trim());
+  fd.append('lieu_examen', document.getElementById('add-exam-lieu').value);
+  fd.append('consignes_preparation', document.getElementById('add-exam-consignes').value);
+  fd.append('statut_preparation', document.getElementById('add-exam-statut-prep').value);
+  fd.append('statut', document.getElementById('add-exam-statut').value);
+  fd.append('description', document.getElementById('add-exam-desc').value);
+  fd.append('resultat', document.getElementById('add-exam-resultat').value);
+
+  const res = await fetch('{% url "add_examen_global" %}', { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.success) {
+    showMsg('add-exam-success', data.message || 'Examen enregistré !', true);
+    setTimeout(() => { closeModal('modal-add-examen'); location.reload(); }, 900);
+  } else {
+    showMsg('add-exam-error', JSON.stringify(data.errors || data.error), false);
+  }
+}
+
+// ── EDIT EXAMEN ──
+async function openEditExamenModal(id) {
+  const res = await fetch(`/api/examen/${id}/`);
+  const data = await res.json();
+
+  document.getElementById('edit-exam-id').value = id;
+  document.getElementById('edit-exam-patient-display').textContent = data.patient_name;
+  document.getElementById('edit-exam-titre').value = data.titre;
+  document.getElementById('edit-exam-type').value = data.type_examen;
+  document.getElementById('edit-exam-date').value = data.date_examen;
+  document.getElementById('edit-exam-heure').value = data.heure_examen;
+  document.getElementById('edit-exam-lieu').value = data.lieu_examen || '';
+  document.getElementById('edit-exam-consignes').value = data.consignes_preparation || '';
+  document.getElementById('edit-exam-statut-prep').value = data.statut_preparation || 'NON_REQUISE';
+  document.getElementById('edit-exam-statut').value = data.statut || 'PLANIFIE';
+  document.getElementById('edit-exam-desc').value = data.description || '';
+  document.getElementById('edit-exam-resultat').value = data.resultat || '';
+
+  openModal('modal-edit-examen');
+}
+
+async function submitEditExamen() {
+  const id = document.getElementById('edit-exam-id').value;
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('titre', document.getElementById('edit-exam-titre').value);
+  fd.append('type_examen', document.getElementById('edit-exam-type').value);
+  fd.append('date_examen', document.getElementById('edit-exam-date').value);
+  fd.append('heure_examen', document.getElementById('edit-exam-heure').value.trim());
+  fd.append('lieu_examen', document.getElementById('edit-exam-lieu').value);
+  fd.append('consignes_preparation', document.getElementById('edit-exam-consignes').value);
+  fd.append('statut_preparation', document.getElementById('edit-exam-statut-prep').value);
+  fd.append('statut', document.getElementById('edit-exam-statut').value);
+  fd.append('description', document.getElementById('edit-exam-desc').value);
+  fd.append('resultat', document.getElementById('edit-exam-resultat').value);
+
+  const res = await fetch(`/docteur/examen/${id}/edit/`, { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.success) {
+    showMsg('edit-exam-success', 'Examen mis à jour !', true);
+    setTimeout(() => { closeModal('modal-edit-examen'); location.reload(); }, 800);
+  } else {
+    showMsg('edit-exam-error', JSON.stringify(data.errors || data.error), false);
+  }
+}
+
+// ── QUICK VALIDATE PREPARATION ──
+async function quickValidatePrep(id) {
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('statut_preparation', 'VALIDEE');
+
+  const res = await fetch(`/examens/${id}/valider-preparation/`, { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.success) {
+    location.reload();
+  }
+}
+
+// ── CONFIRM DELETE ──
+function confirmDeleteExamen(url, name) {
+  document.getElementById('del-exam-name').textContent = name;
+  document.getElementById('form-delete-examen').action = url;
+  openModal('modal-delete');
+}
+
+function showMsg(id, text, isSuccess) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3500);
+}
+</script>
+{% endblock %}
+{% endblock %}

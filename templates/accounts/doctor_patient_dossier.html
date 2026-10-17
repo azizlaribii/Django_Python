@@ -99,6 +99,7 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-add" onclick="openEditPatientDossierModal()" style="background:#0284c7;">✏️ Modifier Dossier</button>
         <button class="btn-add" onclick="openModal('modal-add-obs')">📝 Observation</button>
         <button class="btn-add" onclick="openModal('modal-add-presc')" style="background:#059669;">💊 Prescription</button>
         <button class="btn-add" onclick="openAddExamenModal()" style="background:#7c3aed;">🩺 Examen</button>
@@ -107,6 +108,16 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
     </div>
   </div>
 
+  {% if dossier.allergies %}
+    <div style="background:#fef2f2;border:1.5px solid #f87171;border-radius:14px;padding:12px 18px;margin-bottom:20px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 8px rgba(220,38,38,.08);">
+      <div style="font-size:1.6rem;">⚠️</div>
+      <div>
+        <strong style="color:#b91c1c;font-size:.85rem;letter-spacing:.04em;text-transform:uppercase;">Alerte Médicale — Allergies Connues Signalées :</strong>
+        <div style="color:#7f1d1d;font-size:.88rem;margin-top:2px;font-weight:700;">{{ dossier.allergies }}</div>
+      </div>
+    </div>
+  {% endif %}
+
   <!-- TABS -->
   <div class="nav-tabs">
     <button class="tab-btn active" onclick="switchTab('resume',this)">📋 Résumé</button>
@@ -114,6 +125,7 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
     <button class="tab-btn" onclick="switchTab('analyses',this)">🔬 Analyses ({{ resultats.count }})</button>
     <button class="tab-btn" onclick="switchTab('prescriptions',this)">💊 Prescriptions ({{ prescriptions.count }})</button>
     <button class="tab-btn" onclick="switchTab('observations',this)">📝 Observations ({{ observations.count }})</button>
+    <button class="tab-btn" onclick="switchTab('medecins',this)">👨‍⚕️ Médecins ({{ medecins_assoc.count }})</button>
   </div>
 
   <!-- ─── RÉSUMÉ ─── -->
@@ -170,16 +182,34 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
       {% if examens %}
         <div style="overflow-x:auto;">
           <table class="mt">
-            <thead><tr><th>Date</th><th>Intitulé</th><th>Type</th><th>Statut</th><th>Résultat</th><th style="text-align:right;">Actions</th></tr></thead>
+            <thead><tr><th>Date & Heure</th><th>Intitulé & Lieu</th><th>Type</th><th>Préparation</th><th>Statut</th><th>Résultat</th><th style="text-align:right;">Actions</th></tr></thead>
             <tbody>
               {% for ex in examens %}
               <tr>
-                <td style="white-space:nowrap;color:#64748b;">{{ ex.date_examen|date:"d M Y" }}{% if ex.heure_examen %}<br><small>{{ ex.heure_examen|time:"H:i" }}</small>{% endif %}</td>
-                <td><strong>{{ ex.titre }}</strong></td>
-                <td>{{ ex.get_type_examen_display }}</td>
+                <td style="white-space:nowrap;color:#64748b;">
+                  <strong style="color:#0f172a;">{{ ex.date_examen|date:"d M Y" }}</strong>
+                  {% if ex.heure_examen %}<br><small style="color:#6366f1;font-weight:600;">🕐 {{ ex.heure_examen|time:"H:i" }}</small>{% endif %}
+                </td>
+                <td>
+                  <strong>{{ ex.titre }}</strong>
+                  {% if ex.lieu_examen %}<div style="font-size:.74rem;color:#64748b;">📍 {{ ex.lieu_examen }}</div>{% endif %}
+                </td>
+                <td><span style="background:#f3e8ff;color:#6b21a8;font-weight:600;padding:2px 7px;border-radius:6px;font-size:.72rem;">{{ ex.get_type_examen_display }}</span></td>
+                <td>
+                  <span class="badge badge-prep-{{ ex.statut_preparation|lower }}" style="padding:2px 8px;font-size:.7rem;">
+                    {% if ex.statut_preparation == 'VALIDEE' %}🟢 Validée
+                    {% elif ex.statut_preparation == 'A_FAIRE' %}🟠 À préparer
+                    {% elif ex.statut_preparation == 'EN_COURS' %}🔄 En cours
+                    {% else %}⚪ Non requise{% endif %}
+                  </span>
+                  {% if ex.consignes_preparation %}
+                    <div style="font-size:.73rem;color:#475569;max-width:160px;margin-top:2px;" title="{{ ex.consignes_preparation }}">📋 {{ ex.consignes_preparation|truncatechars:45 }}</div>
+                  {% endif %}
+                </td>
                 <td><span class="badge badge-{{ ex.statut|lower }}">{{ ex.get_statut_display }}</span></td>
-                <td style="font-size:.8rem;max-width:160px;color:#475569;">{{ ex.resultat|default:"—"|truncatechars:60 }}</td>
+                <td style="font-size:.8rem;max-width:140px;color:#475569;">{{ ex.resultat|default:"—"|truncatechars:45 }}</td>
                 <td style="text-align:right;white-space:nowrap;">
+                  <a href="{% url 'examen_fiche_preparation' ex.id %}" class="btn-edit" style="background:#ede9fe;color:#6d28d9;text-decoration:none;" title="Consulter la fiche de préparation">📄 Fiche</a>
                   <button class="btn-edit" data-id="{{ ex.id }}" onclick="editExamen(this.dataset.id)">✏️</button>
                   <button class="btn-del" data-url="{% url 'delete_examen' ex.id %}" onclick="confirmDelete(this.dataset.url,'Supprimer cet examen ?')">🗑</button>
                 </td>
@@ -340,6 +370,50 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
       {% endif %}
     </div>
   </div>
+  <!-- ─── ÉQUIPE MÉDICALE ─── -->
+  <div id="tab-medecins" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">👨‍⚕️ Équipe Médicale & Médecins Associés</span>
+        <button class="btn-add" style="background:#059669;" onclick="openAssocierModalPatient()">+ Associer un Médecin</button>
+      </div>
+      {% if medecins_assoc %}
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">
+          {% for a in medecins_assoc %}
+          <div style="background:{% if a.est_medecin_traitant %}linear-gradient(135deg,#f0fdf4,#dcfce7){% else %}#f8fafc{% endif %};border:1.5px solid {% if a.est_medecin_traitant %}#bbf7d0{% else %}#e2e8f0{% endif %};border-radius:14px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+              <div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#059669,#10b981);display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:#fff;">🩺</div>
+              <div>
+                <div style="font-weight:700;color:#0f172a;font-size:.95rem;">Dr. {{ a.medecin.get_full_name }}</div>
+                {% with a.medecin.doctor_profile as dp %}
+                  <div style="font-size:.8rem;color:#059669;">{{ dp.specialite|default:"Médecin" }}</div>
+                {% endwith %}
+              </div>
+              {% if a.est_medecin_traitant %}
+                <span style="margin-left:auto;background:#059669;color:#fff;padding:2px 8px;border-radius:6px;font-size:.7rem;font-weight:700;">Traitant</span>
+              {% endif %}
+            </div>
+            {% with a.medecin.doctor_profile as dp %}
+              {% if dp.cabinet_name %}<div style="font-size:.8rem;color:#64748b;">📍 {{ dp.cabinet_name }}</div>{% endif %}
+              {% if dp.horaires %}<div style="font-size:.78rem;color:#64748b;margin-top:2px;">🕐 {{ dp.horaires }}</div>{% endif %}
+            {% endwith %}
+            {% if a.medecin.phone %}<div style="font-size:.8rem;color:#0369a1;margin-top:4px;">📞 {{ a.medecin.phone }}</div>{% endif %}
+            {% if a.notes %}<div style="font-size:.78rem;color:#475569;margin-top:6px;background:#fff;padding:6px 10px;border-radius:8px;border:1px solid #e2e8f0;">📝 {{ a.notes }}</div>{% endif %}
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:8px;border-top:1px solid rgba(0,0,0,.06);">
+              <span style="font-size:.72rem;color:#94a3b8;">Depuis {{ a.date_association|date:"d M Y" }}</span>
+              <form method="post" action="{% url 'dissocier_patient' patient.id %}" style="margin:0;" onsubmit="return confirm('Retirer cette association médecin-patient ?')">
+                {% csrf_token %}
+                <button type="submit" class="btn-del" style="padding:3px 8px;">Dissocier</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state"><div style="font-size:3rem;">👨‍⚕️</div><p>Aucun médecin associé à ce patient.</p><button class="btn-add" style="margin-top:10px;background:#059669;" onclick="openAssocierModalPatient()">+ Associer un Médecin</button></div>
+      {% endif %}
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════ -->
@@ -349,20 +423,23 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
 <!-- MODAL ADD / EDIT EXAMEN -->
 <div class="modal-overlay" id="modal-add-exam" onclick="closeModalOnOverlay(event,'modal-add-exam')">
   <div class="modal-box">
-    <div class="modal-header"><span class="modal-title" id="exam-modal-title">🩺 Ajouter un Examen</span><button class="modal-close" onclick="closeModal('modal-add-exam')">✕</button></div>
+    <div class="modal-header"><span class="modal-title" id="exam-modal-title">🩺 Ajouter un Examen & Préparation</span><button class="modal-close" onclick="closeModal('modal-add-exam')">✕</button></div>
     <div class="alert-success" id="exam-success">✓ Examen enregistré !</div>
     <div class="alert-error" id="exam-error"></div>
     <input type="hidden" id="exam-id" value="">
-    <div class="form-group"><label>Intitulé de l'examen *</label><input class="form-input" type="text" id="exam-titre" placeholder="ex: Radiographie thoracique"></div>
+    <div class="form-group"><label>Intitulé de l'examen *</label><input class="form-input" type="text" id="exam-titre" placeholder="ex: Échographie abdominale / Radiographie" required></div>
     <div class="form-row2">
       <div class="form-group"><label>Type</label><select class="form-select" id="exam-type">
         <option value="CONSULTATION">Consultation</option>
-        <option value="RADIOLOGIE">Radiologie</option>
-        <option value="BIOLOGIE">Biologie</option>
+        <option value="RADIOLOGIE">Radiologie / Rayons X</option>
+        <option value="BIOLOGIE">Biologie / Bilan</option>
         <option value="ECHOGRAPHIE">Échographie</option>
+        <option value="SCANNER_IRM">Scanner / IRM</option>
+        <option value="CARDIOLOGIE">Cardiologie / ECG</option>
+        <option value="ENDOSCOPIE">Endoscopie</option>
         <option value="AUTRE">Autre</option>
       </select></div>
-      <div class="form-group"><label>Statut</label><select class="form-select" id="exam-statut">
+      <div class="form-group"><label>Statut de l'examen</label><select class="form-select" id="exam-statut">
         <option value="PLANIFIE">Planifié</option>
         <option value="EN_COURS">En cours</option>
         <option value="TERMINE">Terminé</option>
@@ -370,17 +447,140 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
       </select></div>
     </div>
     <div class="form-row2">
-      <div class="form-group"><label>Date *</label><input class="form-input" type="date" id="exam-date"></div>
+      <div class="form-group"><label>Date *</label><input class="form-input" type="date" id="exam-date" required></div>
       <div class="form-group">
         <label>Heure du rendez-vous / examen</label>
         <input class="form-input" type="text" id="exam-heure" placeholder="HH:MM (ex: 14:30)" maxlength="5" autocomplete="off">
       </div>
     </div>
+    <div class="form-group">
+      <label>Lieu / Salle d'examen</label>
+      <input type="text" class="form-input" id="exam-lieu" placeholder="ex: Cabinet Médical - Salle d'échographie / Service Radiologie">
+    </div>
+
+    <!-- PREPARATION -->
+    <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+        <label style="font-size:.82rem;font-weight:700;color:#6b21a8;margin:0;">📋 Consignes de Préparation du Patient</label>
+        <select class="form-select" id="exam-prep-statut" style="width:auto;padding:3px 8px;font-size:.76rem;">
+          <option value="NON_REQUISE">Non requise</option>
+          <option value="A_FAIRE" selected>À préparer par le patient</option>
+          <option value="EN_COURS">En cours</option>
+          <option value="VALIDEE">Validée / Prêt</option>
+        </select>
+      </div>
+      <textarea class="form-input" id="exam-consignes" rows="2" placeholder="Consignes impératives à suivre par le patient..."></textarea>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;">
+        <span style="font-size:.7rem;color:#64748b;font-weight:700;">Ajout :</span>
+        <button type="button" class="btn-edit" style="font-size:.7rem;padding:2px 7px;" onclick="addPrepPreset('À jeun strict au moins 6 heures avant.')">🥣 À jeun 6h</button>
+        <button type="button" class="btn-edit" style="font-size:.7rem;padding:2px 7px;" onclick="addPrepPreset('Boire 1L d\'eau 1h avant sans uriner (vessie pleine).')">💧 Vessie pleine</button>
+        <button type="button" class="btn-edit" style="font-size:.7rem;padding:2px 7px;" onclick="addPrepPreset('Apporter carte vitale, ordonnance et anciens clichés.')">📁 Clichés & Ordonnance</button>
+      </div>
+    </div>
+
     <div class="form-group"><label>Description / Motif</label><textarea class="form-input" id="exam-desc" rows="2"></textarea></div>
-    <div class="form-group"><label>Résultat / Compte-rendu</label><textarea class="form-input" id="exam-resultat" rows="3"></textarea></div>
+    <div class="form-group"><label>Résultat / Compte-rendu</label><textarea class="form-input" id="exam-resultat" rows="2"></textarea></div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeModal('modal-add-exam')">Annuler</button>
       <button class="btn-save" onclick="submitExamen()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT PATIENT & DOSSIER COMPLET -->
+<div class="modal-overlay" id="modal-edit-patient-dossier" onclick="closeModalOnOverlay(event, 'modal-edit-patient-dossier')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Modifier les Informations du Patient & Dossier</span>
+      <button class="modal-close" onclick="closeModal('modal-edit-patient-dossier')">✕</button>
+    </div>
+    <div class="alert-success" id="ed-success">✓ Dossier mis à jour !</div>
+    <div class="alert-error" id="ed-error"></div>
+
+    <div style="font-weight:700;color:#0284c7;font-size:.82rem;margin-bottom:8px;text-transform:uppercase;">1. État Civil & Coordonnées</div>
+    <div class="form-row2">
+      <div class="form-group"><label>Prénom *</label><input type="text" class="form-input" id="med-first-name" value="{{ patient.first_name }}"></div>
+      <div class="form-group"><label>Nom *</label><input type="text" class="form-input" id="med-last-name" value="{{ patient.last_name }}"></div>
+    </div>
+    <div class="form-row3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label>Date de naissance</label>
+        <input type="date" class="form-input" id="med-date-naissance" value="{{ profile.date_naissance|date:'Y-m-d' }}">
+      </div>
+      <div class="form-group">
+        <label>Groupe Sanguin</label>
+        <select class="form-select" id="med-groupe-sanguin">
+          <option value="A+" {% if profile.groupe_sanguin == 'A+' %}selected{% endif %}>A+</option>
+          <option value="A-" {% if profile.groupe_sanguin == 'A-' %}selected{% endif %}>A-</option>
+          <option value="B+" {% if profile.groupe_sanguin == 'B+' %}selected{% endif %}>B+</option>
+          <option value="B-" {% if profile.groupe_sanguin == 'B-' %}selected{% endif %}>B-</option>
+          <option value="AB+" {% if profile.groupe_sanguin == 'AB+' %}selected{% endif %}>AB+</option>
+          <option value="AB-" {% if profile.groupe_sanguin == 'AB-' %}selected{% endif %}>AB-</option>
+          <option value="O+" {% if profile.groupe_sanguin == 'O+' %}selected{% endif %}>O+</option>
+          <option value="O-" {% if profile.groupe_sanguin == 'O-' %}selected{% endif %}>O-</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>N° Sécurité Sociale</label>
+        <input type="text" class="form-input" id="med-secu" value="{{ profile.numero_securite_sociale|default:'' }}">
+      </div>
+    </div>
+    <div class="form-row2">
+      <div class="form-group"><label>Téléphone</label><input type="text" class="form-input" id="med-phone" value="{{ patient.phone|default:'' }}"></div>
+      <div class="form-group"><label>Email</label><input type="email" class="form-input" id="med-email" value="{{ patient.email|default:'' }}"></div>
+    </div>
+    <div class="form-row2">
+      <div class="form-group"><label>Ville</label><input type="text" class="form-input" id="med-city" value="{{ patient.city|default:'' }}"></div>
+      <div class="form-group"><label>Contact Urgence</label><input type="text" class="form-input" id="med-contact-urg" value="{{ profile.personne_contact|default:'' }}"></div>
+    </div>
+
+    <div style="font-weight:700;color:#0284c7;font-size:.82rem;margin:14px 0 8px;text-transform:uppercase;">2. Données Médicales du Dossier</div>
+    <div class="form-group">
+      <label style="color:#dc2626;">⚠️ Allergies Connues (Alerte Clinique)</label>
+      <textarea class="form-input" id="med-allergies" rows="2" placeholder="ex: Pénicilline, aspirine, latex...">{{ dossier.allergies|default:'' }}</textarea>
+    </div>
+    <div class="form-row2">
+      <div class="form-group"><label>Antécédents Personnels</label><textarea class="form-input" id="med-antecedents" rows="2">{{ profile.antecedents|default:'' }}</textarea></div>
+      <div class="form-group"><label>Antécédents Familiaux</label><textarea class="form-input" id="med-antecedents-fam" rows="2">{{ dossier.antecedents_familiaux|default:'' }}</textarea></div>
+    </div>
+    <div class="form-group"><label>Notes Générales de Suivi</label><textarea class="form-input" id="med-notes-gen" rows="2">{{ dossier.notes_generales|default:'' }}</textarea></div>
+
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modal-edit-patient-dossier')">Annuler</button>
+      <button class="btn-save" onclick="submitEditPatientDossier()">✓ Enregistrer les modifications</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ASSOCIER MEDECIN AU PATIENT -->
+<div class="modal-overlay" id="modal-assoc-patient" onclick="closeModalOnOverlay(event, 'modal-assoc-patient')">
+  <div style="background:#fff;border-radius:18px;padding:26px;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div class="modal-header">
+      <span class="modal-title">👨‍⚕️ Associer un Médecin</span>
+      <button class="modal-close" onclick="closeModal('modal-assoc-patient')">✕</button>
+    </div>
+    <div class="alert-success" id="assoc-p-success">✓ Association enregistrée !</div>
+    <div class="alert-error" id="assoc-p-error"></div>
+
+    <div class="form-group">
+      <label>Sélectionner le Médecin</label>
+      <select class="form-select" id="assoc-p-medecin">
+        <option value="{{ user.id }}">Dr. {{ user.get_full_name }} (Vous-même)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;">
+        <input type="checkbox" id="assoc-p-traitant" checked style="width:16px;height:16px;">
+        Médecin Traitant Principal
+      </label>
+    </div>
+    <div class="form-group">
+      <label>Notes de suivi</label>
+      <textarea class="form-input" id="assoc-p-notes" rows="2" placeholder="Motif ou notes de coordination..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modal-assoc-patient')">Annuler</button>
+      <button class="btn-save" onclick="submitAssocierModalPatient()">✓ Associer</button>
     </div>
   </div>
 </div>
@@ -576,15 +776,25 @@ function confirmDelete(url, msg) {
   openModal('modal-confirm-delete');
 }
 
+// ── PRESET HELPER ──────────────────────────────
+function addPrepPreset(text) {
+  const el = document.getElementById('exam-consignes');
+  if (el.value.trim().length > 0) el.value += '\n• ' + text;
+  else el.value = '• ' + text;
+}
+
 // ── EXAMEN ──────────────────────────────────────
 function openAddExamenModal() {
   document.getElementById('exam-id').value = '';
-  document.getElementById('exam-modal-title').textContent = '🩺 Ajouter un Examen';
+  document.getElementById('exam-modal-title').textContent = '🩺 Ajouter un Examen & Préparation';
   document.getElementById('exam-titre').value = '';
   document.getElementById('exam-type').value = 'CONSULTATION';
   document.getElementById('exam-statut').value = 'PLANIFIE';
   document.getElementById('exam-date').value = today();
   document.getElementById('exam-heure').value = '';
+  document.getElementById('exam-lieu').value = '';
+  document.getElementById('exam-prep-statut').value = 'A_FAIRE';
+  document.getElementById('exam-consignes').value = '';
   document.getElementById('exam-desc').value = '';
   document.getElementById('exam-resultat').value = '';
   openModal('modal-add-exam');
@@ -593,12 +803,15 @@ function openAddExamenModal() {
 async function editExamen(id) {
   const data = await (await fetch(`/api/examen/${id}/`)).json();
   document.getElementById('exam-id').value = id;
-  document.getElementById('exam-modal-title').textContent = '✏️ Modifier l\'Examen';
+  document.getElementById('exam-modal-title').textContent = '✏️ Modifier l\'Examen & Préparation';
   document.getElementById('exam-titre').value = data.titre || '';
   document.getElementById('exam-type').value = data.type_examen || 'CONSULTATION';
   document.getElementById('exam-statut').value = data.statut || 'PLANIFIE';
   document.getElementById('exam-date').value = data.date_examen || '';
   document.getElementById('exam-heure').value = data.heure_examen || '';
+  document.getElementById('exam-lieu').value = data.lieu_examen || '';
+  document.getElementById('exam-prep-statut').value = data.statut_preparation || 'NON_REQUISE';
+  document.getElementById('exam-consignes').value = data.consignes_preparation || '';
   document.getElementById('exam-desc').value = data.description || '';
   document.getElementById('exam-resultat').value = data.resultat || '';
   openModal('modal-add-exam');
@@ -614,6 +827,9 @@ async function submitExamen() {
   fd.append('date_examen', document.getElementById('exam-date').value);
   let heureVal = (document.getElementById('exam-heure').value || '').trim().replace('h', ':').replace('H', ':');
   fd.append('heure_examen', heureVal);
+  fd.append('lieu_examen', document.getElementById('exam-lieu').value);
+  fd.append('consignes_preparation', document.getElementById('exam-consignes').value);
+  fd.append('statut_preparation', document.getElementById('exam-prep-statut').value);
   fd.append('description', document.getElementById('exam-desc').value);
   fd.append('resultat', document.getElementById('exam-resultat').value);
 
@@ -622,6 +838,57 @@ async function submitExamen() {
   const data = await res.json();
   showAlert('exam-success','exam-error', data.success, data.errors ? JSON.stringify(data.errors) : 'Erreur');
   if(data.success) setTimeout(() => { closeModal('modal-add-exam'); location.reload(); }, 900);
+}
+
+// ── MODIFIER LE DOSSIER PATIENT (360°) ───────────
+function openEditPatientDossierModal() {
+  openModal('modal-edit-patient-dossier');
+}
+
+async function submitEditPatientDossier() {
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('first_name', document.getElementById('med-first-name').value);
+  fd.append('last_name', document.getElementById('med-last-name').value);
+  fd.append('date_naissance', document.getElementById('med-date-naissance').value);
+  fd.append('groupe_sanguin', document.getElementById('med-groupe-sanguin').value);
+  fd.append('numero_securite_sociale', document.getElementById('med-secu').value);
+  fd.append('phone', document.getElementById('med-phone').value);
+  fd.append('email', document.getElementById('med-email').value);
+  fd.append('city', document.getElementById('med-city').value);
+  fd.append('personne_contact', document.getElementById('med-contact-urg').value);
+  fd.append('allergies', document.getElementById('med-allergies').value);
+  fd.append('antecedents', document.getElementById('med-antecedents').value);
+  fd.append('antecedents_familiaux', document.getElementById('med-antecedents-fam').value);
+  fd.append('notes_generales', document.getElementById('med-notes-gen').value);
+
+  const res = await fetch(`/dossiers/${PATIENT_ID}/edit/`, { method: 'POST', body: fd });
+  const data = await res.json();
+  showAlert('ed-success', 'ed-error', data.success, data.errors ? JSON.stringify(data.errors) : 'Erreur');
+  if(data.success) setTimeout(() => { closeModal('modal-edit-patient-dossier'); location.reload(); }, 900);
+}
+
+// ── ASSOCIER MEDECIN ─────────────────────────────
+function openAssocierModalPatient() {
+  openModal('modal-assoc-patient');
+}
+
+async function submitAssocierModalPatient() {
+  const medId = document.getElementById('assoc-p-medecin').value;
+  const isTraitant = document.getElementById('assoc-p-traitant').checked;
+  const notes = document.getElementById('assoc-p-notes').value;
+
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('patient_id', PATIENT_ID);
+  fd.append('medecin_id', medId);
+  fd.append('est_medecin_traitant', isTraitant ? 'true' : 'false');
+  fd.append('notes', notes);
+
+  const res = await fetch('{% url "associer_patient" %}', { method: 'POST', body: fd });
+  const data = await res.json();
+  showAlert('assoc-p-success', 'assoc-p-error', data.success, data.error || 'Erreur');
+  if(data.success) setTimeout(() => { closeModal('modal-assoc-patient'); location.reload(); }, 900);
 }
 
 // ── ANALYSE ──────────────────────────────────────

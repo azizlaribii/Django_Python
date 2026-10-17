@@ -61,12 +61,16 @@ def seed():
         print(f"  ✓ Association Dr. {docteur.get_full_name()} ↔ {patient.get_full_name()}")
 
     # Examens médicaux
+    # Examens médicaux
     examens_data = [
         {
             'titre': 'Consultation cardiologie',
             'type_examen': 'CONSULTATION',
             'description': 'Contrôle tension artérielle et évaluation risque cardiovasculaire',
             'date_examen': date.today() - timedelta(days=30),
+            'lieu_examen': 'Cabinet Dr. Moreau — Salle 1',
+            'consignes_preparation': 'Apporter le carnet de relevés tensionnels des 7 derniers jours et les ordonnances actuelles.',
+            'statut_preparation': 'VALIDEE',
             'statut': 'TERMINE',
             'resultat': 'TA 138/88 mmHg. ECG normal. Poursuite traitement actuel recommandée.'
         },
@@ -75,34 +79,58 @@ def seed():
             'type_examen': 'RADIOLOGIE',
             'description': 'Contrôle pulmonaire annuel',
             'date_examen': date.today() - timedelta(days=60),
+            'lieu_examen': 'Service Radiologie — Salle RX 2',
+            'consignes_preparation': 'Retirer tout objet métallique (chaînette, piercing) avant l\'entrée en salle.',
+            'statut_preparation': 'NON_REQUISE',
             'statut': 'TERMINE',
             'resultat': 'Poumons clairs. Pas d\'anomalie détectée.'
         },
         {
             'titre': 'Échographie cardiaque (Echocardiographie)',
             'type_examen': 'ECHOGRAPHIE',
-            'description': 'Évaluation fonction cardiaque',
+            'description': 'Évaluation fonction cardiaque et cinétique ventriculaire',
             'date_examen': date.today() + timedelta(days=14),
+            'lieu_examen': 'Service d\'Imagerie Cardiovasculaire — Hôpital Saint-Luc',
+            'consignes_preparation': '• Tenue confortable en deux pièces.\n• Ne pas appliquer de crème ou huile corporelle sur le thorax le jour de l\'examen.\n• Apporter les résultats de la dernière prise de sang et le précédent électrocardiogramme.',
+            'statut_preparation': 'A_FAIRE',
             'statut': 'PLANIFIE',
             'resultat': ''
         },
         {
-            'titre': 'Bilan biologique complet',
+            'titre': 'Échographie abdomino-pelvienne',
+            'type_examen': 'ECHOGRAPHIE',
+            'description': 'Exploration foie, vésicule et reins',
+            'date_examen': date.today() + timedelta(days=5),
+            'lieu_examen': 'Centre d\'Échographie Pasteur — Salle 3',
+            'consignes_preparation': '• Être à jeun strict au moins 6 heures avant l\'examen (pas d\'aliments solides ni liquides sucrés ou café).\n• Boire 1 litre d\'eau plate 1 heure avant l\'examen et ne pas uriner (nécessité d\'une vessie pleine).',
+            'statut_preparation': 'A_FAIRE',
+            'statut': 'PLANIFIE',
+            'resultat': ''
+        },
+        {
+            'titre': 'Bilan biologique complet pré-anesthésie',
             'type_examen': 'BIOLOGIE',
-            'description': 'NFS + bilan lipidique + glycémie à jeun',
+            'description': 'NFS + bilan lipidique + glycémie à jeun + hémostase',
             'date_examen': date.today(),
+            'lieu_examen': 'Laboratoire d\'Analyses Pasteur',
+            'consignes_preparation': '• Être à jeun strict depuis la veille à minuit (12 heures de jeûne).\n• Eau plate autorisée en petite quantité.',
+            'statut_preparation': 'VALIDEE',
             'statut': 'EN_COURS',
             'resultat': ''
         },
     ]
 
     for e_data in examens_data:
-        ExamenMedical.objects.get_or_create(
+        ex, created = ExamenMedical.objects.get_or_create(
             dossier=dossier,
             titre=e_data['titre'],
             defaults={**e_data, 'medecin': docteur}
         )
-    print(f"  ✓ {len(examens_data)} examens créés")
+        if not created:
+            for k, v in e_data.items():
+                setattr(ex, k, v)
+            ex.save()
+    print(f"  ✓ {len(examens_data)} examens créés/mis à jour avec préparation")
 
     # Résultats laboratoire
     resultats_data = [
