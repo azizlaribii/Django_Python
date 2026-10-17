@@ -3,6 +3,7 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 
+
 class Tarif(models.Model):
     class Categorie(models.TextChoices):
         CONSULTATION = 'CONSULTATION', 'Consultation'
@@ -63,7 +64,7 @@ class Facture(models.Model):
     def total_ttc(self):
         return self.total_ht + self.montant_tva
 
-        def save(self, *args, **kwargs):
+    def save(self, *args, **kwargs):
         if not self.numero:
             prefixe = f"FAC-{timezone.now().year}-"
             derniere = (Facture.objects
@@ -76,10 +77,6 @@ class Facture(models.Model):
 
     def __str__(self):
         return self.numero or f"Facture #{self.pk}"
-        
-    def __str__(self):
-        return self.numero or f"Facture #{self.pk}"
-        
 
 
 class LigneFacture(models.Model):
