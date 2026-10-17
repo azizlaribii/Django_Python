@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Stocks médicaux - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% include 'stock/_header.html' with active='dashboard' %}
+
+    <div class="stats-row">
+        <div class="stat-widget">
+            <div class="stat-info"><h4>Produits actifs</h4><div class="stat-number">{{ nb_produits }}</div></div>
+            <div class="stat-icon" style="color: var(--primary); background: var(--primary-light);">🧪</div>
+        </div>
+        {% for bloc in blocs %}
+        <a href="{% url 'stock:produit_list' %}?statut={{ bloc.cle }}" class="stat-widget" style="color:inherit;">
+            <div class="stat-info">
+                <h4>{{ bloc.titre }}</h4>
+                <div class="stat-number" {% if bloc.nb %}style="color:{% if bloc.cle == 'faible' or bloc.cle == 'bientot' %}#b45309{% else %}#dc2626{% endif %};"{% endif %}>{{ bloc.nb }}</div>
+            </div>
+            <div class="stat-icon">{{ bloc.icone }}</div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <div class="stock-grid-2">
+        {% for bloc in blocs %}
+        <div class="stock-card">
+            <h3>
+                <span>{{ bloc.icone }} {{ bloc.titre }}{% if bloc.cle == 'bientot' %} <span class="muted">(≤ {{ seuil_jours }} jours)</span>{% endif %}</span>
+                {% if bloc.nb > 8 %}<a href="{% url 'stock:produit_list' %}?statut={{ bloc.cle }}" class="btn btn-secondary btn-sm">Tout voir ({{ bloc.nb }})</a>{% endif %}
+            </h3>
+            {% if bloc.produits %}
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead><tr><th>Produit</th><th>Quantité</th><th>{% if bloc.mode == 'date' %}Péremption{% else %}Seuil{% endif %}</th></tr></thead>
+                    <tbody>
+                    {% for p in bloc.produits %}
+                        <tr>
+                            <td><a href="{% url 'stock:produit_detail' p.pk %}"><strong>{{ p.nom }}</strong></a></td>
+                            <td>{{ p.quantite }} {{ p.get_unite_display|lower }}</td>
+                            <td>{% if bloc.mode == 'date' %}{{ p.date_peremption|date:"d/m/Y" }}{% else %}{{ p.seuil_alerte }}{% endif %}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+                <p class="empty-state">✓ Aucune alerte.</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="stock-card" style="margin-bottom: 40px;">
+        <h3>🔁 Derniers mouvements <a href="{% url 'stock:mouvement_list' %}" class="btn btn-secondary btn-sm">Tout l’historique</a></h3>
+        {% if derniers_mouvements %}
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead><tr><th>Date</th><th>Produit</th><th>Mouvement</th><th>Motif</th><th>Par</th></tr></thead>
+                <tbody>
+                {% for m in derniers_mouvements %}
+                    <tr>
+                        <td>{{ m.date|date:"d/m/Y H:i" }}</td>
+                        <td><a href="{% url 'stock:produit_detail' m.produit.pk %}">{{ m.produit.nom }}</a></td>
+                        <td><span class="status-pill {% if m.type == 'ENTREE' %}verified{% else %}info{% endif %}">{% if m.type == 'ENTREE' %}+{% else %}−{% endif %}{{ m.quantite }}</span></td>
+                        <td>{{ m.get_motif_display }}</td>
+                        <td>{{ m.auteur }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}<p class="empty-state">Aucun mouvement enregistré.</p>{% endif %}
+    </div>
+</div>
+{% endblock %}

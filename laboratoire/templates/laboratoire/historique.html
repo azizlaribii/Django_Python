@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Historique du laboratoire — SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
+{% block content %}
+<div class="lab-shell">
+  <header class="lab-hero">
+    <div class="lab-hero__copy">
+      <span class="lab-hero__eyebrow">🔬 Traçabilité</span>
+      <h1>Historique des actions</h1>
+      <p>Journal de consultation des créations, changements de statut, saisies et validations.</p>
+    </div>
+    <div class="lab-hero__actions"><a class="lab-btn lab-btn--white" href="{% url 'laboratoire:demande_list' %}">← Demandes</a></div>
+  </header>
+  <form method="get" class="lab-filter lab-history-filter" role="search">
+    <div>
+      <label for="history-q">Rechercher dans le journal</label>
+      <input id="history-q" type="search" name="q" value="{{ q }}" placeholder="Utilisateur, action ou objet">
+    </div>
+    <button class="lab-btn lab-btn--primary" type="submit">Rechercher</button>
+  </form>
+  <section class="lab-stats lab-history-stats" aria-label="Résumé du journal">
+    <article class="lab-stat"><span class="lab-stat__icon">◷</span><span><strong class="lab-stat__number">{{ action_count }}</strong><span class="lab-stat__label">Événements affichés</span></span></article>
+    <article class="lab-stat"><span class="lab-stat__icon">🔒</span><span><strong class="lab-stat__number">Traçable</strong><span class="lab-stat__label">Actions horodatées et attribuées</span></span></article>
+  </section>
+  <section class="lab-panel">
+    <div class="lab-panel__head"><h2>Événements récents</h2><span class="lab-badge lab-badge--neutral">{{ action_count }} affiché{{ action_count|pluralize:"s" }} · 200 maximum</span></div>
+    <div class="lab-history-list">
+      {% for action in actions %}
+        <article class="lab-history-item">
+          <div class="lab-history-item__aside">
+            <span class="lab-history-item__date">{{ action.date_action|date:"d/m/Y" }}</span>
+            <span class="lab-history-item__time">{{ action.date_action|date:"H:i:s" }}</span>
+          </div>
+          <div class="lab-history-item__main">
+            <div class="lab-history-item__heading">
+              <span class="lab-history-item__action">{{ action.action_label }}</span>
+              <span class="lab-history-item__object">{{ action.object_label }}{% if action.objet_id %} · #{{ action.objet_id }}{% endif %}</span>
+            </div>
+            <p class="lab-history-item__user">Effectué par <strong>{{ action.actor_label }}</strong></p>
+            {% if action.detail_sections %}
+              <div class="lab-history-changes">
+                {% for section in action.detail_sections %}
+                  <section class="lab-history-change">
+                    <h3>{{ section.title }}</h3>
+                    <dl>
+                      {% for item in section.items %}
+                        <div><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></div>
+                      {% endfor %}
+                    </dl>
+                  </section>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="lab-history-no-details">Aucun détail complémentaire enregistré.</p>
+            {% endif %}
+          </div>
+        </article>
+      {% empty %}
+        <div class="lab-empty"><span class="lab-empty__icon">🕘</span><h3>Aucune action pour le moment</h3><p>Les opérations effectuées sur les demandes, prélèvements et résultats seront consignées ici.</p></div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

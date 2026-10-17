@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Mes résultats — SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
+{% block content %}
+<div class="lab-shell">
+  <header class="lab-hero">
+    <div class="lab-hero__copy">
+      <span class="lab-hero__eyebrow">👤 Espace patient</span>
+      <h1>Mes résultats d’analyses</h1>
+      <p>Seuls les résultats validés par un professionnel habilité sont publiés ici.</p>
+    </div>
+    <div class="lab-hero__actions"><a class="lab-btn lab-btn--white" href="{% url 'dashboard' %}">← Tableau de bord</a></div>
+  </header>
+
+  <section class="lab-stats" aria-label="Résumé de vos résultats">
+    <article class="lab-stat"><span class="lab-stat__icon">✓</span><span><strong class="lab-stat__number">{{ resultats_count }}</strong><span class="lab-stat__label">Résultats publiés</span></span></article>
+  </section>
+
+  <section class="lab-panel">
+    <div class="lab-panel__head"><h2>Résultats disponibles</h2><span class="lab-badge lab-badge--neutral">{{ resultats_count }} résultat{{ resultats_count|pluralize:"s" }}</span></div>
+    <div class="lab-patient-results">
+      {% if resultats %}
+        <h3 class="lab-patient-results__section-title">Résultats du nouveau laboratoire</h3>
+      {% endif %}
+      {% for resultat in resultats %}
+        <article class="lab-patient-result">
+          <div class="lab-patient-result__head">
+            <div>
+              <span class="lab-history-item__action">{{ resultat.analyse_demandee.type_analyse.nom }}</span>
+              <p class="lab-patient-result__date">Validé le {{ resultat.date_validation|date:"d/m/Y à H:i" }}</p>
+            </div>
+            <span class="lab-badge lab-badge--done">Validé</span>
+          </div>
+          <div class="lab-patient-result__value">
+            <strong>{{ resultat.valeur }}</strong><span>{{ resultat.unite|default:resultat.analyse_demandee.type_analyse.unite }}</span>
+            {% if resultat.potentiellement_anormal %}<span class="lab-result__flag">À revoir avec votre médecin</span>{% endif %}
+          </div>
+          <dl class="lab-patient-result__details">
+            <div><dt>Valeurs de référence</dt><dd>{{ resultat.valeur_reference|default:"Non renseignées" }}</dd></div>
+            <div><dt>Médecin prescripteur</dt><dd>{{ resultat.analyse_demandee.demande.medecin.get_full_name|default:resultat.analyse_demandee.demande.medecin.username }}</dd></div>
+            <div><dt>Validé par</dt><dd>{{ resultat.valide_par.get_full_name|default:resultat.valide_par.username|default:"Professionnel habilité" }}</dd></div>
+            {% if resultat.interpretation %}<div><dt>Interprétation</dt><dd>{{ resultat.interpretation }}</dd></div>{% endif %}
+            {% if resultat.observation %}<div><dt>Observation</dt><dd>{{ resultat.observation }}</dd></div>{% endif %}
+          </dl>
+          <p class="lab-patient-result__notice">Un résultat hors des valeurs de référence n’est pas, à lui seul, un diagnostic. Demandez l’interprétation à votre médecin.</p>
+        </article>
+      {% endfor %}
+      {% if resultats_legacy %}
+        <h3 class="lab-patient-results__section-title">Résultats du dossier médical</h3>
+      {% endif %}
+      {% for resultat in resultats_legacy %}
+        <article class="lab-patient-result">
+          <div class="lab-patient-result__head">
+            <div>
+              <span class="lab-history-item__action">{{ resultat.type_analyse }}</span>
+              <p class="lab-patient-result__date">Référence {{ resultat.reference }} · Réalisé le {{ resultat.date_realisation|default:resultat.date_prescription|date:"d/m/Y" }}</p>
+            </div>
+            <span class="lab-badge lab-badge--done">{{ resultat.get_statut_display }}</span>
+          </div>
+          {% if resultat.valeurs %}
+            <div class="lab-patient-result__legacy-value">{{ resultat.valeurs|linebreaksbr }}</div>
+          {% endif %}
+          <dl class="lab-patient-result__details">
+            {% if resultat.laboratoire %}<div><dt>Laboratoire</dt><dd>{{ resultat.laboratoire.lab_profile.nom_laboratoire|default:resultat.laboratoire.username }}</dd></div>{% endif %}
+            {% if resultat.medecin_prescripteur %}<div><dt>Médecin prescripteur</dt><dd>{{ resultat.medecin_prescripteur.get_full_name|default:resultat.medecin_prescripteur.username }}</dd></div>{% endif %}
+            {% if resultat.interpretation %}<div><dt>Interprétation</dt><dd>{{ resultat.interpretation }}</dd></div>{% endif %}
+          </dl>
+          <p class="lab-patient-result__notice">Un résultat ne remplace pas l’avis de votre médecin. Demandez-lui de vous l’expliquer.</p>
+        </article>
+      {% endfor %}
+      {% if not resultats and not resultats_legacy %}
+        <div class="lab-empty"><span class="lab-empty__icon">🧪</span><h3>Aucun résultat publié</h3><p>Vos résultats apparaîtront ici après la validation du laboratoire.</p></div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

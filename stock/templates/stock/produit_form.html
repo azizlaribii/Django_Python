@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{{ titre }} - Stocks médicaux{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    <div class="glass-card" style="margin-bottom: 40px;">
+        <h1 style="font-size:1.6rem; margin-bottom:6px;">{{ titre }}</h1>
+        <p style="color:var(--text-muted); margin-bottom:24px;">
+            {% if produit %}La quantité en stock se modifie uniquement via les entrées et sorties.{% else %}Renseignez la fiche du produit, sa date de péremption et le stock de départ.{% endif %}
+        </p>
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="alert alert-error">{{ form.non_field_errors }}</div>{% endif %}
+            <div class="form-grid">
+                {% for field in form %}
+                    <div {% if field.name == 'description' %}class="full"{% endif %}>{% include 'stock/_field.html' %}</div>
+                {% endfor %}
+            </div>
+            <div style="display:flex; gap:10px; margin-top:8px;">
+                <button type="submit" class="btn btn-primary">{% if produit %}Enregistrer les modifications{% else %}Ajouter le produit{% endif %}</button>
+                <a href="{% if produit %}{% url 'stock:produit_detail' produit.pk %}{% else %}{% url 'stock:produit_list' %}{% endif %}" class="btn btn-secondary">Annuler</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

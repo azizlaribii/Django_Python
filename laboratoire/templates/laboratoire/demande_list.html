@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Demandes d’analyses — SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
+{% block content %}
+<div class="lab-shell">
+  <header class="lab-hero">
+    <div class="lab-hero__copy">
+      <span class="lab-hero__eyebrow">🔬 Espace laboratoire</span>
+      <h1>Demandes d’analyses</h1>
+      <p>Suivez les prescriptions, les prélèvements et les résultats depuis un seul espace.</p>
+    </div>
+    <div class="lab-hero__actions">
+      {% if can_create %}
+        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:demande_create' %}">＋ Nouvelle prescription</a>
+      {% endif %}
+      {% if can_manage_catalog %}
+        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:type_list' %}">Catalogue</a>
+      {% endif %}
+      {% if user.is_laboratory or user.is_admin_user %}
+        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:historique' %}">Historique</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <section class="lab-stats" aria-label="Résumé des demandes">
+    <article class="lab-stat"><span class="lab-stat__icon">▤</span><span><strong class="lab-stat__number">{{ stats.total }}</strong><span class="lab-stat__label">Demandes visibles</span></span></article>
+    <article class="lab-stat"><span class="lab-stat__icon">◷</span><span><strong class="lab-stat__number">{{ stats.en_attente }}</strong><span class="lab-stat__label">En attente</span></span></article>
+    <article class="lab-stat"><span class="lab-stat__icon">⌛</span><span><strong class="lab-stat__number">{{ stats.en_cours }}</strong><span class="lab-stat__label">En cours</span></span></article>
+    <article class="lab-stat"><span class="lab-stat__icon">✓</span><span><strong class="lab-stat__number">{{ stats.terminees }}</strong><span class="lab-stat__label">Terminées</span></span></article>
+  </section>
+
+  <form method="get" class="lab-filter" role="search">
+    <div>
+      <label for="lab-q">Patient ou commentaire</label>
+      <input id="lab-q" type="search" name="q" value="{{ q }}" placeholder="Nom, prénom, commentaire">
+    </div>
+    <div>
+      <label for="lab-from">Depuis le</label>
+      <input id="lab-from" type="date" name="date_debut" value="{{ date_debut }}">
+    </div>
+    <div>
+      <label for="lab-to">Jusqu’au</label>
+      <input id="lab-to" type="date" name="date_fin" value="{{ date_fin }}">
+    </div>
+    <div>
+      <label for="lab-status">Statut</label>
+      <select id="lab-status" name="statut">
+        <option value="">Tous les statuts</option>
+        {% for value, label in statut_choices %}
+          <option value="{{ value }}" {% if statut == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="lab-btn lab-btn--primary" type="submit">Filtrer</button>
+  </form>
+
+  <section class="lab-panel">
+    <div class="lab-panel__head">
+      <h2>File des demandes</h2>
+      <span class="lab-badge lab-badge--neutral">{{ stats.total }} demande{{ stats.total|pluralize:"s" }}</span>
+    </div>
+    <div class="lab-table-wrap">
+      <table class="lab-table">
+        <thead>
+          <tr><th>Patient</th><th>Médecin</th><th>Analyses</th><th>Prescrite le</th><th>Priorité</th><th>Statut</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for demande in demandes %}
+            <tr>
+              <td><span class="lab-table__primary">{{ demande.patient.get_full_name|default:demande.patient.username }}</span><span class="lab-table__secondary">{{ demande.patient.username }}</span></td>
+              <td>{{ demande.medecin.get_full_name|default:demande.medecin.username }}</td>
+              <td>{{ demande.analyses.count }}</td>
+              <td>{{ demande.date_demande|date:"d/m/Y" }}<span class="lab-table__secondary">{{ demande.date_demande|date:"H:i" }}</span></td>
+              <td><span class="lab-priority {% if demande.priorite == 'URGENTE' %}lab-priority--urgent{% elif demande.priorite == 'HAUTE' %}lab-priority--high{% else %}lab-priority--normal{% endif %}">{{ demande.get_priorite_display }}</span></td>
+              <td>
+                <span class="lab-badge {% if demande.statut == 'EN_ATTENTE' %}lab-badge--pending{% elif demande.statut == 'EN_COURS' %}lab-badge--progress{% elif demande.statut == 'TERMINEE' %}lab-badge--done{% else %}lab-badge--cancelled{% endif %}">{{ demande.get_statut_display }}</span>
+              </td>
+              <td><a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:demande_detail' demande.pk %}">Ouvrir →</a></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7">
+              <div class="lab-empty">
+                <span class="lab-empty__icon">🧪</span>
+                <h3>Aucune demande à afficher</h3>
+                {% if user.is_doctor %}
+                  <p>Créez une prescription pour un patient qui vous est associé afin de démarrer le parcours.</p>
+                  <a class="lab-btn lab-btn--primary" href="{% url 'laboratoire:demande_create' %}">＋ Créer une prescription</a>
+                {% elif user.is_laboratory %}
+                  <p>Cette file affiche les demandes attribuées à <strong>{{ user.username }}</strong> ainsi que celles qui ne sont pas encore attribuées.</p>
+                  <p>Si une prescription existe mais reste invisible, vérifiez le laboratoire destinataire choisi par le médecin et retirez les filtres actifs.</p>
+                  <p class="lab-empty__hint">Pour (ré)attribuer les demandes de démonstration au compte labo, exécutez <code>python manage.py seed_laboratory_demo</code>.</p>
+                {% else %}
+                  <p>Aucune demande ne correspond à vos filtres.</p>
+                {% endif %}
+              </div>
+            </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

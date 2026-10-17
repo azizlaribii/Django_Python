@@ -1,6 +1,10 @@
 from django import forms
 from django.contrib.auth import authenticate
-from .models import User, DoctorProfile, LaboratoryProfile, PatientProfile
+from .models import (
+    User, DoctorProfile, LaboratoryProfile, PatientProfile,
+    ExamenMedical, ResultatLaboratoire, Prescription, ObservationMedicale,
+    AssociationMedecinPatient, DossierMedical,
+)
 
 
 class LoginForm(forms.Form):
@@ -8,7 +12,7 @@ class LoginForm(forms.Form):
         label="Nom d'utilisateur",
         widget=forms.TextInput(attrs={
             'class': 'form-input',
-            'placeholder': 'Entrez votre nom d’utilisateur',
+            'placeholder': "Entrez votre nom d'utilisateur",
             'autocomplete': 'username',
             'id': 'login-username'
         })
@@ -199,8 +203,6 @@ class AdminCreateUserForm(RegisterForm):
         return user
 
 
-
-
 class UserProfileUpdateForm(forms.ModelForm):
     class Meta:
         model = User
@@ -288,3 +290,100 @@ class AdminUserEditForm(forms.ModelForm):
             user.save()
         return user
 
+
+# ─────────────────────────────────────────────────────────────
+# FORMULAIRES MÉDICAUX
+# ─────────────────────────────────────────────────────────────
+class ExamenMedicalForm(forms.ModelForm):
+    heure_examen = forms.TimeField(
+        required=False,
+        input_formats=['%H:%M', '%H:%M:%S', '%Hh%M', '%Hh%M:%S', '%H:%M %p'],
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'HH:MM (ex: 14:30)'})
+    )
+
+    class Meta:
+        model = ExamenMedical
+        fields = ['titre', 'type_examen', 'description', 'date_examen', 'heure_examen', 'statut', 'resultat']
+        widgets = {
+            'titre': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'ex: Radiographie thoracique'}),
+            'type_examen': forms.Select(attrs={'class': 'form-select'}),
+            'description': forms.Textarea(attrs={'class': 'form-input', 'rows': 2, 'placeholder': 'Motif ou description'}),
+            'date_examen': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
+            'statut': forms.Select(attrs={'class': 'form-select'}),
+            'resultat': forms.Textarea(attrs={'class': 'form-input', 'rows': 3, 'placeholder': 'Compte-rendu du résultat'}),
+        }
+
+
+class ResultatLaboratoireForm(forms.ModelForm):
+    class Meta:
+        model = ResultatLaboratoire
+        fields = ['type_analyse', 'priorite', 'statut', 'date_prescription', 'date_realisation', 'laboratoire', 'valeurs', 'interpretation']
+        widgets = {
+            'type_analyse': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'ex: NFS, Glycémie, Bilan hépatique...'}),
+            'priorite': forms.Select(attrs={'class': 'form-select'}),
+            'statut': forms.Select(attrs={'class': 'form-select'}),
+            'date_prescription': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
+            'date_realisation': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
+            'laboratoire': forms.Select(attrs={'class': 'form-select'}),
+            'valeurs': forms.Textarea(attrs={'class': 'form-input', 'rows': 3, 'placeholder': 'Valeurs mesurées'}),
+            'interpretation': forms.Textarea(attrs={'class': 'form-input', 'rows': 2, 'placeholder': 'Interprétation des résultats'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['laboratoire'].queryset = User.objects.filter(role=User.Role.LABORATOIRE, is_active=True)
+        self.fields['laboratoire'].empty_label = "— Sélectionner un laboratoire —"
+        self.fields['laboratoire'].required = False
+        self.fields['date_realisation'].required = False
+
+
+class PrescriptionForm(forms.ModelForm):
+    class Meta:
+        model = Prescription
+        fields = ['medicament', 'posologie', 'instructions', 'date_prescription', 'date_fin', 'statut']
+        widgets = {
+            'medicament': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'ex: Amoxicilline 500mg'}),
+            'posologie': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'ex: 3 fois/jour pendant 7 jours'}),
+            'instructions': forms.Textarea(attrs={'class': 'form-input', 'rows': 2, 'placeholder': 'Instructions particulières'}),
+            'date_prescription': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
+            'date_fin': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
+            'statut': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['date_fin'].required = False
+
+
+class ObservationMedicaleForm(forms.ModelForm):
+    class Meta:
+        model = ObservationMedicale
+        fields = ['titre', 'contenu', 'date_observation', 'confidentiel']
+        widgets = {
+            'titre': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'ex: Contrôle tension artérielle'}),
+            'contenu': forms.Textarea(attrs={'class': 'form-input', 'rows': 4, 'placeholder': 'Détails de l\'observation...'}),
+            'date_observation': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
+            'confidentiel': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+        }
+
+
+class AssociationForm(forms.ModelForm):
+    class Meta:
+        model = AssociationMedecinPatient
+        fields = ['patient', 'est_medecin_traitant', 'notes']
+        widgets = {
+            'patient': forms.Select(attrs={'class': 'form-select'}),
+            'est_medecin_traitant': forms.CheckboxInput(attrs={'class': 'form-checkbox'}),
+            'notes': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
+        }
+
+
+class DossierMedicalForm(forms.ModelForm):
+    class Meta:
+        model = DossierMedical
+        fields = ['notes_generales', 'allergies', 'antecedents_familiaux']
+        widgets = {
+            'notes_generales': forms.Textarea(attrs={'class': 'form-input', 'rows': 3}),
+            'allergies': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
+            'antecedents_familiaux': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
+        }
