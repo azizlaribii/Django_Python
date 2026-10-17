@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 from django.db.models import Q
+from django.db import transaction
 from django.http import JsonResponse
 from django.utils import timezone
 import json
@@ -152,7 +153,9 @@ def patient_dashboard(request):
 
     # Récupération des données réelles
     examens = ExamenMedical.objects.filter(dossier=dossier).order_by('-date_examen')[:5]
-    resultats = ResultatLaboratoire.objects.filter(dossier=dossier).order_by('-date_prescription')[:5]
+    resultats = ResultatLaboratoire.objects.filter(
+        dossier=dossier, statut__in=['DISPONIBLE', 'TRANSMIS'],
+    ).order_by('-date_prescription')[:5]
     prescriptions = Prescription.objects.filter(dossier=dossier, statut='ACTIVE').order_by('-date_prescription')
     observations = ObservationMedicale.objects.filter(dossier=dossier, confidentiel=False).order_by('-date_observation')[:3]
 
@@ -163,7 +166,9 @@ def patient_dashboard(request):
 
     stats = {
         'prescriptions': prescriptions.count(),
-        'lab_results': ResultatLaboratoire.objects.filter(dossier=dossier).count(),
+        'lab_results': ResultatLaboratoire.objects.filter(
+            dossier=dossier, statut__in=['DISPONIBLE', 'TRANSMIS'],
+        ).count(),
         'upcoming_appointments': ExamenMedical.objects.filter(
             dossier=dossier, statut='PLANIFIE', date_examen__gte=timezone.now().date()
         ).count(),
@@ -193,7 +198,9 @@ def patient_dossier(request):
     dossier = get_or_create_dossier(request.user)
 
     examens = ExamenMedical.objects.filter(dossier=dossier).order_by('-date_examen')
-    resultats = ResultatLaboratoire.objects.filter(dossier=dossier).order_by('-date_prescription')
+    resultats = ResultatLaboratoire.objects.filter(
+        dossier=dossier, statut__in=['DISPONIBLE', 'TRANSMIS'],
+    ).order_by('-date_prescription')
     prescriptions = Prescription.objects.filter(dossier=dossier).order_by('-date_prescription')
     observations = ObservationMedicale.objects.filter(dossier=dossier, confidentiel=False).order_by('-date_observation')
     medecins = AssociationMedecinPatient.objects.filter(patient=request.user).select_related('medecin', 'medecin__doctor_profile')
@@ -653,16 +660,19 @@ def lab_dashboard(request):
         return redirect('dashboard')
 
     profile, _ = LaboratoryProfile.objects.get_or_create(user=request.user)
+    from laboratoire.permissions import laboratory_team_user_ids
+
+    team_user_ids = laboratory_team_user_ids(request.user)
 
     pending_analyses = ResultatLaboratoire.objects.filter(
-        laboratoire=request.user
+        laboratoire__in=team_user_ids
     ).select_related('dossier__patient', 'medecin_prescripteur').order_by('-date_prescription')
 
-    total_analyses = ResultatLaboratoire.objects.filter(laboratoire=request.user).count()
-    in_progress = ResultatLaboratoire.objects.filter(laboratoire=request.user, statut='EN_COURS').count()
-    completed = ResultatLaboratoire.objects.filter(laboratoire=request.user, statut__in=['DISPONIBLE', 'TRANSMIS']).count()
+    total_analyses = ResultatLaboratoire.objects.filter(laboratoire__in=team_user_ids).count()
+    in_progress = ResultatLaboratoire.objects.filter(laboratoire__in=team_user_ids, statut='EN_COURS').count()
+    completed = ResultatLaboratoire.objects.filter(laboratoire__in=team_user_ids, statut__in=['DISPONIBLE', 'TRANSMIS']).count()
     active_doctors = ResultatLaboratoire.objects.filter(
-        laboratoire=request.user,
+        laboratoire__in=team_user_ids,
         medecin_prescripteur__isnull=False
     ).values('medecin_prescripteur').distinct().count()
 
@@ -686,20 +696,63 @@ def lab_dashboard(request):
 @require_POST
 def lab_update_resultat(request, resultat_id):
     """Permet au laboratoire de mettre à jour un résultat d'analyse."""
-    if not (request.user.is_laboratory or request.user.is_admin_user):
+    if not request.user.is_laboratory:
         return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
 
-    resultat = get_object_or_404(ResultatLaboratoire, id=resultat_id, laboratoire=request.user)
+    from laboratoire.permissions import can_validate_results, laboratory_team_user_ids
+
+    resultat = get_object_or_404(
+        ResultatLaboratoire,
+        id=resultat_id,
+        laboratoire__in=laboratory_team_user_ids(request.user),
+    )
     statut = request.POST.get('statut', resultat.statut)
+    if statut not in dict(ResultatLaboratoire.STATUT_CHOICES):
+        return JsonResponse({'success': False, 'error': 'Statut invalide'}, status=400)
+    published_statuses = ['DISPONIBLE', 'TRANSMIS']
+    if (
+        (statut in published_statuses or resultat.statut in published_statuses)
+        and not can_validate_results(request.user)
+    ):
+        return JsonResponse(
+            {'success': False, 'error': 'Validation réservée aux professionnels du laboratoire'},
+            status=403,
+        )
     valeurs = request.POST.get('valeurs', resultat.valeurs)
     interpretation = request.POST.get('interpretation', resultat.interpretation)
 
+    avant = {
+        'statut': resultat.statut,
+        'valeurs': resultat.valeurs,
+        'interpretation': resultat.interpretation,
+        'date_realisation': resultat.date_realisation.isoformat() if resultat.date_realisation else None,
+    }
     resultat.statut = statut
     resultat.valeurs = valeurs
     resultat.interpretation = interpretation
     if statut in ['DISPONIBLE', 'TRANSMIS'] and not resultat.date_realisation:
         resultat.date_realisation = timezone.now().date()
-    resultat.save()
+    from laboratoire.services import enregistrer_action
+
+    with transaction.atomic():
+        resultat.save()
+        enregistrer_action(
+            utilisateur=request.user,
+            action='RESULTAT_LEGACY_MODIFIE',
+            objet='ResultatLaboratoire',
+            objet_id=resultat.pk,
+            details={
+                'avant': avant,
+                'apres': {
+                    'statut': resultat.statut,
+                    'valeurs': resultat.valeurs,
+                    'interpretation': resultat.interpretation,
+                    'date_realisation': (
+                        resultat.date_realisation.isoformat() if resultat.date_realisation else None
+                    ),
+                },
+            },
+        )
     return JsonResponse({'success': True, 'message': 'Résultat mis à jour.'})
 
 
