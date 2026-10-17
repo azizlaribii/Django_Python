@@ -17,13 +17,15 @@
 
     <!-- Navigation Bar -->
     <nav class="navbar" id="main-navbar">
-        <div class="container navbar-inner">
-            <a href="{% url 'home' %}" class="logo-brand" id="brand-logo-link">
-                <span class="logo-icon">🩺</span>
-                <span>Santé<strong style="color: var(--primary);">Connect</strong></span>
-            </a>
+        <div class="navbar-inner">
+            <div class="navbar-brand-section">
+                <a href="{% url 'home' %}" class="logo-brand" id="brand-logo-link">
+                    <span class="logo-icon">🩺</span>
+                    <span class="logo-text">Santé<strong style="color: var(--primary);">Connect</strong></span>
+                </a>
+            </div>
 
-            <div class="nav-links">
+            <div class="nav-links" id="main-nav-links">
                 <a href="{% url 'home' %}" class="nav-item-link" id="nav-home">Accueil</a>
 
                 {% if user.is_authenticated %}
@@ -45,20 +47,22 @@
                     {% endif %}
                     
                     {% if user.is_admin_user or user.is_staff or user.is_superuser %}
-                        <a href="{% url 'admin_dashboard' %}" class="nav-item-link" style="color: #dc2626; font-weight: 700;" id="nav-admin-hub">
+                        <a href="{% url 'tarif_list' %}" class="nav-item-link" id="nav-tarifs">💳 Tarifs</a>
+                        <a href="{% url 'admin_dashboard' %}" class="nav-item-link nav-item-admin" id="nav-admin-hub">
                             🛡️ Hub Admin
                         </a>
-                        <a href="{% url 'tarif_list' %}" class="nav-item-link">💳 Tarifs</a>
                     {% endif %}
+                {% endif %}
+            </div>
 
-
+            <div class="navbar-user-actions" id="nav-user-actions">
+                {% if user.is_authenticated %}
                     <div class="nav-user-badge" id="nav-user-profile">
                         <span class="badge-role {{ user.role }}">{{ user.get_role_display }}</span>
-                        <span>{{ user.first_name|default:user.username }}</span>
-                        <a href="{% url 'profile' %}" title="Modifier mon profil" style="margin-left: 4px;" id="nav-profile-edit">👤</a>
+                        <span class="nav-user-name">{{ user.first_name|default:user.username }}</span>
+                        <a href="{% url 'profile' %}" class="nav-profile-icon" title="Modifier mon profil" id="nav-profile-edit">👤</a>
                     </div>
-
-                    <a href="{% url 'logout' %}" class="btn btn-secondary btn-sm" id="btn-nav-logout">Déconnexion</a>
+                    <a href="{% url 'logout' %}" class="btn btn-secondary btn-sm nav-logout-btn" id="btn-nav-logout">Déconnexion</a>
                 {% else %}
                     <a href="{% url 'login' %}" class="btn btn-outline btn-sm" id="btn-nav-login">Connexion</a>
                     <a href="{% url 'register' %}" class="btn btn-primary btn-sm" id="btn-nav-register">Créer un compte</a>
