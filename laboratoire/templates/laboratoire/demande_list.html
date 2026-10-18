@@ -15,7 +15,12 @@
         <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:demande_create' %}">＋ Nouvelle prescription</a>
       {% endif %}
       {% if can_manage_catalog %}
+        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:supervision' %}">Supervision</a>
+        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:rapports' %}">Rapports</a>
         <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:type_list' %}">Catalogue</a>
+      {% endif %}
+      {% if can_validate %}
+        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:validation_queue' %}">Validation biologiste</a>
       {% endif %}
       {% if user.is_laboratory or user.is_admin_user %}
         <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:historique' %}">Historique</a>
@@ -28,6 +33,7 @@
     <article class="lab-stat"><span class="lab-stat__icon">◷</span><span><strong class="lab-stat__number">{{ stats.en_attente }}</strong><span class="lab-stat__label">En attente</span></span></article>
     <article class="lab-stat"><span class="lab-stat__icon">⌛</span><span><strong class="lab-stat__number">{{ stats.en_cours }}</strong><span class="lab-stat__label">En cours</span></span></article>
     <article class="lab-stat"><span class="lab-stat__icon">✓</span><span><strong class="lab-stat__number">{{ stats.terminees }}</strong><span class="lab-stat__label">Terminées</span></span></article>
+    <article class="lab-stat"><span class="lab-stat__icon">⚠</span><span><strong class="lab-stat__number">{{ stats.urgentes_en_retard }}</strong><span class="lab-stat__label">Urgentes en retard ({{ delai_alerte_urgente }} min)</span></span></article>
   </section>
 
   <form method="get" class="lab-filter" role="search">
@@ -52,6 +58,17 @@
         {% endfor %}
       </select>
     </div>
+    {% if user.is_laboratory %}
+      <div>
+        <label for="lab-priority">Urgence</label>
+        <select id="lab-priority" name="priorite">
+          <option value="">Toutes les priorités</option>
+          {% for value, label in priorite_choices %}
+            <option value="{{ value }}" {% if priorite == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
     <button class="lab-btn lab-btn--primary" type="submit">Filtrer</button>
   </form>
 
@@ -72,7 +89,9 @@
               <td>{{ demande.medecin.get_full_name|default:demande.medecin.username }}</td>
               <td>{{ demande.analyses.count }}</td>
               <td>{{ demande.date_demande|date:"d/m/Y" }}<span class="lab-table__secondary">{{ demande.date_demande|date:"H:i" }}</span></td>
-              <td><span class="lab-priority {% if demande.priorite == 'URGENTE' %}lab-priority--urgent{% elif demande.priorite == 'HAUTE' %}lab-priority--high{% else %}lab-priority--normal{% endif %}">{{ demande.get_priorite_display }}</span></td>
+              <td><span class="lab-priority {% if demande.priorite == 'URGENTE' %}lab-priority--urgent{% elif demande.priorite == 'HAUTE' %}lab-priority--high{% else %}lab-priority--normal{% endif %}">{{ demande.get_priorite_display }}</span>
+                {% if demande.urgent_en_retard %}<span class="lab-badge lab-badge--rejected" title="Délai configuré : {{ delai_alerte_urgente }} minutes">En retard</span>{% endif %}
+              </td>
               <td>
                 <span class="lab-badge {% if demande.statut == 'EN_ATTENTE' %}lab-badge--pending{% elif demande.statut == 'EN_COURS' %}lab-badge--progress{% elif demande.statut == 'TERMINEE' %}lab-badge--done{% else %}lab-badge--cancelled{% endif %}">{{ demande.get_statut_display }}</span>
               </td>

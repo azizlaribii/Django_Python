@@ -9,7 +9,7 @@ from .models import (
     Prelevement,
     Resultat,
 )
-from .permissions import can_validate_results
+from .permissions import can_validate_results, is_lab_responsable
 
 
 def _audit_values(instance, fields):
@@ -49,6 +49,10 @@ def enregistrer_prelevement(*, prelevement, utilisateur, donnees):
         created = True
     for field, value in donnees.items():
         setattr(prelevement, field, value)
+    if not prelevement.code_prelevement:
+        prelevement.code_prelevement = Prelevement._meta.get_field(
+            "code_prelevement",
+        ).get_default()
     if prelevement.statut == Prelevement.Statut.PRELEVE and not prelevement.date_prelevement:
         prelevement.date_prelevement = timezone.now()
     if prelevement.statut == Prelevement.Statut.RECU and not prelevement.date_reception:
@@ -102,6 +106,10 @@ def enregistrer_resultat(*, analyse_demandee, prelevement, utilisateur, donnees,
     else:
         resultat = Resultat.objects.select_for_update().get(pk=resultat.pk)
     correction = resultat.statut in (Resultat.Statut.VALIDE, Resultat.Statut.CORRIGE)
+    if correction and not is_lab_responsable(utilisateur):
+        raise ValidationError(
+            "Seul le biologiste responsable peut corriger un résultat déjà validé."
+        )
     if correction:
         was_validated = resultat.statut == Resultat.Statut.VALIDE
         resultat.statut = Resultat.Statut.CORRIGE
@@ -111,6 +119,7 @@ def enregistrer_resultat(*, analyse_demandee, prelevement, utilisateur, donnees,
         action = "RESULTAT_CORRIGE"
     else:
         resultat.statut = Resultat.Statut.EN_ATTENTE_VALIDATION
+        resultat.commentaire_rejet = ""
         action = "RESULTAT_SAISI" if created else "RESULTAT_MODIFIE"
 
     avant = {
@@ -158,7 +167,7 @@ def enregistrer_resultat(*, analyse_demandee, prelevement, utilisateur, donnees,
 def valider_resultat(*, resultat, utilisateur):
     if not can_validate_results(utilisateur):
         raise ValidationError(
-            "La validation est réservée aux professionnels du laboratoire."
+            "La validation est réservée au groupe Biologiste responsable."
         )
     resultat = Resultat.objects.select_for_update().select_related(
         "analyse_demandee__demande",
@@ -197,6 +206,50 @@ def valider_resultat(*, resultat, utilisateur):
             objet="DemandeAnalyse", objet_id=analyse.demande_id,
             details={"avant": ancien_statut, "apres": analyse.demande.statut},
         )
+    return resultat
+
+
+@transaction.atomic
+def rejeter_resultat(*, resultat, utilisateur, commentaire):
+    if not can_validate_results(utilisateur):
+        raise ValidationError(
+            "Le rejet des résultats est réservé au biologiste responsable."
+        )
+    commentaire = commentaire.strip()
+    if len(commentaire) < 3:
+        raise ValidationError(
+            "Un commentaire d’au moins 3 caractères est obligatoire pour rejeter le résultat."
+        )
+    resultat = Resultat.objects.select_for_update().select_related(
+        "analyse_demandee__demande",
+    ).get(pk=resultat.pk)
+    if resultat.statut not in (
+        Resultat.Statut.EN_ATTENTE_VALIDATION,
+        Resultat.Statut.CORRIGE,
+    ):
+        raise ValidationError("Seul un résultat en attente peut être rejeté.")
+    ancien_statut = resultat.statut
+    resultat.statut = Resultat.Statut.REJETE
+    resultat.commentaire_rejet = commentaire
+    resultat.valide_par = None
+    resultat.date_validation = None
+    resultat.save(update_fields=[
+        "statut", "commentaire_rejet", "valide_par", "date_validation",
+        "date_modification",
+    ])
+    enregistrer_action(
+        utilisateur=utilisateur,
+        action="RESULTAT_REJETE",
+        objet="Resultat",
+        objet_id=resultat.pk,
+        details={
+            "avant": {"statut": ancien_statut},
+            "apres": {
+                "statut": resultat.statut,
+                "commentaire": commentaire,
+            },
+        },
+    )
     return resultat
 
 

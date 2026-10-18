@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Rapports laboratoire — Administration{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
+{% block content %}
+<div class="lab-shell">
+  <header class="lab-hero">
+    <div class="lab-hero__copy">
+      <span class="lab-hero__eyebrow">Administration uniquement</span>
+      <h1>Activité et rapports</h1>
+      <p>Analyse de la charge, des délais, des rejets et du chiffre d’affaires théorique.</p>
+    </div>
+    <div class="lab-hero__actions">
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:supervision' %}">Supervision quotidienne</a>
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:type_list' %}">Catalogue</a>
+    </div>
+  </header>
+
+  <section class="lab-panel">
+    <div class="lab-panel__head"><h2>Période du rapport</h2></div>
+    <div class="lab-panel__body">
+      <form method="get" class="lab-filter">
+        {% for field in form %}
+          <div>{{ field.label_tag }}{{ field }}{% if field.errors %}<div class="lab-form__errors">{{ field.errors }}</div>{% endif %}</div>
+        {% endfor %}
+        <button class="lab-btn lab-btn--primary" type="submit">Appliquer</button>
+        <a class="lab-btn lab-btn--soft" href="{% url 'laboratoire:rapports' %}">Toute la période</a>
+      </form>
+      {% if form.non_field_errors %}<div class="lab-form__errors">{{ form.non_field_errors }}</div>{% endif %}
+    </div>
+  </section>
+
+  {% if report %}
+    <div class="lab-actions">
+      <a class="lab-btn lab-btn--success" href="{% url 'laboratoire:rapports_export' 'csv' %}?date_debut={{ form.data.date_debut }}&amp;date_fin={{ form.data.date_fin }}">Exporter CSV</a>
+      <a class="lab-btn lab-btn--success" href="{% url 'laboratoire:rapports_export' 'xlsx' %}?date_debut={{ form.data.date_debut }}&amp;date_fin={{ form.data.date_fin }}">Exporter Excel (.xlsx)</a>
+    </div>
+
+    <section class="lab-stats" aria-label="Indicateurs de la période">
+      <article class="lab-stat"><span class="lab-stat__icon">▤</span><span><strong class="lab-stat__number">{{ report.total_demandes }}</strong><span class="lab-stat__label">Demandes</span></span></article>
+      <article class="lab-stat"><span class="lab-stat__icon">◷</span><span><strong class="lab-stat__number">{% if report.delai_moyen_minutes == 0 %}0{% elif report.delai_moyen_minutes %}{{ report.delai_moyen_minutes|floatformat:0 }}{% else %}—{% endif %}</strong><span class="lab-stat__label">Délai moyen (min)</span></span></article>
+      <article class="lab-stat"><span class="lab-stat__icon">🧫</span><span><strong class="lab-stat__number">{{ report.taux_rejet|floatformat:1 }}%</strong><span class="lab-stat__label">Taux de rejet ({{ report.echantillons_rejetes }}/{{ report.nombre_prelevements }})</span></span></article>
+      <article class="lab-stat"><span class="lab-stat__icon">✓</span><span><strong class="lab-stat__number">{{ report.resultats_en_attente }}</strong><span class="lab-stat__label">Résultats à valider</span></span></article>
+      <article class="lab-stat"><span class="lab-stat__icon">€</span><span><strong class="lab-stat__number">{{ report.chiffre_affaires|floatformat:2 }} €</strong><span class="lab-stat__label">Chiffre d’affaires théorique</span></span></article>
+    </section>
+    <p class="lab-table__secondary">Le chiffre d’affaires théorique est estimé à partir des tarifs actuels des analyses prescrites sur la période, hors demandes annulées; il ne représente pas les factures encaissées. Le délai moyen est calculé entre prescription et dernière validation des demandes terminées.</p>
+
+    <section class="lab-panel">
+      <div class="lab-panel__head"><h2>Répartition par statut</h2></div>
+      <div class="lab-table-wrap">
+        <table class="lab-table"><thead><tr><th>Statut</th><th>Demandes</th></tr></thead>
+          <tbody>{% for item in report.statuts %}<tr><td>{{ item.label }}</td><td>{{ item.nombre }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="lab-panel">
+      <div class="lab-panel__head"><h2>Demandes par jour</h2></div>
+      <div class="lab-table-wrap">
+        <table class="lab-table"><thead><tr><th>Jour</th><th>Demandes</th></tr></thead>
+          <tbody>{% for item in report.par_jour %}<tr><td>{{ item.jour|date:"d/m/Y" }}</td><td>{{ item.nombre }}</td></tr>{% empty %}<tr><td colspan="2">Aucune demande sur la période.</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="lab-panel">
+      <div class="lab-panel__head"><h2>Analyses les plus demandées</h2></div>
+      <div class="lab-table-wrap">
+        <table class="lab-table"><thead><tr><th>Code</th><th>Analyse</th><th>Demandes</th></tr></thead>
+          <tbody>{% for item in report.analyses_populaires %}<tr><td><span class="lab-code">{{ item.analyses__type_analyse__code }}</span></td><td>{{ item.analyses__type_analyse__nom }}</td><td>{{ item.nombre }}</td></tr>{% empty %}<tr><td colspan="3">Aucune analyse prescrite sur la période.</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

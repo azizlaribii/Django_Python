@@ -69,6 +69,10 @@
       </p>
     </div>
     <div class="hero-actions">
+      <a href="{% url 'laboratoire:mes_resultats' %}" class="btn-white">
+        🔬 Mon dossier laboratoire
+        {% if stats.lab_new_results %}<span style="margin-left:6px;padding:2px 7px;border-radius:20px;background:#dc2626;color:#fff;">{{ stats.lab_new_results }} {% if stats.lab_new_results == 1 %}nouveau résultat{% else %}nouveaux résultats{% endif %}</span>{% endif %}
+      </a>
       <a href="{% url 'patient_dossier' %}" class="btn-white">📁 Mon Dossier Complet</a>
       <a href="{% url 'profile' %}" class="btn-outline-white">⚙️ Modifier mon profil</a>
     </div>

@@ -26,6 +26,18 @@
         </div>
     </div>
 
+    <section style="background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:20px 24px; margin-bottom:24px;">
+        <h2 style="font-size:1.1rem; margin:0 0 6px; color:#0f172a;">Configuration du laboratoire</h2>
+        <p style="color:#64748b; margin:0 0 16px;">Gérez le catalogue, les bilans et les paramètres utilisés par les comptes rendus.</p>
+        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+            <a href="{% url 'laboratoire:supervision' %}" class="btn btn-primary">📊 Superviser l’activité</a>
+            <a href="{% url 'laboratoire:rapports' %}" class="btn btn-secondary">📈 Rapports et exports</a>
+            <a href="{% url 'laboratoire:type_list' %}" class="btn btn-primary">🧪 Catalogue des analyses</a>
+            <a href="{% url 'laboratoire:bilan_list' %}" class="btn btn-secondary">📋 Bilans prédéfinis</a>
+            <a href="{% url 'laboratoire:parametres' %}" class="btn btn-secondary">⚙️ Paramètres du laboratoire</a>
+        </div>
+    </section>
+
     <!-- Stats Widgets (5 KPIs) -->
     <div class="stats-row" style="margin-bottom: 24px;">
         <div class="stat-widget" style="padding: 18px 20px;">
@@ -374,4 +386,3 @@
     });
 </script>
 {% endblock %}
-
