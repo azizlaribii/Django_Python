@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Bilans prédéfinis — Laboratoire{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
+{% block content %}
+<div class="lab-shell">
+  <header class="lab-hero">
+    <div class="lab-hero__copy">
+      <span class="lab-hero__eyebrow">🔬 Configuration laboratoire</span>
+      <h1>Bilans prédéfinis</h1>
+      <p>Composez des bilans lipidique, rénal, hépatique ou personnalisés à partir du catalogue.</p>
+    </div>
+    <div class="lab-hero__actions">
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:type_list' %}">Catalogue</a>
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:parametres' %}">Paramètres</a>
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:bilan_create' %}">＋ Créer un bilan</a>
+    </div>
+  </header>
+  <section class="lab-panel">
+    <div class="lab-panel__head">
+      <h2>Bilans configurés</h2>
+      <span class="lab-badge lab-badge--neutral">{{ bilans|length }} bilan{{ bilans|length|pluralize:"s" }}</span>
+    </div>
+    <div class="lab-table-wrap">
+      <table class="lab-table">
+        <thead><tr><th>Bilan</th><th>Analyses</th><th>Statut</th><th></th></tr></thead>
+        <tbody>
+          {% for bilan in bilans %}
+            <tr>
+              <td><span class="lab-table__primary">{{ bilan.nom }}</span>{% if bilan.description %}<span class="lab-table__secondary">{{ bilan.description|truncatechars:100 }}</span>{% endif %}</td>
+              <td>{% for analyse in bilan.analyses.all %}<span class="lab-code">{{ analyse.code }}</span> {{ analyse.nom }}{% if not forloop.last %}<br>{% endif %}{% empty %}Aucune analyse{% endfor %}</td>
+              <td>{% if bilan.actif %}<span class="lab-badge lab-badge--done">Actif</span>{% else %}<span class="lab-badge lab-badge--neutral">Désactivé</span>{% endif %}</td>
+              <td><a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:bilan_update' bilan.pk %}">Modifier</a></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4"><div class="lab-empty"><span class="lab-empty__icon">🧪</span><h3>Aucun bilan prédéfini</h3><p>Créez un bilan et sélectionnez les analyses qui le composent.</p><a class="lab-btn lab-btn--primary" href="{% url 'laboratoire:bilan_create' %}">＋ Créer un bilan</a></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

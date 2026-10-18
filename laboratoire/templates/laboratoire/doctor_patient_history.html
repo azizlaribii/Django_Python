@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Historique des analyses — {{ patient.get_full_name|default:patient.username }}{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">
+<style>
+  .lab-chart { width:100%; height:auto; min-height:220px; }
+  .lab-chart polyline { fill:none; stroke:#047857; stroke-width:3; }
+  .lab-chart circle { fill:#047857; stroke:white; stroke-width:2; }
+  .lab-history-abnormal { color:#b91c1c; font-weight:700; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="lab-shell">
+  <header class="lab-hero">
+    <div class="lab-hero__copy">
+      <span class="lab-hero__eyebrow">Dossier laboratoire · Patient</span>
+      <h1>{{ patient.get_full_name|default:patient.username }}</h1>
+      <p>Historique des résultats validés des demandes prescrites par vous.</p>
+    </div>
+    <div class="lab-hero__actions">
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:demande_list' %}">Mes demandes</a>
+      <a class="lab-btn lab-btn--white" href="{% url 'dashboard' %}">Tableau de bord</a>
+    </div>
+  </header>
+
+  <section class="lab-panel">
+    <div class="lab-panel__head"><h2>Évolution dans le temps</h2></div>
+    <form method="get" class="lab-filter">
+      <div>
+        <label for="analysis-filter">Analyse</label>
+        <select id="analysis-filter" name="analyse">
+          <option value="">Toutes les analyses</option>
+          {% for type in types_analyse %}
+            <option value="{{ type.pk }}" {% if selected_type == type.pk|stringformat:"s" %}selected{% endif %}>{{ type.nom }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="lab-btn lab-btn--primary" type="submit">Afficher</button>
+      {% if selected_type %}<a class="lab-btn lab-btn--soft" href="{% url 'laboratoire:doctor_patient_history' patient.pk %}">Réinitialiser</a>{% endif %}
+    </form>
+    {% if chart_points %}
+      <svg class="lab-chart" viewBox="0 0 600 260" role="img" aria-label="Graphique d’évolution des résultats numériques">
+        <line x1="30" y1="220" x2="570" y2="220" stroke="#cbd5e1"/>
+        <line x1="30" y1="30" x2="30" y2="220" stroke="#cbd5e1"/>
+        {% if chart_points|length > 1 %}<polyline points="{{ chart_polyline }}"/>{% endif %}
+        {% for point in chart_points %}
+          <circle cx="{{ point.x }}" cy="{{ point.y }}" r="6">
+            <title>{{ point.date|date:"d/m/Y" }} — {{ point.value }} {{ point.unit }}</title>
+          </circle>
+        {% endfor %}
+      </svg>
+    {% else %}
+      <div class="lab-empty"><span class="lab-empty__icon">📈</span><h3>Choisissez une analyse à comparer</h3><p>Le graphique affiche l’évolution numérique d’une seule analyse pour conserver une unité et une échelle cohérentes.</p></div>
+    {% endif %}
+  </section>
+
+  {% if legacy_resultats %}
+    <section class="lab-panel">
+      <div class="lab-panel__head"><h2>Résultats antérieurs du dossier médical</h2></div>
+      {% for resultat in legacy_resultats %}
+        <article class="lab-sample">
+          <div>
+            <strong>{{ resultat.type_analyse }}</strong>
+            <span class="lab-table__secondary">{{ resultat.valeurs|linebreaksbr }}</span>
+            <span class="lab-table__secondary">Référence {{ resultat.reference }} · {{ resultat.date_realisation|default:resultat.date_prescription|date:"d/m/Y" }}</span>
+          </div>
+        </article>
+      {% endfor %}
+    </section>
+  {% endif %}
+
+  <section class="lab-panel">
+    <div class="lab-panel__head"><h2>Résultats validés</h2><span class="lab-badge lab-badge--neutral">{{ resultats|length }}</span></div>
+    <div class="lab-table-wrap">
+      <table class="lab-table">
+        <thead><tr><th>Date</th><th>Analyse</th><th>Résultat</th><th>Référence</th><th>Demande</th></tr></thead>
+        <tbody>
+          {% for resultat in resultats %}
+            <tr>
+              <td>{{ resultat.date_validation|date:"d/m/Y H:i" }}</td>
+              <td>{{ resultat.analyse_demandee.type_analyse.nom }}</td>
+              <td class="{% if resultat.potentiellement_anormal %}lab-history-abnormal{% endif %}">{{ resultat.valeur }} {{ resultat.unite|default:resultat.analyse_demandee.type_analyse.unite }}</td>
+              <td>{{ resultat.valeur_reference|default:"Non renseignée" }}</td>
+              <td><a href="{% url 'laboratoire:demande_detail' resultat.analyse_demandee.demande_id %}">#{{ resultat.analyse_demandee.demande_id }}</a></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5">Aucun résultat validé pour ce patient et cette analyse.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

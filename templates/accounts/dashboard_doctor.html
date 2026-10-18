@@ -86,6 +86,8 @@
       <p>{{ profile.specialite }}{% if profile.numero_ordre %} &bull; N° {{ profile.numero_ordre }}{% endif %}{% if profile.cabinet_name %} &bull; {{ profile.cabinet_name }}{% endif %}</p>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <a href="{% url 'laboratoire:demande_list' %}" class="btn-white-out">🧪 Mes demandes laboratoire</a>
+      <a href="{% url 'laboratoire:doctor_notifications' %}" class="btn-white-out">🔔 Alertes laboratoire</a>
       <a href="{% url 'dossiers_patients_list' %}" class="btn-white-out">📁 Dossiers Patients</a>
       <a href="{% url 'examens_list' %}" class="btn-white-out">🩺 Examens & Préparations</a>
       <button class="btn-white-out" onclick="openModal('modal-add-patient')">➕ Associer Patient</button>
@@ -145,6 +147,7 @@
             </div>
             <div style="display:flex;gap:6px;flex-shrink:0;">
               <a href="{% url 'doctor_patient_dossier' a.patient.id %}" class="btn-blue">📁 Dossier</a>
+              <a href="{% url 'laboratoire:doctor_patient_history' a.patient.id %}" class="btn-blue">📈 Analyses</a>
               <form method="post" action="{% url 'dissocier_patient' a.patient.id %}" style="margin:0;" onsubmit="return confirm('Retirer ce patient de votre liste ?')">
                 {% csrf_token %}
                 <button type="submit" class="btn-red" title="Retirer l'association">✕</button>

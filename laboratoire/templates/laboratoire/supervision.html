@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Supervision laboratoire — Administration{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
+{% block content %}
+<div class="lab-shell">
+  <header class="lab-hero">
+    <div class="lab-hero__copy">
+      <span class="lab-hero__eyebrow">Administration uniquement</span>
+      <h1>Supervision de l’activité</h1>
+      <p>Demandes, prélèvements rejetés, résultats à valider et opérations de déblocage.</p>
+    </div>
+    <div class="lab-hero__actions">
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:demande_list' %}">Toutes les demandes</a>
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:rapports' %}">Tableau de bord et rapports</a>
+    </div>
+  </header>
+
+  <section class="lab-stats" aria-label="Indicateurs de supervision">
+    <article class="lab-stat"><span class="lab-stat__icon">▤</span><span><strong class="lab-stat__number">{{ nombre_demandes }}</strong><span class="lab-stat__label">Demandes filtrées</span></span></article>
+    <article class="lab-stat"><span class="lab-stat__icon">⛔</span><span><strong class="lab-stat__number">{{ nombre_bloquees }}</strong><span class="lab-stat__label">Ouvertes non attribuées</span></span></article>
+    <article class="lab-stat"><span class="lab-stat__icon">⚠</span><span><strong class="lab-stat__number">{{ nombre_urgentes_en_retard }}</strong><span class="lab-stat__label">Urgentes en retard (&gt; {{ delai_alerte_urgente }} min)</span></span></article>
+    <article class="lab-stat"><span class="lab-stat__icon">🧫</span><span><strong class="lab-stat__number">{{ nombre_echantillons_rejetes }}</strong><span class="lab-stat__label">Échantillons rejetés</span></span></article>
+    <article class="lab-stat"><span class="lab-stat__icon">✓</span><span><strong class="lab-stat__number">{{ nombre_resultats_a_valider }}</strong><span class="lab-stat__label">Résultats à valider</span></span></article>
+  </section>
+
+  <section class="lab-panel">
+    <div class="lab-panel__head"><h2>Filtres</h2></div>
+    <div class="lab-panel__body">
+      <form method="get" class="lab-filter">
+        {% for field in form %}
+          <div>
+            {{ field.label_tag }}{{ field }}
+            {% if field.errors %}<div class="lab-form__errors">{{ field.errors }}</div>{% endif %}
+          </div>
+        {% endfor %}
+        <button class="lab-btn lab-btn--primary" type="submit">Filtrer</button>
+        <a class="lab-btn lab-btn--soft" href="{% url 'laboratoire:supervision' %}">Effacer</a>
+      </form>
+      <p class="lab-table__secondary">Une demande est considérée bloquée si elle est encore ouverte et n’a aucun laboratoire affecté. Une urgence est en retard après le délai configuré dans les paramètres du laboratoire.</p>
+    </div>
+  </section>
+
+  <section class="lab-panel">
+    <div class="lab-panel__head">
+      <h2>Demandes et actions de supervision</h2>
+      <span class="lab-badge lab-badge--neutral">{{ nombre_demandes }} demande{{ nombre_demandes|pluralize:"s" }}</span>
+    </div>
+    <div class="lab-table-wrap">
+      <table class="lab-table">
+        <thead><tr><th>Patient / médecin</th><th>Analyses</th><th>Date</th><th>Priorité / statut</th><th>Laboratoire</th><th>Suivi</th><th>Actions administrateur</th></tr></thead>
+        <tbody>
+          {% for demande in demandes %}
+            <tr>
+              <td>
+                <span class="lab-table__primary">{{ demande.patient.get_full_name|default:demande.patient.username }}</span>
+                <span class="lab-table__secondary">Médecin : {{ demande.medecin.get_full_name|default:demande.medecin.username }}</span>
+                <a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:demande_detail' demande.pk %}">Demande #{{ demande.pk }}</a>
+              </td>
+              <td>{% for analyse in demande.analyses.all %}{{ analyse.type_analyse.nom }}{% if not forloop.last %}, {% endif %}{% empty %}Aucune analyse{% endfor %}</td>
+              <td>{{ demande.date_demande|date:"d/m/Y H:i" }}</td>
+              <td>{{ demande.get_priorite_display }}<br><span class="lab-badge lab-badge--neutral">{{ demande.get_statut_display }}</span>
+                {% if demande.urgent_en_retard %}<span class="lab-badge lab-badge--rejected">Urgente en retard</span>{% endif %}
+                {% if not demande.laboratoire and demande.statut != "TERMINEE" and demande.statut != "ANNULEE" %}<span class="lab-badge lab-badge--rejected">Bloquée : non attribuée</span>{% endif %}
+              </td>
+              <td>{% if demande.laboratoire %}{{ demande.laboratoire.username }}{% else %}Non attribué{% endif %}</td>
+              <td>
+                Échantillons rejetés : {{ demande.nombre_echantillons_rejetes }}<br>
+                Résultats à valider : {{ demande.nombre_resultats_a_valider }}
+              </td>
+              <td>
+                {% if demande.statut == "EN_ATTENTE" or demande.statut == "EN_COURS" %}
+                  <form method="post" action="{% url 'laboratoire:demande_reaffecter' demande.pk %}" style="margin-bottom:10px;">
+                    {% csrf_token %}
+                    <label for="labo-{{ demande.pk }}">Réaffecter</label>
+                    <select id="labo-{{ demande.pk }}" name="laboratoire" required>
+                      <option value="">Choisir un laboratoire</option>
+                      {% for laboratoire in laboratoires %}
+                        <option value="{{ laboratoire.pk }}" {% if demande.laboratoire_id == laboratoire.pk %}selected{% endif %}>{{ laboratoire.username }}</option>
+                      {% endfor %}
+                    </select>
+                    <button class="lab-btn lab-btn--soft lab-btn--small" type="submit">Affecter / débloquer</button>
+                  </form>
+                  <form method="post" action="{% url 'laboratoire:demande_annuler_admin' demande.pk %}" onsubmit="return confirm('Confirmer l’annulation de cette demande ?');">
+                    {% csrf_token %}
+                    <label for="motif-{{ demande.pk }}">Annuler (motif obligatoire)</label>
+                    <textarea id="motif-{{ demande.pk }}" name="motif" rows="2" required></textarea>
+                    <button class="lab-btn lab-btn--danger lab-btn--small" type="submit">Annuler</button>
+                  </form>
+                {% elif demande.motif_annulation %}
+                  <span class="lab-table__secondary">Motif : {{ demande.motif_annulation }}</span>
+                {% else %}Aucune action{% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7"><div class="lab-empty"><h3>Aucune demande trouvée</h3><p>Modifiez les filtres ou effacez-les pour voir toute l’activité.</p></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

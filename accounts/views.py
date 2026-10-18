@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -181,6 +183,13 @@ def patient_dashboard(request):
         ).count(),
         'observations': observations.count(),
     }
+    from laboratoire.models import Resultat as ResultatAnalyse
+
+    stats['lab_new_results'] = ResultatAnalyse.objects.filter(
+        analyse_demandee__demande__patient=request.user,
+        statut=ResultatAnalyse.Statut.VALIDE,
+        date_validation__gte=timezone.now() - timedelta(days=7),
+    ).count()
 
     context = {
         'profile': profile,
@@ -1563,4 +1572,3 @@ def get_protocole_details(request, protocole_id):
     if not proto:
         return JsonResponse({'success': False, 'error': 'Protocole non trouvé.'}, status=404)
     return JsonResponse({'success': True, 'protocole': proto})
-

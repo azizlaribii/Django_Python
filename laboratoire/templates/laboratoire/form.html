@@ -16,19 +16,24 @@
     <section class="lab-panel">
       <div class="lab-panel__head"><h2>Informations</h2></div>
       <div class="lab-panel__body">
-        <form method="post" class="lab-form">
+        <form method="post" class="lab-form" enctype="multipart/form-data">
           {% csrf_token %}
           {% if form.non_field_errors %}
             <div class="lab-form__nonfield lab-form__field--wide" role="alert">{{ form.non_field_errors }}</div>
           {% endif %}
           {% for field in form %}
-            <div class="lab-form__field {% if field.name == 'analyses' or field.name == 'commentaire' or field.name == 'description' or field.name == 'observation' or field.name == 'motif_rejet' or field.name == 'remarque' %}lab-form__field--wide{% endif %}">
+            <div class="lab-form__field {% if field.name == 'analyses' or field.name == 'bilans' or field.name == 'commentaire' or field.name == 'description' or field.name == 'observation' or field.name == 'motif_rejet' or field.name == 'motifs_rejet' or field.name == 'entete_compte_rendu' or field.name == 'signature_compte_rendu' or field.name == 'remarque' %}lab-form__field--wide{% endif %}">
               {{ field.label_tag }}
               {% if field.field.required %}<span aria-hidden="true" style="color:#b42318;">*</span>{% endif %}
-              {% if field.name == "analyses" %}
+              {% if field.name == "analyses" or field.name == "bilans" %}
                 <div class="lab-form__choices">{{ field }}</div>
               {% else %}
                 {{ field }}
+                {% if field.name == "motif_rejet" and form.motifs_rejet %}
+                  <datalist id="motifs-rejet-options">
+                    {% for motif in form.motifs_rejet %}<option value="{{ motif }}">{% endfor %}
+                  </datalist>
+                {% endif %}
               {% endif %}
               {% if field.help_text %}<span class="lab-form__help">{{ field.help_text }}</span>{% endif %}
               {% if field.errors %}<div class="lab-form__errors" role="alert">{{ field.errors }}</div>{% endif %}

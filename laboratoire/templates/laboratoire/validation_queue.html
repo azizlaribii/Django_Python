@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Validation biologique — Laboratoire{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">
+<style>
+  .critical-row { border-left: 4px solid #dc2626; background: #fff7f7; }
+  .result-review { padding: 18px; border-bottom: 1px solid #e2e8f0; }
+  .result-review:last-child { border-bottom: 0; }
+  .review-actions { display:flex; gap:12px; flex-wrap:wrap; align-items:end; margin-top:12px; }
+  .review-actions textarea { min-width:260px; min-height:60px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="lab-shell">
+  <header class="lab-hero">
+    <div class="lab-hero__copy">
+      <span class="lab-hero__eyebrow">Biologiste responsable</span>
+      <h1>Résultats à valider</h1>
+      <p>Vérifiez les valeurs, l’interprétation automatique et les retours opérateur avant validation.</p>
+    </div>
+    <div class="lab-hero__actions">
+      <span class="lab-badge {% if nombre_critiques %}lab-badge--rejected{% else %}lab-badge--neutral{% endif %}">{{ nombre_critiques }} résultat{{ nombre_critiques|pluralize:"s" }} critique{{ nombre_critiques|pluralize:"s" }}</span>
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:demande_list' %}">File des demandes</a>
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:historique' %}">Journal de traçabilité</a>
+    </div>
+  </header>
+
+  <section class="lab-panel">
+    <div class="lab-panel__head"><h2>En attente de validation</h2><span class="lab-badge lab-badge--neutral">{{ resultats|length }}</span></div>
+    {% for resultat in resultats %}
+      <article class="result-review {% if resultat.potentiellement_critique %}critical-row{% endif %}">
+        <div class="lab-analysis__head">
+          <div>
+            <h3>{{ resultat.analyse_demandee.type_analyse.nom }} <span class="lab-code">{{ resultat.analyse_demandee.type_analyse.code }}</span></h3>
+            <div class="lab-analysis__meta">
+              Patient : {{ resultat.analyse_demandee.demande.patient.get_full_name|default:resultat.analyse_demandee.demande.patient.username }}
+              · Demande #{{ resultat.analyse_demandee.demande_id }}
+              · Priorité {{ resultat.analyse_demandee.demande.get_priorite_display }}
+            </div>
+          </div>
+          <span class="lab-badge {% if resultat.potentiellement_critique %}lab-badge--rejected{% else %}lab-badge--pending{% endif %}">{{ resultat.get_statut_display }}</span>
+        </div>
+        <p class="lab-result__value">
+          {{ resultat.valeur }} {{ resultat.unite|default:resultat.analyse_demandee.type_analyse.unite }}
+          {% if resultat.potentiellement_critique %}<strong class="lab-result__flag">⚠ CRITIQUE — validation à examiner</strong>{% endif %}
+        </p>
+        <p class="lab-result__meta">
+          Références : {{ resultat.valeur_reference|default:"Non renseignées" }}
+          · Interprétation automatique : <strong>{{ resultat.interpretation_automatique }}</strong>
+          {% if resultat.interpretation %}· Interprétation opérateur : {{ resultat.interpretation }}{% endif %}
+        </p>
+        {% if resultat.observation %}<p class="lab-result__meta">Note opérateur : {{ resultat.observation }}</p>{% endif %}
+        {% if resultat.commentaire_rejet %}<p class="lab-result__flag">Retour précédent : {{ resultat.commentaire_rejet }}</p>{% endif %}
+        <p class="lab-result__meta">Saisi par {{ resultat.saisi_par }} · {{ resultat.date_saisie|date:"d/m/Y H:i" }}</p>
+        <div class="review-actions">
+          <form method="post" action="{% url 'laboratoire:resultat_validate' resultat.pk %}">
+            {% csrf_token %}
+            <button class="lab-btn lab-btn--success" type="submit">Valider le résultat</button>
+          </form>
+          <form method="post" action="{% url 'laboratoire:resultat_reject' resultat.pk %}">
+            {% csrf_token %}
+            <label for="rejet-{{ resultat.pk }}">Commentaire obligatoire</label>
+            <textarea id="rejet-{{ resultat.pk }}" name="commentaire" required minlength="3" rows="2" placeholder="Précisez la correction attendue"></textarea>
+            <button class="lab-btn lab-btn--danger" type="submit">Retourner à l’opérateur</button>
+          </form>
+        </div>
+      </article>
+    {% empty %}
+      <div class="lab-empty"><span class="lab-empty__icon">✓</span><h3>Aucun résultat à valider</h3><p>Les résultats saisis par l’opérateur apparaîtront ici.</p></div>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

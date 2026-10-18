@@ -1,0 +1,38 @@
+{% load static %}
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Étiquette {{ prelevement.code_prelevement }}</title>
+  <style>
+    @page { size: 70mm 40mm; margin: 3mm; }
+    body { font: 10pt Arial, sans-serif; color: #111; }
+    .label { width: 64mm; }
+    .code { font-weight: 700; font-size: 12pt; }
+    svg { display: block; width: 62mm; height: 13mm; margin: 2mm 0; }
+    .patient { font-weight: 700; }
+    .meta { margin-top: 1mm; }
+    @media screen {
+      body { margin: 20px; }
+      .print { margin-bottom: 18px; }
+    }
+    @media print { .print { display: none; } }
+  </style>
+</head>
+<body>
+  <button class="print" onclick="window.print()">Imprimer l’étiquette</button>
+  <main class="label">
+    <div class="patient">{{ prelevement.demande.patient.get_full_name|default:prelevement.demande.patient.username }}</div>
+    <div class="meta">Demande #{{ prelevement.demande_id }} · {{ prelevement.get_type_prelevement_display }}</div>
+    <svg viewBox="0 0 {{ barcode_width }} 60" role="img" aria-label="Code-barres {{ prelevement.code_prelevement }}">
+      {% for bar in bars %}
+        <rect x="{{ bar.x }}" y="0" width="{{ bar.width }}" height="48" fill="#000"/>
+      {% endfor %}
+    </svg>
+    <div class="code">{{ prelevement.code_prelevement }}</div>
+    <div class="meta">
+      {% if prelevement.date_prelevement %}Prélevé le {{ prelevement.date_prelevement|date:"d/m/Y H:i" }}{% else %}À prélever{% endif %}
+    </div>
+  </main>
+</body>
+</html>
