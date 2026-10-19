@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Calendrier des rendez-vous - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'rendezvous/rendezvous.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% include 'rendezvous/_header.html' %}
+
+    <form method="get" class="filters-bar" id="cal-filters">
+        <input type="hidden" name="semaine" value="{{ lundi|date:'Y-m-d' }}">
+        {% if medecins is not None %}
+        <div class="form-group"><label class="form-label" for="c-medecin">Médecin</label>
+            <select id="c-medecin" name="medecin" class="form-select">
+                <option value="">{% if user.is_patient %}Tous mes médecins{% else %}Tous les médecins{% endif %}</option>
+                {% for m in medecins %}<option value="{{ m.pk }}" {% if medecin and medecin.pk == m.pk %}selected{% endif %}>Dr {{ m.get_full_name|default:m.username }}</option>{% endfor %}
+            </select></div>
+        {% endif %}
+        {% if mode_creneaux %}
+        <div class="form-group"><label class="form-label" for="c-etat">Créneaux</label>
+            <select id="c-etat" name="etat" class="form-select">
+                {% for val, label in etats %}<option value="{{ val }}" {% if etat_sel == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select></div>
+        {% endif %}
+        <div class="form-group"><label class="form-label" for="c-statut">Statut du RDV</label>
+            <select id="c-statut" name="statut" class="form-select">
+                <option value="">{% if mode_creneaux %}Tous{% else %}Tous sauf annulés{% endif %}</option>
+                {% for val, label in statut_choices %}<option value="{{ val }}" {% if statut_sel == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select></div>
+        <div class="form-group" style="flex-basis:150px;"><label class="form-label" for="c-date">Aller au</label>
+            <input type="date" id="c-date" class="form-input" value="{{ lundi|date:'Y-m-d' }}"
+                   onchange="this.form.semaine.value=this.value; this.form.submit();"></div>
+        <button type="submit" class="btn btn-primary">Filtrer</button>
+        <a href="{% url 'rendezvous:calendrier' %}" class="btn btn-secondary">Réinitialiser</a>
+    </form>
+
+    <div class="week-nav">
+        <a class="btn btn-secondary btn-sm" href="?semaine={{ semaine_prec|date:'Y-m-d' }}{% if medecin and medecins is not None %}&medecin={{ medecin.pk }}{% endif %}{% if statut_sel %}&statut={{ statut_sel }}{% endif %}{% if etat_sel %}&etat={{ etat_sel }}{% endif %}">← Semaine précédente</a>
+        <div class="range">Semaine du {{ lundi|date:"j F" }} au {{ dimanche|date:"j F Y" }}
+            {% if medecin and not user.is_doctor %}<span class="muted"> · Dr {{ medecin.get_full_name|default:medecin.username }}</span>{% endif %}
+        </div>
+        <div style="display:flex; gap:8px;">
+            <a class="btn btn-secondary btn-sm" href="?{% if medecin and medecins is not None %}medecin={{ medecin.pk }}{% endif %}">Aujourd'hui</a>
+            <a class="btn btn-secondary btn-sm" href="?semaine={{ semaine_suiv|date:'Y-m-d' }}{% if medecin and medecins is not None %}&medecin={{ medecin.pk }}{% endif %}{% if statut_sel %}&statut={{ statut_sel }}{% endif %}{% if etat_sel %}&etat={{ etat_sel }}{% endif %}">Semaine suivante →</a>
+        </div>
+    </div>
+
+    <div class="cal-legend">
+        {% if mode_creneaux %}<span style="--c:#10b981">Libre</span><span style="--c:#94a3b8">Bloqué</span>{% endif %}
+        <span style="--c:#f59e0b">En attente</span><span style="--c:#3b82f6">Confirmé</span>
+        <span style="--c:#0ea5e9">Honoré</span><span style="--c:#64748b">Absent</span><span style="--c:#ef4444">Annulé</span>
+    </div>
+    {% if not mode_creneaux and user.is_admin_user %}
+        <p class="muted" style="margin-bottom:12px;">Choisissez un médecin pour voir aussi ses créneaux libres et bloqués.</p>
+    {% endif %}
+
+    <div class="cal-week" id="calendar-week">
+        {% for jour in jours %}
+        <div class="cal-day{% if jour.est_aujourdhui %} today{% elif jour.est_passe %} past{% endif %}">
+            <div class="cal-day-head"><span class="nom">{{ jour.nom }}</span><span class="num">{{ jour.date|date:"d/m" }}</span></div>
+            <div class="cal-day-body">
+                {% for it in jour.items %}
+                    {% if it.rdv %}
+                    <a class="cal-item st-{{ it.rdv.statut }}" href="{% url 'rendezvous:rdv_detail' it.rdv.pk %}" title="{{ it.rdv.get_statut_display }} — {{ it.rdv.motif }}">
+                        <span class="h">{{ it.creneau.debut|time:"H:i" }}–{{ it.creneau.fin|time:"H:i" }}</span>
+                        <span class="who">{% if user.is_patient %}Dr {{ it.rdv.medecin.get_full_name|default:it.rdv.medecin.username }}{% else %}{{ it.rdv.patient.get_full_name|default:it.rdv.patient.username }}{% endif %}</span>
+                        {% if user.is_admin_user and not mode_creneaux %}<span class="who muted">Dr {{ it.rdv.medecin.last_name|default:it.rdv.medecin.username }}</span>{% endif %}
+                    </a>
+                    {% elif it.etat == 'libre' %}
+                    <a class="cal-item libre" href="{% url 'rendezvous:reserver_creneau' it.creneau.pk %}" title="Réserver ce créneau pour un patient">
+                        <span class="h">{{ it.creneau.debut|time:"H:i" }}–{{ it.creneau.fin|time:"H:i" }}</span><span class="who">Libre</span>
+                    </a>
+                    {% else %}
+                    <div class="cal-item {{ it.etat }}">
+                        <span class="h">{{ it.creneau.debut|time:"H:i" }}–{{ it.creneau.fin|time:"H:i" }}</span>
+                        <span class="who">{% if it.etat == 'bloque' %}Bloqué{% else %}Non réservé{% endif %}</span>
+                    </div>
+                    {% endif %}
+                {% empty %}
+                    <div class="cal-empty">—</div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not nb_items %}
+    <div class="rdv-card empty-state">
+        Rien de prévu cette semaine.
+        {% if mode_creneaux %}<br><a href="{% url 'rendezvous:creneau_generer' %}">Ouvrir des créneaux de consultation →</a>
+        {% else %}<br><a href="{% url 'rendezvous:reserver' %}">Prendre un rendez-vous →</a>{% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

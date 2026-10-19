@@ -13,7 +13,7 @@
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <!-- Main Style CSS -->
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20261017_5">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20261019_1">
     {% block extra_css %}{% endblock %}
 </head>
 
@@ -36,6 +36,9 @@
                 <a href="{% url 'dashboard' %}" class="nav-item-link" id="nav-dashboard">Tableau de bord</a>
                 {% if user.is_admin_user or user.is_doctor %}
                 <a href="{% url 'dossiers_patients_list' %}" class="nav-item-link" id="nav-dossiers">Dossiers Patients</a>
+                {% endif %}
+                {% if user.is_admin_user or user.is_doctor or user.is_patient %}
+                <a href="{% url 'rendezvous:rdv_list' %}" class="nav-item-link" id="nav-rendezvous">Rendez-vous</a>
                 {% endif %}
                 {% if user.is_admin_user or user.is_doctor %}
                 <a href="{% url 'examens_list' %}" class="nav-item-link" id="nav-examens">Examens &amp; Préparations</a>

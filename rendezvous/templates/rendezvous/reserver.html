@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Prendre rendez-vous - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'rendezvous/rendezvous.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% include 'rendezvous/_header.html' %}
+
+    {% if not user.is_doctor %}
+    <div class="rdv-card">
+        <h3>1. Choisissez un médecin</h3>
+        {% if specialites|length > 1 %}
+        <form method="get" class="filters-bar" style="margin-bottom:14px;">
+            <div class="form-group" style="max-width:320px;"><label class="form-label" for="r-spe">Spécialité</label>
+                <select id="r-spe" name="specialite" class="form-select" onchange="this.form.submit()">
+                    <option value="">Toutes les spécialités</option>
+                    {% for s in specialites %}<option value="{{ s }}" {% if specialite_sel == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+                </select></div>
+        </form>
+        {% endif %}
+        <div class="doctor-chips">
+            {% for m in medecins %}
+            <a href="?medecin={{ m.pk }}{% if specialite_sel %}&specialite={{ specialite_sel|urlencode }}{% endif %}" class="doctor-chip{% if medecin and medecin.pk == m.pk %} active{% endif %}">
+                <strong>Dr {{ m.get_full_name|default:m.username }}</strong>
+                <small>{{ m.doctor_profile.specialite|default:"Médecine générale" }}{% if m.doctor_profile.cabinet_name %} · {{ m.doctor_profile.cabinet_name }}{% endif %}</small>
+            </a>
+            {% empty %}
+            <p class="empty-state">Aucun médecin disponible pour le moment.</p>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if medecin %}
+    <div class="rdv-card">
+        <h3>{% if user.is_doctor %}Choisissez un créneau libre{% else %}2. Choisissez un créneau{% endif %}</h3>
+        <div class="week-nav">
+            {% if semaine_prec %}
+            <a class="btn btn-secondary btn-sm" href="?medecin={{ medecin.pk }}&semaine={{ semaine_prec|date:'Y-m-d' }}">← Semaine précédente</a>
+            {% else %}<span></span>{% endif %}
+            <div class="range">Du {{ lundi|date:"j F" }} au {{ dimanche|date:"j F Y" }}</div>
+            <a class="btn btn-secondary btn-sm" href="?medecin={{ medecin.pk }}&semaine={{ semaine_suiv|date:'Y-m-d' }}">Semaine suivante →</a>
+        </div>
+        <div class="slot-days" id="slot-days">
+            {% for jour in jours %}
+                {% if jour.creneaux %}
+                <div class="slot-day">
+                    <h4>{{ jour.nom }} <small>{{ jour.date|date:"d/m" }}</small></h4>
+                    <div class="slot-list">
+                        {% for c in jour.creneaux %}
+                        <a class="slot-btn" href="{% url 'rendezvous:reserver_creneau' c.pk %}">{{ c.debut|time:"H:i" }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% if prochain %}
+        <div class="empty-state">
+            Aucun créneau libre cette semaine.<br>
+            <a href="?medecin={{ medecin.pk }}&semaine={{ prochain.debut|date:'Y-m-d' }}">Prochaine disponibilité : {{ prochain.debut|date:"l j F à H:i" }} →</a>
+        </div>
+        {% elif aucun_creneau %}
+        <div class="empty-state">
+            Ce médecin n'a aucun créneau libre pour le moment.
+            {% if user.is_doctor %}<br><a href="{% url 'rendezvous:creneau_generer' %}">Ouvrir des créneaux →</a>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% elif user.is_doctor %}
+    <div class="rdv-card empty-state">Aucun créneau. <a href="{% url 'rendezvous:creneau_generer' %}">Ouvrez vos créneaux →</a></div>
+    {% endif %}
+</div>
+{% endblock %}

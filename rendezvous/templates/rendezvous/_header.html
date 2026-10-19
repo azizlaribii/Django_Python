@@ -1,0 +1,21 @@
+<div class="glass-card" style="padding: 24px; margin-bottom: 20px; border-left: 6px solid var(--primary);">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+        <div>
+            <h1 style="font-size:1.75rem;">📅 Rendez-vous</h1>
+            <p style="color:var(--text-muted); font-size:0.95rem; margin-top:4px;">
+                {% if user.is_patient %}Réservez une consultation et suivez vos rendez-vous.
+                {% elif user.is_doctor %}Vos créneaux de consultation, demandes et rendez-vous.
+                {% else %}Créneaux, réservations et suivi de tous les médecins.{% endif %}
+            </p>
+        </div>
+        <a href="{% url 'rendezvous:reserver' %}" class="btn btn-primary btn-sm" id="btn-new-rdv">+ Prendre rendez-vous</a>
+    </div>
+</div>
+<div class="rdv-tabs">
+    <a href="{% url 'rendezvous:rdv_list' %}" class="btn btn-sm {% if active == 'liste' %}btn-primary{% else %}btn-secondary{% endif %}">📋 Rendez-vous{% if nb_en_attente %}<span class="count" title="En attente de confirmation">{{ nb_en_attente }}</span>{% endif %}</a>
+    <a href="{% url 'rendezvous:calendrier' %}" class="btn btn-sm {% if active == 'calendrier' %}btn-primary{% else %}btn-secondary{% endif %}">🗓️ Calendrier</a>
+    <a href="{% url 'rendezvous:reserver' %}" class="btn btn-sm {% if active == 'reserver' %}btn-primary{% else %}btn-secondary{% endif %}">➕ Réserver</a>
+    {% if can_manage_slots %}
+    <a href="{% url 'rendezvous:creneau_list' %}" class="btn btn-sm {% if active == 'creneaux' %}btn-primary{% else %}btn-secondary{% endif %}">⏱️ Créneaux</a>
+    {% endif %}
+</div>

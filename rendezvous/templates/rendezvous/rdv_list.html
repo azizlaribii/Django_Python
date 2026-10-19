@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Rendez-vous - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'rendezvous/rendezvous.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% include 'rendezvous/_header.html' %}
+
+    <div class="rdv-kpis">
+        <div class="rdv-kpi"><div class="val" style="color:var(--primary);">{{ stats.a_venir }}</div><div class="lbl">Rendez-vous à venir</div></div>
+        <div class="rdv-kpi"><div class="val" style="color:#059669;">{{ stats.aujourdhui }}</div><div class="lbl">Aujourd'hui</div></div>
+        <div class="rdv-kpi"><div class="val" style="color:#d97706;">{{ stats.en_attente }}</div><div class="lbl">En attente de confirmation</div></div>
+        <div class="rdv-kpi"><div class="val" style="color:#dc2626;">{{ stats.annules }}</div><div class="lbl">Annulés (total)</div></div>
+    </div>
+
+    <form method="get" class="filters-bar" id="rdv-filters">
+        <div class="form-group"><label class="form-label" for="f-q">Recherche</label>
+            <input type="text" id="f-q" name="q" value="{{ q }}" class="form-input" placeholder="{% if user.is_patient %}Médecin, motif…{% else %}Patient, médecin, motif…{% endif %}"></div>
+        <div class="form-group"><label class="form-label" for="f-periode">Période</label>
+            <select id="f-periode" name="periode" class="form-select">
+                {% for val, label in periodes %}<option value="{{ val }}" {% if periode_sel == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select></div>
+        <div class="form-group"><label class="form-label" for="f-statut">Statut</label>
+            <select id="f-statut" name="statut" class="form-select">
+                <option value="">Tous les statuts</option>
+                {% for val, label in statut_choices %}<option value="{{ val }}" {% if statut_sel == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select></div>
+        {% if medecins is not None %}
+        <div class="form-group"><label class="form-label" for="f-medecin">Médecin</label>
+            <select id="f-medecin" name="medecin" class="form-select">
+                <option value="">Tous les médecins</option>
+                {% for m in medecins %}<option value="{{ m.pk }}" {% if medecin_sel == m.pk %}selected{% endif %}>Dr {{ m.get_full_name|default:m.username }}</option>{% endfor %}
+            </select></div>
+        {% endif %}
+        <div class="form-group" style="flex-basis:140px;"><label class="form-label" for="f-du">Du</label>
+            <input type="date" id="f-du" name="du" value="{{ du }}" class="form-input"></div>
+        <div class="form-group" style="flex-basis:140px;"><label class="form-label" for="f-au">Au</label>
+            <input type="date" id="f-au" name="au" value="{{ au }}" class="form-input"></div>
+        <button type="submit" class="btn btn-primary">Filtrer</button>
+        <a href="{% url 'rendezvous:rdv_list' %}" class="btn btn-secondary">Réinitialiser</a>
+    </form>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead><tr>
+                <th>Date</th>
+                {% if not user.is_patient %}<th>Patient</th>{% endif %}
+                {% if not user.is_doctor %}<th>Médecin</th>{% endif %}
+                <th>Motif</th><th>Statut</th><th>Actions</th>
+            </tr></thead>
+            <tbody>
+            {% for r in page_obj %}
+                <tr>
+                    <td><strong>{{ r.creneau.debut|date:"D d/m/Y" }}</strong><br><span class="muted">{{ r.creneau.debut|time:"H:i" }} – {{ r.creneau.fin|time:"H:i" }}</span></td>
+                    {% if not user.is_patient %}<td>{{ r.patient.get_full_name|default:r.patient.username }}</td>{% endif %}
+                    {% if not user.is_doctor %}<td>Dr {{ r.medecin.get_full_name|default:r.medecin.username }}{% if r.medecin.doctor_profile %}<br><span class="muted">{{ r.medecin.doctor_profile.specialite }}</span>{% endif %}</td>{% endif %}
+                    <td>{{ r.motif|truncatechars:50 }}</td>
+                    <td><span class="status-pill {{ r.classe_statut }}">{{ r.get_statut_display }}</span></td>
+                    <td class="actions-col">
+                        <a href="{% url 'rendezvous:rdv_detail' r.pk %}" class="btn-table-edit">Détail</a>
+                        {% if r.statut == 'EN_ATTENTE' and not user.is_patient and not r.est_passe %}
+                        <form method="post" action="{% url 'rendezvous:rdv_confirmer' r.pk %}">{% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <button type="submit" class="btn-table-activate">Confirmer</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="empty-state">
+                    Aucun rendez-vous ne correspond à ces filtres.
+                    {% if user.is_patient %}<br><a href="{% url 'rendezvous:reserver' %}">Prendre un rendez-vous →</a>{% endif %}
+                </td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'rendezvous/_pagination.html' %}
+    <div style="height:40px;"></div>
+</div>
+{% endblock %}
