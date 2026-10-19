@@ -942,3 +942,39 @@ a:hover {
     padding: 20px;
   }
 }
+
+/* Navbar : resserrer les liens entre 1251 et 1480 px (7 à 8 liens selon le rôle) */
+@media (min-width: 1251px) and (max-width: 1480px) {
+  .navbar-inner {
+    gap: 10px !important;
+  }
+  .nav-item-link {
+    font-size: 0.8rem !important;
+    padding: 6px 6px !important;
+  }
+  .nav-links {
+    gap: 2px !important;
+  }
+  .nav-user-name-link {
+    max-width: 110px !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* Navbar : sous 1350 px, on garde seulement l'icône du logo pour laisser la place aux liens */
+@media (min-width: 861px) and (max-width: 1350px) {
+  .logo-text {
+    display: none !important;
+  }
+}
+@media (min-width: 861px) and (max-width: 1250px) {
+  .nav-user-badge .badge-role {
+    display: none !important;
+  }
+  .nav-links {
+    justify-content: safe center !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+}

@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'laboratoire',
     'stock',
     'billing',
+    'rendezvous',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
