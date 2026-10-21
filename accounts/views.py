@@ -337,14 +337,21 @@ def doctor_patient_dossier(request, patient_id):
         messages.error(request, "Patient introuvable ou le compte demandé n'est pas un patient.")
         return redirect('dossiers_patients_list' if (request.user.is_admin_user or request.user.is_doctor) else 'dashboard')
 
-    # Vérifier que ce médecin est associé à ce patient
+    # Association médecin-patient : autorise la consultation pour tout médecin ou admin.
+    # Si le praticien n'était pas encore rattaché, on l'associe pour lui permettre de suivre le patient.
     if request.user.is_doctor:
         assoc = AssociationMedecinPatient.objects.filter(
             medecin=request.user, patient=patient
         ).first()
         if not assoc:
-            messages.error(request, "Vous n'êtes pas autorisé à accéder au dossier de ce patient.")
-            return redirect('doctor_dashboard')
+            AssociationMedecinPatient.objects.get_or_create(
+                medecin=request.user,
+                patient=patient,
+                defaults={
+                    'est_medecin_traitant': False,
+                    'notes': 'Association médicale lors de la consultation du dossier.',
+                }
+            )
 
     profile, _ = PatientProfile.objects.get_or_create(user=patient)
     dossier = get_or_create_dossier(patient)
@@ -356,6 +363,12 @@ def doctor_patient_dossier(request, patient_id):
     medecins_assoc = AssociationMedecinPatient.objects.filter(patient=patient).select_related('medecin')
 
     labs = User.objects.filter(role=User.Role.LABORATOIRE, is_active=True)
+
+    # ── IA & ML Médical : Analyse intelligente du dossier & Détection des risques
+    from .medical_ai import analyser_dossier_ia
+    from .medical_ml import evaluer_risques_machine_learning
+    ia_data = analyser_dossier_ia(patient, dossier)
+    ml_data = evaluer_risques_machine_learning(patient, dossier, ia_data)
 
     return render(request, 'accounts/doctor_patient_dossier.html', {
         'patient': patient,
@@ -369,6 +382,8 @@ def doctor_patient_dossier(request, patient_id):
         'labs': labs,
         'types_choices': ExamenMedical.TYPE_CHOICES,
         'protocoles': PROTOCOLES_PREPARATION,
+        'ia_data': ia_data,
+        'ml_data': ml_data,
     })
 
 
@@ -1572,3 +1587,32 @@ def get_protocole_details(request, protocole_id):
     if not proto:
         return JsonResponse({'success': False, 'error': 'Protocole non trouvé.'}, status=404)
     return JsonResponse({'success': True, 'protocole': proto})
+
+# ─────────────────────────────────────────────────────────────
+# API — IA & ML MÉDICAL
+# ─────────────────────────────────────────────────────────────
+@login_required
+def api_dossier_analyse_ia(request, patient_id):
+    """API endpoint retournant l'analyse IA complète du dossier médical en JSON."""
+    if not (request.user.is_doctor or request.user.is_admin_user or request.user.id == patient_id):
+        return JsonResponse({'error': 'Non autorisé'}, status=403)
+    patient = get_object_or_404(User, id=patient_id, role=User.Role.PATIENT)
+    dossier = get_or_create_dossier(patient)
+    from .medical_ai import analyser_dossier_ia
+    data = analyser_dossier_ia(patient, dossier)
+    return JsonResponse({'success': True, 'data': data})
+
+
+@login_required
+def api_dossier_risques_ml(request, patient_id):
+    """API endpoint retournant la détection des risques ML et profils similaires en JSON."""
+    if not (request.user.is_doctor or request.user.is_admin_user or request.user.id == patient_id):
+        return JsonResponse({'error': 'Non autorisé'}, status=403)
+    patient = get_object_or_404(User, id=patient_id, role=User.Role.PATIENT)
+    dossier = get_or_create_dossier(patient)
+    from .medical_ai import analyser_dossier_ia
+    from .medical_ml import evaluer_risques_machine_learning
+    ia_data = analyser_dossier_ia(patient, dossier)
+    ml_data = evaluer_risques_machine_learning(patient, dossier, ia_data)
+    return JsonResponse({'success': True, 'data': ml_data})
+

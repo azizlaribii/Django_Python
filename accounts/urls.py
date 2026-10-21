@@ -74,4 +74,9 @@ urlpatterns = [
     path('examens/<int:examen_id>/appliquer-protocole/', views.appliquer_protocole_a_examen, name='appliquer_protocole_a_examen'),
     path('examens/etape/<int:etape_id>/toggle/', views.toggle_etape_preparation, name='toggle_etape_preparation'),
     path('api/protocole/<str:protocole_id>/', views.get_protocole_details, name='api_protocole_details'),
+
+    # ── IA & ML MÉDICAL ─────────────────────────────────────────
+    path('api/dossier/<int:patient_id>/analyse-ia/', views.api_dossier_analyse_ia, name='api_dossier_analyse_ia'),
+    path('api/dossier/<int:patient_id>/risques-ml/', views.api_dossier_risques_ml, name='api_dossier_risques_ml'),
 ]
+
