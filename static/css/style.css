@@ -978,3 +978,16 @@ a:hover {
     scrollbar-width: none;
   }
 }
+
+/* Accessibilité : contrastes conformes WCAG AA (≥ 4.5:1), vérifiés avec axe-core */
+:root {
+  --primary: #0369a1;
+  --primary-hover: #075985;
+  --text-light: #64748b;
+}
+.badge-role.DOCTEUR { color: #047857 !important; }
+.badge-role.PATIENT { color: #0369a1 !important; }
+.badge-role.ADMIN { color: #b91c1c !important; }
+.badge-role.LABORATOIRE { color: #6d28d9 !important; }
+.btn-table-edit { background: #0369a1 !important; border-color: #0369a1 !important; }
+.btn-table-edit:hover { background: #075985 !important; }

@@ -1,0 +1,4 @@
+Django==6.1.2
+scikit-learn>=1.5
+numpy>=1.26
+coverage>=7.0

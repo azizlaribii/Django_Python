@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Performance de l'IA - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'rendezvous/rendezvous.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% include 'rendezvous/_header.html' %}
+
+    {% if not m %}
+    <section class="rdv-card">
+        <h2>Métriques non calculées</h2>
+        <p>Lancez <code>python manage.py evaluer_ia_rdv</code> pour évaluer le modèle.</p>
+    </section>
+    {% else %}
+    <section class="rdv-card" aria-labelledby="ia-modele">
+        <h2 id="ia-modele">Suggestion de spécialité à partir du motif</h2>
+        <p style="margin-bottom:10px;">
+            Classification de texte supervisée (scikit-learn) : <strong>TF-IDF mots + caractères</strong> puis
+            <strong>régression logistique</strong>. Entraîné sur {{ m.nb_motifs }} motifs de patients et un lexique médical de
+            {{ m.nb_termes_lexique }} termes, pour {{ m.nb_classes }} spécialités. Les trois spécialités les plus probables sont proposées au patient.
+        </p>
+        <p class="muted">Évalué le {{ m.date_evaluation|slice:":10" }}. Données rédigées pour la démonstration : ces chiffres mesurent le modèle, pas une validation clinique.</p>
+    </section>
+
+    <h2 class="section-h">Test indépendant <span class="muted">(chiffre de référence)</span></h2>
+    <p class="muted" style="margin-bottom:12px;">{{ m.test_independant.nb }} motifs rédigés après la mise au point du modèle, jamais utilisés pour le régler.</p>
+    <div class="rdv-kpis">
+        <div class="rdv-kpi"><p class="val">{{ m.test_independant.f1_macro|floatformat:2 }}</p><p class="lbl">F1-score macro</p></div>
+        <div class="rdv-kpi"><p class="val">{% widthratio m.test_independant.accuracy 1 100 %} %</p><p class="lbl">Bonne spécialité en 1<sup>re</sup> position</p></div>
+        <div class="rdv-kpi"><p class="val">{% widthratio m.test_independant.top3_accuracy 1 100 %} %</p><p class="lbl">Bonne spécialité parmi les 3 proposées</p></div>
+        <div class="rdv-kpi"><p class="val">{{ m.latence_ms_moyenne }} ms</p><p class="lbl">Temps de réponse moyen (p95 : {{ m.latence_ms_p95 }} ms)</p></div>
+    </div>
+
+    <section class="rdv-card" aria-labelledby="ia-compar">
+        <h2 id="ia-compar">Comparaison et robustesse</h2>
+        <div class="table-responsive">
+        <table class="data-table">
+            <caption class="sr-only">Comparaison des F1-scores selon la méthode d'évaluation</caption>
+            <thead><tr><th scope="col">Évaluation</th><th scope="col">F1 macro</th><th scope="col">Commentaire</th></tr></thead>
+            <tbody>
+                <tr><th scope="row">Test indépendant</th><td><strong>{{ m.test_independant.f1_macro|floatformat:2 }}</strong></td><td>Formulations nouvelles : estimation la plus honnête.</td></tr>
+                <tr><th scope="row">Test indépendant, sans lexique</th><td>{{ m.test_independant.f1_sans_lexique|floatformat:2 }}</td><td>Apport du lexique médical (ablation).</td></tr>
+                <tr><th scope="row">Hold-out 25 % ({{ m.nb_test }} motifs)</th><td>{{ m.f1_macro|floatformat:2 }}</td><td>Précision {{ m.precision_macro|floatformat:2 }} · rappel {{ m.rappel_macro|floatformat:2 }}. Optimiste : le lexique a été enrichi en analysant ces erreurs.</td></tr>
+                <tr><th scope="row">Validation croisée 5 plis</th><td>{{ m.cv_f1_moyenne|floatformat:2 }} ± {{ m.cv_f1_ecart_type|floatformat:2 }}</td><td>Stabilité selon le découpage des données.</td></tr>
+                <tr><th scope="row">Référence naïve</th><td>{{ m.f1_reference_naive|floatformat:2 }}</td><td>Toujours prédire la classe majoritaire.</td></tr>
+            </tbody>
+        </table>
+        </div>
+        <p class="muted" style="margin-top:12px;">
+            Performance : {{ m.latence_ms_moyenne }} ms par prédiction et {{ m.temps_entrainement_s }} s d'entraînement.
+            L'appel est assez rapide pour rester synchrone : une file Celery/Redis ajouterait de la complexité sans gain mesurable.
+            Elle deviendrait utile avec un grand modèle de langage (plusieurs secondes par appel).
+        </p>
+    </section>
+
+    <section class="rdv-card" aria-labelledby="ia-classes">
+        <h2 id="ia-classes">Scores par spécialité (hold-out)</h2>
+        <div class="table-responsive">
+        <table class="data-table">
+            <caption class="sr-only">Précision, rappel et F1 par spécialité</caption>
+            <thead><tr><th scope="col">Spécialité</th><th scope="col">Précision</th><th scope="col">Rappel</th><th scope="col">F1</th><th scope="col">Motifs testés</th></tr></thead>
+            <tbody>
+            {% for c in m.par_classe %}
+                <tr><th scope="row">{{ c.specialite }}</th><td>{{ c.precision|floatformat:2 }}</td><td>{{ c.rappel|floatformat:2 }}</td><td>{{ c.f1|floatformat:2 }}</td><td>{{ c.support }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </section>
+
+    <section class="rdv-card" aria-labelledby="ia-matrice">
+        <h2 id="ia-matrice">Matrice de confusion (test indépendant)</h2>
+        <p class="muted" style="margin-bottom:12px;">Lignes : spécialité attendue. Colonnes : spécialité prédite. La diagonale correspond aux bonnes réponses.</p>
+        <div class="table-responsive">
+        <table class="confusion">
+            <caption class="sr-only">Matrice de confusion sur le test indépendant</caption>
+            <thead><tr><th scope="col"><span class="sr-only">Attendu / prédit</span></th>
+                {% for c in m.classes %}<th scope="col" title="{{ c }}"><span class="vertical">{{ c }}</span></th>{% endfor %}</tr></thead>
+            <tbody>
+            {% for classe, ligne in m.test_independant.lignes_matrice %}
+                <tr><th scope="row">{{ classe }}</th>
+                {% for v in ligne %}<td class="{% if forloop.counter0 == forloop.parentloop.counter0 %}diag{% elif v %}err{% endif %}">{{ v|default:"" }}</td>{% endfor %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </section>
+
+    {% if m.test_independant.erreurs %}
+    <section class="rdv-card" aria-labelledby="ia-erreurs">
+        <h2 id="ia-erreurs">Analyse des erreurs (test indépendant)</h2>
+        <div class="table-responsive">
+        <table class="data-table">
+            <caption class="sr-only">Motifs mal classés</caption>
+            <thead><tr><th scope="col">Motif</th><th scope="col">Attendu</th><th scope="col">Prédit</th></tr></thead>
+            <tbody>
+            {% for e in m.test_independant.erreurs %}
+                <tr><td>{{ e.motif }}</td><td>{{ e.attendu }}</td><td>{{ e.predit }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        <p class="muted" style="margin-top:12px;">Ces erreurs touchent surtout des motifs à la frontière de deux spécialités (« ma tension monte quand je suis stressé ») : c'est pourquoi trois suggestions sont proposées, et non une seule.</p>
+    </section>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

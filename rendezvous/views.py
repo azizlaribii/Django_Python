@@ -14,11 +14,11 @@ from django.views.decorators.http import require_GET, require_POST
 
 from . import services
 from .forms import (
-    AnnulationForm, ClotureForm, CreneauForm, GenerationCreneauxForm, ReservationForm, medecins_qs,
+    AnnulationForm, ClotureForm, CreneauForm, DeplacementForm, GenerationCreneauxForm, ReservationForm, medecins_qs,
 )
 from .models import STATUTS_ACTIFS, Creneau, RendezVous
 from .permissions import (
-    creneaux_gestion_requise, peut_annuler, peut_cloturer, peut_confirmer, peut_gerer_creneaux,
+    creneaux_gestion_requise, peut_annuler, peut_gerer_creneau, peut_cloturer, peut_confirmer, peut_gerer_creneaux,
     peut_voir_rdv, rdv_acces_requis,
 )
 from .services import RendezVousError
@@ -242,6 +242,7 @@ def reserver(request):
     lundi = max(_semaine_demandee(request), _lundi(timezone.localdate()))
     debut_sem, _ = _bornes_jour(lundi)
     specialite = request.GET.get("specialite", "").strip()
+    motif = request.GET.get("motif", "").strip()[:255]
 
     medecins = medecins_qs().select_related("doctor_profile")
     specialites = sorted({
@@ -284,6 +285,7 @@ def reserver(request):
         "semaine_prec": lundi - timedelta(days=7) if lundi > _lundi(timezone.localdate()) else None,
         "semaine_suiv": lundi + timedelta(days=7),
         "prochain": prochain,
+        "motif": motif,
         "aucun_creneau": bool(medecin) and prochain is None and not any(j["creneaux"] for j in jours),
     })
 
@@ -298,7 +300,7 @@ def reserver_creneau(request, pk):
         messages.error(request, "Ce créneau n'est plus disponible, merci d'en choisir un autre.")
         return redirect(f"{reverse("rendezvous:reserver")}?medecin={creneau.medecin_id}&semaine={timezone.localtime(creneau.debut):%Y-%m-%d}")
 
-    initial = {}
+    initial = {"motif": request.GET.get("motif", "").strip()[:255]}
     if request.GET.get("patient", "").isdigit():
         initial["patient"] = int(request.GET["patient"])
     form = ReservationForm(request.POST or None, user=request.user, initial=initial)
@@ -355,6 +357,7 @@ def rdv_detail(request, pk):
         "autres_rdv": autres,
         "peut_confirmer": peut_confirmer(user, rdv) and not rdv.est_passe,
         "peut_annuler": peut_annuler(user, rdv),
+        "peut_modifier": peut_annuler(user, rdv) and not rdv.est_passe,
         "peut_cloturer": peut_cloturer(user, rdv),
         "annulation_form": AnnulationForm(),
         "cloture_form": ClotureForm(),
@@ -386,6 +389,53 @@ def rdv_annuler(request, pk):
     except RendezVousError as e:
         messages.error(request, str(e))
     return _redirect_suivant(request, reverse("rendezvous:rdv_detail", args=[rdv.pk]))
+
+
+@rdv_acces_requis
+def rdv_deplacer(request, pk):
+    """Modifier un rendez-vous : changer de créneau (même médecin) et/ou corriger le motif."""
+    rdv = _get_rdv_visible(request, pk)
+    if not peut_annuler(request.user, rdv) or rdv.est_passe:
+        messages.error(request, "Ce rendez-vous ne peut plus être modifié.")
+        return redirect("rendezvous:rdv_detail", pk=rdv.pk)
+
+    form = DeplacementForm(request.POST or None, initial={"creneau": rdv.creneau_id, "motif": rdv.motif})
+    if request.method == "POST" and form.is_valid():
+        nouveau = Creneau.objects.filter(pk=form.cleaned_data["creneau"], medecin=rdv.medecin).first()
+        try:
+            if nouveau is None:
+                raise RendezVousError("Créneau introuvable pour ce médecin.")
+            if nouveau.pk == rdv.creneau_id:  # seul le motif change
+                rdv.motif = form.cleaned_data["motif"].strip()[:255]
+                rdv.save(update_fields=["motif", "date_modification"])
+            else:
+                services.deplacer(rdv, nouveau_creneau=nouveau, par=request.user, motif=form.cleaned_data["motif"])
+        except RendezVousError as e:
+            messages.error(request, str(e))
+        else:
+            messages.success(request, "Rendez-vous modifié.")
+            return redirect("rendezvous:rdv_detail", pk=rdv.pk)
+
+    lundi = max(_semaine_demandee(request), _lundi(timezone.localdate()))
+    debut_sem, _ = _bornes_jour(lundi)
+    libres = Creneau.objects.du_medecin(rdv.medecin).disponibles().filter(
+        debut__gte=debut_sem, debut__lt=debut_sem + timedelta(days=7)
+    )
+    par_jour = {}
+    for c in libres:
+        par_jour.setdefault(timezone.localtime(c.debut).date(), []).append(c)
+    jours = [
+        {"date": lundi + timedelta(days=i), "nom": NOMS_JOURS[i], "creneaux": par_jour.get(lundi + timedelta(days=i), [])}
+        for i in range(7)
+    ]
+    return render(request, "rendezvous/rdv_deplacer.html", {
+        **_contexte_commun(request, "liste"),
+        "rdv": rdv, "form": form, "jours": jours,
+        "a_des_creneaux": any(j["creneaux"] for j in jours),
+        "lundi": lundi, "dimanche": lundi + timedelta(days=6),
+        "semaine_prec": lundi - timedelta(days=7) if lundi > _lundi(timezone.localdate()) else None,
+        "semaine_suiv": lundi + timedelta(days=7),
+    })
 
 
 @require_POST
@@ -490,6 +540,29 @@ def creneau_generer(request):
     })
 
 
+@creneaux_gestion_requise
+def creneau_modifier(request, pk):
+    creneau = get_object_or_404(Creneau.objects.select_related("medecin"), pk=pk)
+    if not peut_gerer_creneau(request.user, creneau):
+        raise Http404
+    form = CreneauForm(request.POST or None, user=request.user, instance=creneau)
+    if request.method == "POST" and form.is_valid():
+        try:
+            services.modifier_creneau(
+                creneau, par=request.user, debut=form.debut, fin=form.fin, note=form.cleaned_data.get("note", "")
+            )
+        except RendezVousError as e:
+            form.add_error(None, str(e))
+        else:
+            messages.success(request, f"Créneau modifié : {creneau}.")
+            return redirect("rendezvous:creneau_list")
+    return render(request, "rendezvous/creneau_form.html", {
+        **_contexte_commun(request, "creneaux"),
+        "form": form, "titre": "Modifier le créneau", "mode": "modification", "creneau": creneau,
+        "rdv_actif": creneau.rdv_actif,
+    })
+
+
 @require_POST
 @creneaux_gestion_requise
 def creneau_bloquer(request, pk):
@@ -534,4 +607,63 @@ def api_creneaux_disponibles(request):
              "fin": timezone.localtime(c.fin).isoformat(), "duree_minutes": c.duree_minutes}
             for c in creneaux
         ],
+    })
+
+
+# --------------------------------------------------------------------------
+# IA : suggestion de spécialité à partir du motif
+# --------------------------------------------------------------------------
+def medecins_pour_specialite(specialite):
+    """Médecins actifs dont la spécialité déclarée contient celle suggérée (sans tenir compte des accents)."""
+    from .ia.classifieur import normaliser
+    cle = normaliser(specialite).split("-")[0]  # « gastro-enterologie » → « gastro »
+    return [
+        m for m in medecins_qs().select_related("doctor_profile")
+        if hasattr(m, "doctor_profile") and cle in normaliser(m.doctor_profile.specialite)
+    ]
+
+
+@require_GET
+@rdv_acces_requis
+def api_suggestion_specialite(request):
+    from .ia.classifieur import suggerer
+    motif = request.GET.get("motif", "")
+    try:
+        resultat = suggerer(motif)
+    except ValueError as e:
+        return JsonResponse({"erreur": str(e)}, status=400)
+    except Exception:  # modèle indisponible, fichier de données manquant…
+        return JsonResponse(
+            {"erreur": "La suggestion automatique est momentanément indisponible. Choisissez un médecin ci-dessous."},
+            status=503,
+        )
+    libres = set(Creneau.objects.disponibles().values_list("medecin_id", flat=True).distinct())
+    for s in resultat["suggestions"]:
+        s["medecins"] = [
+            {"id": m.pk, "nom": f"Dr {m.get_full_name() or m.username}",
+             "specialite": m.doctor_profile.specialite, "a_des_creneaux": m.pk in libres}
+            for m in medecins_pour_specialite(s["specialite"])
+        ]
+    resultat["generalistes"] = [] if any(s["medecins"] for s in resultat["suggestions"]) else [
+        {"id": m.pk, "nom": f"Dr {m.get_full_name() or m.username}", "specialite": m.doctor_profile.specialite,
+         "a_des_creneaux": m.pk in libres}
+        for m in medecins_pour_specialite("Médecine générale")
+    ]
+    return JsonResponse(resultat)
+
+
+@rdv_acces_requis
+def ia_performance(request):
+    import json
+    from .ia.classifieur import FICHIER_METRIQUES
+    if request.user.is_patient:
+        raise Http404
+    metriques = None
+    if FICHIER_METRIQUES.exists():
+        metriques = json.loads(FICHIER_METRIQUES.read_text(encoding="utf-8"))
+        for bloc in (metriques, metriques["test_independant"]):
+            bloc["lignes_matrice"] = list(zip(metriques["classes"], bloc["matrice_confusion"]))
+    return render(request, "rendezvous/ia_performance.html", {
+        **_contexte_commun(request, "ia"),
+        "m": metriques,
     })

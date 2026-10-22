@@ -7,8 +7,8 @@
 <div class="container">
     {% include 'rendezvous/_header.html' %}
 
-    <div class="rdv-card" style="max-width:720px;">
-        <h3>Confirmer la réservation</h3>
+    <section class="rdv-card" style="max-width:720px;" aria-labelledby="conf-titre">
+        <h2 id="conf-titre">Confirmer la réservation</h2>
         <dl class="def-list" style="margin-bottom:20px;">
             <dt>Médecin</dt><dd>Dr {{ creneau.medecin.get_full_name|default:creneau.medecin.username }}{% if creneau.medecin.doctor_profile %} — {{ creneau.medecin.doctor_profile.specialite }}{% endif %}</dd>
             {% if creneau.medecin.doctor_profile.cabinet_name %}<dt>Cabinet</dt><dd>{{ creneau.medecin.doctor_profile.cabinet_name }}</dd>{% endif %}
@@ -16,14 +16,14 @@
             <dt>Horaire</dt><dd>{{ creneau.debut|time:"H:i" }} – {{ creneau.fin|time:"H:i" }} ({{ creneau.duree_minutes }} min)</dd>
         </dl>
 
-        <form method="post" novalidate>
+        <form method="post">
             {% csrf_token %}
-            {% if form.non_field_errors %}<div class="alert alert-error">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+            {% if form.non_field_errors %}<div class="alert alert-error" role="alert">{{ form.non_field_errors|join:" " }}</div>{% endif %}
             {% for field in form %}
             <div class="form-group">
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
-                {% for e in field.errors %}<div class="form-error">{{ e }}</div>{% endfor %}
+                {% for e in field.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
             </div>
             {% endfor %}
             {% if user.is_patient %}
@@ -34,6 +34,6 @@
                 <a href="{% url 'rendezvous:reserver' %}?medecin={{ creneau.medecin_id }}&semaine={{ creneau.debut|date:'Y-m-d' }}" class="btn btn-secondary">Choisir un autre créneau</a>
             </div>
         </form>
-    </div>
+    </section>
 </div>
 {% endblock %}
