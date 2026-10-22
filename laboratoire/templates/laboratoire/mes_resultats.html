@@ -1,27 +1,118 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}Mes résultats — SantéConnect{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
+{% block title %}Mon dossier laboratoire — SantéConnect{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">
+<style>
+  .patient-chart { width:100%; height:auto; min-height:220px; }
+  .patient-chart polyline { fill:none; stroke:#047857; stroke-width:3; }
+  .patient-chart circle { fill:#047857; stroke:white; stroke-width:2; }
+  .patient-filter { display:flex; flex-wrap:wrap; align-items:end; gap:12px; padding:18px; }
+  .patient-filter label { display:block; font-size:.85rem; font-weight:600; margin-bottom:5px; }
+  .patient-filter input,.patient-filter select { min-height:40px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; }
+  .patient-request { padding:16px 20px; border-bottom:1px solid #e2e8f0; }
+  .patient-request:last-child { border-bottom:0; }
+  .patient-request__head { display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px; align-items:center; }
+  .patient-request__analyses { color:#475569; margin:8px 0 0; }
+  .patient-notice { margin:0 0 18px; padding:14px 18px; border:1px solid #bfdbfe; border-radius:12px; background:#eff6ff; color:#1e3a8a; }
+  .patient-abnormal { color:#b91c1c; }
+</style>
+{% endblock %}
 {% block content %}
 <div class="lab-shell">
   <header class="lab-hero">
     <div class="lab-hero__copy">
       <span class="lab-hero__eyebrow">👤 Espace patient</span>
-      <h1>Mes résultats d’analyses</h1>
-      <p>Seuls les résultats validés par un professionnel habilité sont publiés ici.</p>
+      <h1>Mon dossier laboratoire</h1>
+      <p>Suivez vos demandes et consultez uniquement les résultats validés qui vous concernent.</p>
     </div>
-    <div class="lab-hero__actions"><a class="lab-btn lab-btn--white" href="{% url 'dashboard' %}">← Tableau de bord</a></div>
+    <div class="lab-hero__actions"><a class="lab-btn lab-btn--white" href="{% url 'patient_dossier' %}">← Mon dossier médical</a></div>
   </header>
 
-  <section class="lab-stats" aria-label="Résumé de vos résultats">
+  {% if notifications %}
+    <aside class="patient-notice" role="status" aria-live="polite">
+      <strong>🔔 Nouveau résultat disponible</strong>
+      {% for notification in notifications %}
+        <div>
+          {{ notification.analyse_demandee.type_analyse.nom }} — validé le {{ notification.date_validation|date:"d/m/Y à H:i" }}
+          <a href="{% url 'laboratoire:patient_report_pdf' notification.analyse_demandee.demande_id %}">Télécharger le compte rendu PDF</a>
+        </div>
+      {% endfor %}
+    </aside>
+  {% endif %}
+
+  <section class="lab-stats" aria-label="Résumé de mon dossier laboratoire">
+    <article class="lab-stat"><span class="lab-stat__icon">▤</span><span><strong class="lab-stat__number">{{ demandes|length }}</strong><span class="lab-stat__label">Demandes suivies</span></span></article>
     <article class="lab-stat"><span class="lab-stat__icon">✓</span><span><strong class="lab-stat__number">{{ resultats_count }}</strong><span class="lab-stat__label">Résultats publiés</span></span></article>
+    <article class="lab-stat"><span class="lab-stat__icon">🔔</span><span><strong class="lab-stat__number">{{ notifications|length }}</strong><span class="lab-stat__label">Nouveaux résultats (7 jours)</span></span></article>
   </section>
 
   <section class="lab-panel">
-    <div class="lab-panel__head"><h2>Résultats disponibles</h2><span class="lab-badge lab-badge--neutral">{{ resultats_count }} résultat{{ resultats_count|pluralize:"s" }}</span></div>
+    <div class="lab-panel__head"><h2>Avancement de mes demandes</h2></div>
+    {% for demande in demandes %}
+      <article class="patient-request">
+        <div class="patient-request__head">
+          <div>
+            <strong>Demande #{{ demande.pk }}</strong>
+            <span class="lab-table__secondary">Prescrite le {{ demande.date_demande|date:"d/m/Y à H:i" }} par {{ demande.medecin.get_full_name|default:demande.medecin.username }}</span>
+          </div>
+          <span class="lab-badge {% if demande.statut == 'EN_ATTENTE' %}lab-badge--pending{% elif demande.statut == 'EN_COURS' %}lab-badge--progress{% elif demande.statut == 'TERMINEE' %}lab-badge--done{% else %}lab-badge--cancelled{% endif %}">{{ demande.get_statut_display }}</span>
+        </div>
+        <p class="patient-request__analyses">
+          {% for analyse in demande.analyses.all %}
+            {{ analyse.type_analyse.nom }} ({{ analyse.get_statut_display }}){% if not forloop.last %} · {% endif %}
+          {% empty %}
+            Aucune analyse associée.
+          {% endfor %}
+        </p>
+        {% if demande.statut == "TERMINEE" %}
+          <a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:patient_report_pdf' demande.pk %}">Télécharger le compte rendu PDF</a>
+        {% endif %}
+      </article>
+    {% empty %}
+      <div class="lab-empty"><span class="lab-empty__icon">🧪</span><h3>Aucune demande enregistrée</h3><p>Vos demandes d’analyses apparaîtront ici lorsqu’un médecin vous prescrira un bilan.</p></div>
+    {% endfor %}
+  </section>
+
+  <section class="lab-panel">
+    <div class="lab-panel__head"><h2>Évolution d’une analyse dans le temps</h2></div>
+    <form method="get" class="patient-filter">
+      <div>
+        <label for="filter-analyse">Type d’analyse à comparer</label>
+        <select id="filter-analyse" name="analyse">
+          <option value="">Choisir une analyse</option>
+          {% for type in types_analyse %}
+            <option value="{{ type.pk }}" {% if selected_analyse == type.pk|stringformat:"s" %}selected{% endif %}>{{ type.nom }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div><label for="filter-from">Du</label><input id="filter-from" type="date" name="date_debut" value="{{ date_debut }}"></div>
+      <div><label for="filter-to">Au</label><input id="filter-to" type="date" name="date_fin" value="{{ date_fin }}"></div>
+      <div><label for="filter-legacy-type">Autre type d’analyse</label><input id="filter-legacy-type" type="search" name="type_legacy" value="{{ type_legacy }}" placeholder="Ex. NFS"></div>
+      <button class="lab-btn lab-btn--primary" type="submit">Filtrer</button>
+      {% if selected_analyse or date_debut or date_fin or type_legacy %}<a class="lab-btn lab-btn--soft" href="{% url 'laboratoire:mes_resultats' %}">Réinitialiser</a>{% endif %}
+    </form>
+    {% if chart_points %}
+      <div class="lab-panel__body">
+        <svg class="patient-chart" viewBox="0 0 600 260" role="img" aria-label="Évolution des résultats validés de l’analyse sélectionnée">
+          <line x1="30" y1="220" x2="570" y2="220" stroke="#cbd5e1"/>
+          <line x1="30" y1="30" x2="30" y2="220" stroke="#cbd5e1"/>
+          {% if chart_points|length > 1 %}<polyline points="{{ chart_polyline }}"/>{% endif %}
+          {% for point in chart_points %}
+            <circle cx="{{ point.x }}" cy="{{ point.y }}" r="6"><title>{{ point.date|date:"d/m/Y" }} — {{ point.value }} {{ point.unit }}</title></circle>
+          {% endfor %}
+        </svg>
+      </div>
+    {% else %}
+      <p class="lab-empty__hint" style="padding:0 20px 18px;">Choisissez un type d’analyse pour afficher son évolution numérique. Le graphique n’utilise que les résultats validés de cette analyse.</p>
+    {% endif %}
+  </section>
+
+  <section class="lab-panel">
+    <div class="lab-panel__head"><h2>Historique de mes résultats</h2><span class="lab-badge lab-badge--neutral">{{ resultats_count }} résultat{{ resultats_count|pluralize:"s" }}</span></div>
     <div class="lab-patient-results">
       {% if resultats %}
-        <h3 class="lab-patient-results__section-title">Résultats du nouveau laboratoire</h3>
+        <h3 class="lab-patient-results__section-title">Résultats du laboratoire</h3>
       {% endif %}
       {% for resultat in resultats %}
         <article class="lab-patient-result">
@@ -33,21 +124,22 @@
             <span class="lab-badge lab-badge--done">Validé</span>
           </div>
           <div class="lab-patient-result__value">
-            <strong>{{ resultat.valeur }}</strong><span>{{ resultat.unite|default:resultat.analyse_demandee.type_analyse.unite }}</span>
+            <strong class="{% if resultat.potentiellement_anormal %}patient-abnormal{% endif %}">{{ resultat.valeur }}</strong>
+            <span>{{ resultat.unite|default:resultat.analyse_demandee.type_analyse.unite }}</span>
             {% if resultat.potentiellement_anormal %}<span class="lab-result__flag">À revoir avec votre médecin</span>{% endif %}
           </div>
           <dl class="lab-patient-result__details">
             <div><dt>Valeurs de référence</dt><dd>{{ resultat.valeur_reference|default:"Non renseignées" }}</dd></div>
+            <div><dt>Interprétation</dt><dd>{{ resultat.interpretation|default:"Non renseignée" }}</dd></div>
             <div><dt>Médecin prescripteur</dt><dd>{{ resultat.analyse_demandee.demande.medecin.get_full_name|default:resultat.analyse_demandee.demande.medecin.username }}</dd></div>
-            <div><dt>Validé par</dt><dd>{{ resultat.valide_par.get_full_name|default:resultat.valide_par.username|default:"Professionnel habilité" }}</dd></div>
-            {% if resultat.interpretation %}<div><dt>Interprétation</dt><dd>{{ resultat.interpretation }}</dd></div>{% endif %}
             {% if resultat.observation %}<div><dt>Observation</dt><dd>{{ resultat.observation }}</dd></div>{% endif %}
           </dl>
-          <p class="lab-patient-result__notice">Un résultat hors des valeurs de référence n’est pas, à lui seul, un diagnostic. Demandez l’interprétation à votre médecin.</p>
+          <a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:patient_report_pdf' resultat.analyse_demandee.demande_id %}">Télécharger le compte rendu PDF de la demande</a>
+          <p class="lab-patient-results__notice">Un résultat hors des valeurs de référence n’est pas, à lui seul, un diagnostic. Demandez l’interprétation à votre médecin.</p>
         </article>
       {% endfor %}
       {% if resultats_legacy %}
-        <h3 class="lab-patient-results__section-title">Résultats du dossier médical</h3>
+        <h3 class="lab-patient-results__section-title">Résultats publiés antérieurement</h3>
       {% endif %}
       {% for resultat in resultats_legacy %}
         <article class="lab-patient-result">
@@ -58,19 +150,18 @@
             </div>
             <span class="lab-badge lab-badge--done">{{ resultat.get_statut_display }}</span>
           </div>
-          {% if resultat.valeurs %}
-            <div class="lab-patient-result__legacy-value">{{ resultat.valeurs|linebreaksbr }}</div>
-          {% endif %}
+          {% if resultat.valeurs %}<div class="lab-patient-result__legacy-value">{{ resultat.valeurs|linebreaksbr }}</div>{% endif %}
           <dl class="lab-patient-result__details">
             {% if resultat.laboratoire %}<div><dt>Laboratoire</dt><dd>{{ resultat.laboratoire.lab_profile.nom_laboratoire|default:resultat.laboratoire.username }}</dd></div>{% endif %}
             {% if resultat.medecin_prescripteur %}<div><dt>Médecin prescripteur</dt><dd>{{ resultat.medecin_prescripteur.get_full_name|default:resultat.medecin_prescripteur.username }}</dd></div>{% endif %}
             {% if resultat.interpretation %}<div><dt>Interprétation</dt><dd>{{ resultat.interpretation }}</dd></div>{% endif %}
           </dl>
-          <p class="lab-patient-result__notice">Un résultat ne remplace pas l’avis de votre médecin. Demandez-lui de vous l’expliquer.</p>
+          <a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:patient_legacy_report_pdf' resultat.pk %}">Télécharger le compte rendu PDF</a>
+          <p class="lab-patient-results__notice">Un résultat ne remplace pas l’avis de votre médecin. Demandez-lui de vous l’expliquer.</p>
         </article>
       {% endfor %}
       {% if not resultats and not resultats_legacy %}
-        <div class="lab-empty"><span class="lab-empty__icon">🧪</span><h3>Aucun résultat publié</h3><p>Vos résultats apparaîtront ici après la validation du laboratoire.</p></div>
+        <div class="lab-empty"><span class="lab-empty__icon">🧪</span><h3>Aucun résultat publié correspondant aux filtres</h3><p>Les résultats apparaîtront après validation par un professionnel habilité.</p></div>
       {% endif %}
     </div>
   </section>

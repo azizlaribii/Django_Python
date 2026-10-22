@@ -1,0 +1,130 @@
+/* Compléments au design system SantéConnect pour le module Rendez-vous */
+.status-pill.danger { background: #fee2e2; color: #b91c1c; }
+.status-pill.info { background: #e0f2fe; color: #0369a1; }
+.muted { color: var(--text-muted); font-size: 0.8rem; }
+.empty-state { color: var(--text-muted); padding: 16px 0; font-size: 0.9rem; text-align: center; }
+
+.rdv-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+.rdv-tabs .count { background: #fff; color: var(--primary); border-radius: 999px; padding: 0 7px; margin-left: 6px; font-size: 0.75rem; font-weight: 700; }
+.btn-secondary .count { background: var(--primary); color: #fff; }
+
+.filters-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 20px; }
+.filters-bar .form-group { margin-bottom: 0; flex: 1 1 160px; }
+
+.rdv-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.rdv-kpi { background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 18px 20px; }
+.rdv-kpi .val { font-size: 1.9rem; font-weight: 800; line-height: 1; margin: 0; color: var(--primary-hover); }
+.rdv-kpi .lbl { font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0; }
+
+.rdv-card { background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 24px; margin-bottom: 24px; }
+.rdv-card h2 { font-size: 1.1rem; margin-bottom: 14px; }
+.section-h { font-size: 1.15rem; margin: 8px 0 6px; }
+.rdv-grid-2 { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px; }
+@media (max-width: 900px) { .rdv-grid-2 { grid-template-columns: 1fr; } }
+.def-list { display: grid; grid-template-columns: 160px 1fr; gap: 10px 16px; font-size: 0.925rem; }
+.def-list dt { color: var(--text-muted); font-weight: 600; }
+@media (max-width: 560px) { .def-list { grid-template-columns: 1fr; gap: 2px 0; } .def-list dd { margin-bottom: 8px; } }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 20px; }
+.form-grid .full { grid-column: 1 / -1; }
+
+/* Navigation de semaine */
+.week-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.week-nav .range { font-weight: 700; font-size: 1.05rem; margin: 0; }
+
+/* Calendrier hebdomadaire */
+.cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; margin-bottom: 24px; }
+.cal-day { background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-md); min-height: 160px; display: flex; flex-direction: column; }
+.cal-day.today { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-light); }
+.cal-day.past { background: #f8fafc; }
+.cal-day-head { padding: 10px 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: baseline; }
+.cal-day-head .nom { font-weight: 700; font-size: 0.85rem; margin: 0; }
+.cal-day-head .num { font-size: 0.8rem; color: var(--text-muted); }
+.cal-day.today .cal-day-head .num { color: #075985; font-weight: 700; }
+.cal-day-body { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.cal-empty { color: var(--text-muted); font-size: 0.78rem; text-align: center; padding: 14px 0; }
+.cal-item { display: block; border-radius: 8px; padding: 6px 8px; font-size: 0.78rem; line-height: 1.35; border-left: 3px solid; text-decoration: none; color: var(--text-main); }
+.cal-item:hover { filter: brightness(0.97); }
+.cal-item .h { font-weight: 700; }
+.cal-item .who { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-item.libre { background: #ecfdf5; border-color: #10b981; }
+.cal-item.bloque { background: #f1f5f9; border-color: #94a3b8; color: var(--text-muted); }
+.cal-item.passe { background: #f8fafc; border-color: #cbd5e1; color: #64748b; }
+.cal-item.st-EN_ATTENTE { background: #fffbeb; border-color: #f59e0b; }
+.cal-item.st-CONFIRME { background: #eff6ff; border-color: #3b82f6; }
+.cal-item.st-TERMINE { background: #f0f9ff; border-color: #0ea5e9; }
+.cal-item.st-ABSENT { background: #f1f5f9; border-color: #64748b; }
+.cal-item.st-ANNULE { background: #fef2f2; border-color: #ef4444; text-decoration: line-through; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px; }
+.cal-legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; background: var(--c); }
+@media (max-width: 1000px) {
+  .cal-week { grid-template-columns: 1fr; }
+  .cal-day { min-height: 0; }
+  .cal-day-body { flex-direction: row; flex-wrap: wrap; }
+  .cal-item { flex: 1 1 150px; }
+}
+
+/* Choix de créneau */
+.slot-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.slot-day { background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; }
+.slot-day h3 { font-size: 0.9rem; margin-bottom: 10px; }
+.slot-day h3 small { color: var(--text-muted); font-weight: 500; }
+.slot-list { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.slot-btn { display: inline-block; padding: 6px 10px; border-radius: 8px; border: 1px solid #a7f3d0; background: #ecfdf5; color: #047857; font-weight: 600; font-size: 0.82rem; text-decoration: none; transition: var(--transition); }
+.slot-btn:hover { background: #10b981; color: #fff; border-color: #10b981; }
+.doctor-chip { display: inline-flex; flex-direction: column; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: #fff; text-decoration: none; color: var(--text-main); min-width: 180px; }
+.doctor-chip small { color: var(--text-muted); }
+.doctor-chip.active { border-color: var(--doctor-color); background: var(--doctor-bg); }
+.doctor-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+
+.weekday-checks ul, .weekday-checks div { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.weekday-checks label { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 999px; font-size: 0.85rem; cursor: pointer; background: #fff; }
+.inline-form { display: inline; }
+.actions-col { white-space: nowrap; }
+.actions-col form { display: inline; }
+
+/* ---- Accessibilité ---- */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.container a:focus-visible, .container button:focus-visible, .container input:focus-visible,
+.container select:focus-visible, .container textarea:focus-visible, .slot-btn:focus-visible, .doctor-chip:focus-visible, .cal-item:focus-visible {
+  outline: 3px solid #0369a1; outline-offset: 2px; border-radius: 6px;
+}
+.form-error { color: #b91c1c; }
+
+/* ---- IA : suggestion de spécialité ---- */
+.ia-card { border-left: 4px solid #7c3aed; }
+.ia-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.ia-row .form-input { flex: 1 1 320px; }
+.ia-form .muted { margin: 6px 0 0; }
+.ia-loading { color: #5b21b6; font-weight: 600; margin-top: 14px; }
+.ia-loading::before { content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px;
+  border: 2px solid #ddd6fe; border-top-color: #7c3aed; border-radius: 50%; animation: ia-spin .8s linear infinite; }
+@keyframes ia-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ia-loading::before { animation: none; } }
+.ia-titre { font-weight: 700; margin: 16px 0 8px; }
+.ia-suggestions { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.ia-suggestion { border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; }
+.ia-entete { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.ia-barre { display: inline-block; width: 120px; height: 8px; border-radius: 999px; background: #ede9fe; overflow: hidden; }
+.ia-barre-rempli { display: block; height: 100%; background: #7c3aed; }
+.ia-suggestion .doctor-chips { margin-bottom: 0; }
+
+/* ---- Matrice de confusion ---- */
+.confusion { border-collapse: collapse; font-size: 0.8rem; }
+.confusion th, .confusion td { border: 1px solid var(--border-color); padding: 6px 8px; text-align: center; min-width: 30px; }
+.confusion tbody th { text-align: left; white-space: nowrap; }
+.confusion .vertical { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; }
+.confusion td.diag { background: #dcfce7; color: #14532d; font-weight: 700; }
+.confusion td.err { background: #fee2e2; color: #7f1d1d; font-weight: 700; }
+
+/* ---- Déplacement d'un rendez-vous (choix par boutons radio) ---- */
+.slot-fieldset { border: 0; padding: 0; margin: 8px 0 0; }
+.slot-fieldset legend { margin-bottom: 10px; }
+.slot-radio { margin-bottom: 14px; display: flex; gap: 8px; align-items: center; }
+.slot-radio-btn input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.slot-radio-btn label { display: inline-block; padding: 6px 10px; border-radius: 8px; border: 1px solid #a7f3d0; background: #ecfdf5; color: #047857; font-weight: 600; font-size: 0.82rem; cursor: pointer; }
+.slot-radio-btn input:checked + label { background: #047857; color: #fff; border-color: #047857; }
+.slot-radio-btn input:focus-visible + label { outline: 3px solid #0369a1; outline-offset: 2px; }
+h2.range { font-size: 1.05rem; }
+.cal-day-head h3.nom { font-size: 0.85rem; }
+/* Le focus clavier doit apparaître immédiatement (pas d'animation sur l'outline) */
+.slot-btn, .doctor-chip, .cal-item, .rdv-tabs .btn { transition: background-color .2s, color .2s, border-color .2s; }

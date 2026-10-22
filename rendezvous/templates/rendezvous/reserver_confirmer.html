@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Confirmer la réservation - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'rendezvous/rendezvous.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% include 'rendezvous/_header.html' %}
+
+    <section class="rdv-card" style="max-width:720px;" aria-labelledby="conf-titre">
+        <h2 id="conf-titre">Confirmer la réservation</h2>
+        <dl class="def-list" style="margin-bottom:20px;">
+            <dt>Médecin</dt><dd>Dr {{ creneau.medecin.get_full_name|default:creneau.medecin.username }}{% if creneau.medecin.doctor_profile %} — {{ creneau.medecin.doctor_profile.specialite }}{% endif %}</dd>
+            {% if creneau.medecin.doctor_profile.cabinet_name %}<dt>Cabinet</dt><dd>{{ creneau.medecin.doctor_profile.cabinet_name }}</dd>{% endif %}
+            <dt>Date</dt><dd><strong>{{ creneau.debut|date:"l j F Y" }}</strong></dd>
+            <dt>Horaire</dt><dd>{{ creneau.debut|time:"H:i" }} – {{ creneau.fin|time:"H:i" }} ({{ creneau.duree_minutes }} min)</dd>
+        </dl>
+
+        <form method="post">
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="alert alert-error" role="alert">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+            {% for field in form %}
+            <div class="form-group">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% for e in field.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+            </div>
+            {% endfor %}
+            {% if user.is_patient %}
+            <p class="muted" style="margin-bottom:16px;">Votre demande sera transmise au médecin, qui la confirmera. Vous pourrez l'annuler en ligne jusqu'à quelques heures avant.</p>
+            {% endif %}
+            <div style="display:flex; gap:10px;">
+                <button type="submit" class="btn btn-primary" id="btn-confirm-booking">{% if user.is_patient %}Envoyer la demande{% else %}Enregistrer le rendez-vous{% endif %}</button>
+                <a href="{% url 'rendezvous:reserver' %}?medecin={{ creneau.medecin_id }}&semaine={{ creneau.debut|date:'Y-m-d' }}" class="btn btn-secondary">Choisir un autre créneau</a>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}

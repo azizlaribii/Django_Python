@@ -11,8 +11,14 @@ def is_lab(user):
     return user.is_authenticated and user.is_laboratory
 
 
+def is_lab_responsable(user):
+    return is_lab(user) and user.groups.filter(
+        name="Biologiste responsable",
+    ).exists()
+
+
 def can_validate_results(user):
-    return is_lab(user)
+    return is_lab_responsable(user)
 
 
 def laboratory_team_user_ids(user):
@@ -26,7 +32,7 @@ def laboratory_team_user_ids(user):
 
 
 def can_manage_catalog(user):
-    return user.is_authenticated and (user.is_laboratory or user.is_admin_user)
+    return user.is_authenticated and user.is_admin_user
 
 
 def can_view_requests(user):
@@ -54,5 +60,5 @@ patient_requis = role_required(
     lambda user: user.is_authenticated and user.is_patient,
     "Cette page est réservée aux patients.",
 )
-catalogue_requis = role_required(can_manage_catalog, "Accès réservé au laboratoire et à l’administration.")
+catalogue_requis = role_required(can_manage_catalog, "Accès réservé à l’administration.")
 consultation_requise = role_required(can_view_requests, "Vous n’avez pas accès au module laboratoire.")

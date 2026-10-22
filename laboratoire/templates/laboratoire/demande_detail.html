@@ -13,6 +13,10 @@
     </div>
     <div class="lab-hero__actions">
       <span class="lab-badge {% if demande.statut == 'EN_ATTENTE' %}lab-badge--pending{% elif demande.statut == 'EN_COURS' %}lab-badge--progress{% elif demande.statut == 'TERMINEE' %}lab-badge--done{% else %}lab-badge--cancelled{% endif %}">{{ demande.get_statut_display }}</span>
+      {% if can_validate %}<a class="lab-btn lab-btn--white" href="{% url 'laboratoire:validation_queue' %}">File de validation</a>{% endif %}
+      {% if can_download_pdf %}
+        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:doctor_report_pdf' demande.pk %}">Télécharger le compte rendu PDF signé</a>
+      {% endif %}
     </div>
   </header>
 
@@ -27,6 +31,7 @@
     <div class="lab-panel__head"><h2>Informations complémentaires</h2></div>
     <div class="lab-panel__body">
       <p>{{ demande.commentaire|default:"Aucun commentaire du prescripteur." }}</p>
+      {% if demande.motif_annulation %}<p><strong>Motif d’annulation :</strong> {{ demande.motif_annulation }}</p>{% endif %}
       {% if can_edit %}
         <div class="lab-actions">
           <a class="lab-btn lab-btn--soft" href="{% url 'laboratoire:demande_update' demande.pk %}">Modifier la demande</a>
@@ -60,6 +65,7 @@
         <div class="lab-actions">
           <span class="lab-badge {% if item.statut == 'RECU' or item.statut == 'PRELEVE' %}lab-badge--progress{% elif item.statut == 'REJETE' or item.statut == 'ANNULE' %}lab-badge--rejected{% else %}lab-badge--pending{% endif %}">{{ item.get_statut_display }}</span>
           <a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:prelevement_update' item.pk %}">Modifier</a>
+          <a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:prelevement_etiquette' item.pk %}" target="_blank" rel="noopener">Imprimer l’étiquette</a>
         </div>
       </article>
     {% empty %}
@@ -97,12 +103,15 @@
         <article class="lab-result">
           <div>
             <div class="lab-result__value">{{ resultat.valeur }} {{ resultat.unite }}
+              {% if resultat.potentiellement_critique %}<span class="lab-result__flag">⚠ Seuil critique atteint</span>{% endif %}
               {% if resultat.potentiellement_anormal %}<span class="lab-result__flag">⚠ Hors des références</span>{% endif %}
             </div>
             <div class="lab-result__meta">Référence : {{ resultat.valeur_reference|default:"—" }} · {{ resultat.get_statut_display }}
               {% if resultat.prelevement %} · Échantillon {{ resultat.prelevement.code_prelevement }}{% endif %}
             </div>
             {% if resultat.interpretation %}<div class="lab-result__meta">Interprétation : {{ resultat.interpretation }}</div>{% endif %}
+            <div class="lab-result__meta">Interprétation automatique : <strong>{{ resultat.interpretation_automatique }}</strong></div>
+            {% if resultat.commentaire_rejet %}<div class="lab-result__meta lab-result__flag">Retour du biologiste : {{ resultat.commentaire_rejet }}</div>{% endif %}
             {% if resultat.observation %}<div class="lab-result__meta">Observation : {{ resultat.observation }}</div>{% endif %}
             <div class="lab-result__meta">Saisi par {{ resultat.saisi_par }} · {{ resultat.date_saisie|date:"d/m/Y H:i" }}
               {% if resultat.valide_par %}<br>Validé par {{ resultat.valide_par }} · {{ resultat.date_validation|date:"d/m/Y H:i" }}{% endif %}
@@ -110,7 +119,9 @@
           </div>
           {% if can_work %}
             <div class="lab-result__actions">
-              <a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:resultat_update' resultat.pk %}">Corriger</a>
+              {% if resultat.statut != "VALIDE" and resultat.statut != "CORRIGE" or can_validate %}
+                <a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:resultat_update' resultat.pk %}">{% if resultat.statut == "VALIDE" or resultat.statut == "CORRIGE" %}Corriger après validation{% else %}Corriger{% endif %}</a>
+              {% endif %}
               {% if can_validate %}
                 {% if resultat.statut == "EN_ATTENTE_VALIDATION" or resultat.statut == "CORRIGE" %}
                   <form method="post" action="{% url 'laboratoire:resultat_validate' resultat.pk %}" class="lab-inline-form">

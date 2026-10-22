@@ -5,10 +5,8 @@ from django.db import transaction
 
 from accounts.models import AssociationMedecinPatient, User
 from laboratoire.models import (
-    AnalyseDemandee,
     DemandeAnalyse,
     HistoriqueAction,
-    TypeAnalyse,
 )
 
 
@@ -65,28 +63,6 @@ class Command(BaseCommand):
             defaults={"est_medecin_traitant": True, "notes": "Association de démonstration laboratoire."},
         )
 
-        analysis_types = [
-            {
-                "code": "DEMO-GLY",
-                "nom": "Glycémie (démo)",
-                "unite": "g/L",
-                "valeur_reference_min": "0.700",
-                "valeur_reference_max": "1.100",
-            },
-            {
-                "code": "DEMO-NFS",
-                "nom": "Hémogramme (démo)",
-                "unite": "G/L",
-                "valeur_reference_min": "4.000",
-                "valeur_reference_max": "10.000",
-            },
-        ]
-        types = []
-        for fields in analysis_types:
-            defaults = {key: value for key, value in fields.items() if key != "code"}
-            item, _ = TypeAnalyse.objects.get_or_create(code=fields["code"], defaults=defaults)
-            types.append(item)
-
         demande_ids = {}
         for code, label in (
             ("ANNULATION", "DEMO_LABO: à annuler par le médecin"),
@@ -117,8 +93,6 @@ class Command(BaseCommand):
                         "laboratoire_id": laboratory.pk,
                     },
                 )
-            for item in types:
-                AnalyseDemandee.objects.get_or_create(demande=demande, type_analyse=item)
             demande_ids[code] = demande.pk
 
         self.stdout.write("")
@@ -129,7 +103,6 @@ class Command(BaseCommand):
         )
         self.stdout.write(f"Demande à annuler : #{demande_ids['ANNULATION']}")
         self.stdout.write(f"Demande du parcours complet : #{demande_ids['PARCOURS']}")
-        self.stdout.write("Catalogue : DEMO-GLY et DEMO-NFS")
         self.stdout.write(
             "Aucune donnée médicale n’est supprimée; l’ancien compte biologiste est "
             "supprimé uniquement s’il n’a aucune trace liée, sinon il est désactivé."

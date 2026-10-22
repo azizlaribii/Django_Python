@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Prendre rendez-vous - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'rendezvous/rendezvous.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% include 'rendezvous/_header.html' %}
+
+    {% if not user.is_doctor %}
+    <section class="rdv-card ia-card" aria-labelledby="ia-titre">
+        <h2 id="ia-titre"><span aria-hidden="true">✨ </span>Vous ne savez pas quel spécialiste consulter ?</h2>
+        <p class="muted" style="margin-bottom:12px;">Décrivez votre motif : notre assistant vous propose les spécialités les plus adaptées. Cette suggestion ne remplace pas un avis médical.</p>
+        <form id="ia-form" class="ia-form" action="{% url 'rendezvous:api_suggestion_specialite' %}" method="get">
+            <label for="ia-motif" class="form-label">Motif de consultation</label>
+            <div class="ia-row">
+                <input type="text" id="ia-motif" name="motif" class="form-input" value="{{ motif }}" required minlength="3" maxlength="255"
+                       placeholder="Ex. : douleur dans la poitrine quand je monte les escaliers" aria-describedby="ia-aide">
+                <button type="submit" class="btn btn-primary" id="ia-btn">Suggérer</button>
+            </div>
+            <p id="ia-aide" class="muted">3 caractères minimum.</p>
+        </form>
+        <div id="ia-resultat" aria-live="polite" aria-busy="false"></div>
+    </section>
+
+    <section class="rdv-card" aria-labelledby="choix-medecin">
+        <h2 id="choix-medecin">{% if user.is_patient %}1. {% endif %}Choisissez un médecin</h2>
+        {% if specialites|length > 1 %}
+        <form method="get" class="filters-bar" style="margin-bottom:14px;">
+            {% if motif %}<input type="hidden" name="motif" value="{{ motif }}">{% endif %}
+            <div class="form-group" style="max-width:320px;"><label class="form-label" for="r-spe">Spécialité</label>
+                <select id="r-spe" name="specialite" class="form-select">
+                    <option value="">Toutes les spécialités</option>
+                    {% for s in specialites %}<option value="{{ s }}" {% if specialite_sel == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+                </select></div>
+            <button type="submit" class="btn btn-secondary">Filtrer</button>
+        </form>
+        {% endif %}
+        <div class="doctor-chips">
+            {% for m in medecins %}
+            <a href="?medecin={{ m.pk }}{% if specialite_sel %}&amp;specialite={{ specialite_sel|urlencode }}{% endif %}{% if motif %}&amp;motif={{ motif|urlencode }}{% endif %}" class="doctor-chip{% if medecin and medecin.pk == m.pk %} active{% endif %}"{% if medecin and medecin.pk == m.pk %} aria-current="true"{% endif %}>
+                <strong>Dr {{ m.get_full_name|default:m.username }}</strong>
+                <small>{{ m.doctor_profile.specialite|default:"Médecine générale" }}{% if m.doctor_profile.cabinet_name %} · {{ m.doctor_profile.cabinet_name }}{% endif %}</small>
+            </a>
+            {% empty %}
+            <p class="empty-state">Aucun médecin disponible pour le moment.</p>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if medecin %}
+    <section class="rdv-card" aria-labelledby="choix-creneau">
+        <h2 id="choix-creneau">{% if user.is_doctor %}Choisissez un créneau libre{% else %}2. Choisissez un créneau avec Dr {{ medecin.get_full_name|default:medecin.username }}{% endif %}</h2>
+        <nav class="week-nav" aria-label="Navigation entre les semaines">
+            {% if semaine_prec %}
+            <a class="btn btn-secondary btn-sm" href="?medecin={{ medecin.pk }}&amp;semaine={{ semaine_prec|date:'Y-m-d' }}{% if motif %}&amp;motif={{ motif|urlencode }}{% endif %}">← Semaine précédente</a>
+            {% else %}<span></span>{% endif %}
+            <p class="range">Du {{ lundi|date:"j F" }} au {{ dimanche|date:"j F Y" }}</p>
+            <a class="btn btn-secondary btn-sm" href="?medecin={{ medecin.pk }}&amp;semaine={{ semaine_suiv|date:'Y-m-d' }}{% if motif %}&amp;motif={{ motif|urlencode }}{% endif %}">Semaine suivante →</a>
+        </nav>
+        <div class="slot-days" id="slot-days">
+            {% for jour in jours %}
+                {% if jour.creneaux %}
+                <div class="slot-day">
+                    <h3>{{ jour.nom }} <small>{{ jour.date|date:"d/m" }}</small></h3>
+                    <ul class="slot-list">
+                        {% for c in jour.creneaux %}
+                        <li><a class="slot-btn" href="{% url 'rendezvous:reserver_creneau' c.pk %}{% if motif %}?motif={{ motif|urlencode }}{% endif %}"
+                               aria-label="Réserver le {{ c.debut|date:'l j F' }} à {{ c.debut|time:'H:i' }}">{{ c.debut|time:"H:i" }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% if prochain %}
+        <p class="empty-state">
+            Aucun créneau libre cette semaine.<br>
+            <a href="?medecin={{ medecin.pk }}&amp;semaine={{ prochain.debut|date:'Y-m-d' }}{% if motif %}&amp;motif={{ motif|urlencode }}{% endif %}">Prochaine disponibilité : {{ prochain.debut|date:"l j F à H:i" }} →</a>
+        </p>
+        {% elif aucun_creneau %}
+        <p class="empty-state">
+            Ce médecin n'a aucun créneau libre pour le moment.
+            {% if user.is_doctor %}<br><a href="{% url 'rendezvous:creneau_generer' %}">Ouvrir des créneaux →</a>{% endif %}
+        </p>
+        {% endif %}
+    </section>
+    {% elif user.is_doctor %}
+    <p class="rdv-card empty-state">Aucun créneau. <a href="{% url 'rendezvous:creneau_generer' %}">Ouvrez vos créneaux →</a></p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if not user.is_doctor %}
+<script>
+(function () {
+    var form = document.getElementById("ia-form");
+    var champ = document.getElementById("ia-motif");
+    var bouton = document.getElementById("ia-btn");
+    var zone = document.getElementById("ia-resultat");
+    if (!form) return;
+
+    function el(tag, attrs, texte) {
+        var e = document.createElement(tag);
+        for (var k in attrs || {}) e.setAttribute(k, attrs[k]);
+        if (texte) e.textContent = texte;
+        return e;
+    }
+    function lienMedecin(m, motif) {
+        var a = el("a", {"class": "doctor-chip", "href": "?medecin=" + m.id + "&motif=" + encodeURIComponent(motif)});
+        a.appendChild(el("strong", {}, m.nom));
+        a.appendChild(el("small", {}, m.specialite + (m.a_des_creneaux ? " · créneaux disponibles" : " · aucun créneau libre")));
+        return a;
+    }
+
+    form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var motif = champ.value.trim();
+        if (motif.length < 3) { champ.reportValidity(); return; }
+        bouton.disabled = true;
+        bouton.textContent = "Analyse…";
+        zone.setAttribute("aria-busy", "true");
+        zone.innerHTML = "";
+        zone.appendChild(el("p", {"class": "ia-loading"}, "Analyse de votre motif en cours…"));
+
+        fetch(form.action + "?motif=" + encodeURIComponent(motif), {headers: {"Accept": "application/json"}})
+            .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, d: d}; }); })
+            .then(function (res) {
+                zone.innerHTML = "";
+                if (!res.ok) { zone.appendChild(el("p", {"class": "alert alert-error", "role": "alert"}, res.d.erreur)); return; }
+                var d = res.d;
+                var titre = d.confiant ? "Spécialités suggérées pour votre motif :" :
+                    "Suggestion incertaine : précisez votre motif ou consultez un généraliste.";
+                zone.appendChild(el("p", {"class": "ia-titre"}, titre));
+                var liste = el("ol", {"class": "ia-suggestions"});
+                d.suggestions.forEach(function (s) {
+                    var li = el("li", {"class": "ia-suggestion"});
+                    var entete = el("div", {"class": "ia-entete"});
+                    entete.appendChild(el("strong", {}, s.specialite));
+                    var pct = Math.round(s.probabilite * 100);
+                    var barre = el("span", {"class": "ia-barre", "role": "img", "aria-label": "Confiance " + pct + " %"});
+                    var rempli = el("span", {"class": "ia-barre-rempli"});
+                    rempli.style.width = pct + "%";
+                    barre.appendChild(rempli);
+                    entete.appendChild(barre);
+                    entete.appendChild(el("span", {"class": "muted"}, pct + " %"));
+                    li.appendChild(entete);
+                    var medecins = el("div", {"class": "doctor-chips"});
+                    if (s.medecins.length) s.medecins.forEach(function (m) { medecins.appendChild(lienMedecin(m, motif)); });
+                    else medecins.appendChild(el("span", {"class": "muted"}, "Aucun médecin de cette spécialité inscrit."));
+                    li.appendChild(medecins);
+                    liste.appendChild(li);
+                });
+                zone.appendChild(liste);
+                if (d.generalistes && d.generalistes.length) {
+                    zone.appendChild(el("p", {"class": "ia-titre"}, "Vous pouvez consulter un médecin généraliste :"));
+                    var g = el("div", {"class": "doctor-chips"});
+                    d.generalistes.forEach(function (m) { g.appendChild(lienMedecin(m, motif)); });
+                    zone.appendChild(g);
+                }
+                zone.appendChild(el("p", {"class": "muted"}, "Analyse effectuée en " + d.temps_ms + " ms."));
+            })
+            .catch(function () {
+                zone.innerHTML = "";
+                zone.appendChild(el("p", {"class": "alert alert-error", "role": "alert"},
+                    "Impossible de contacter l'assistant. Vérifiez votre connexion ou choisissez un médecin ci-dessous."));
+            })
+            .finally(function () {
+                bouton.disabled = false;
+                bouton.textContent = "Suggérer";
+                zone.setAttribute("aria-busy", "false");
+            });
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

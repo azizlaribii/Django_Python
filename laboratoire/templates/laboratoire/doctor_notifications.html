@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Alertes laboratoire — Espace médecin{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
+{% block content %}
+<div class="lab-shell">
+  <header class="lab-hero">
+    <div class="lab-hero__copy">
+      <span class="lab-hero__eyebrow">Espace médecin</span>
+      <h1>Alertes laboratoire</h1>
+      <p>Résultats validés, valeurs potentiellement critiques et échantillons rejetés pour vos demandes.</p>
+    </div>
+    <div class="lab-hero__actions">
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:demande_list' %}">Mes demandes</a>
+      <a class="lab-btn lab-btn--white" href="{% url 'dashboard' %}">Tableau de bord</a>
+    </div>
+  </header>
+
+  <section class="lab-panel">
+    <div class="lab-panel__head"><h2>Notifications récentes</h2><span class="lab-badge lab-badge--neutral">{{ notifications|length }}</span></div>
+    {% for notification in notifications %}
+      <article class="lab-sample">
+        <div>
+          <strong>{{ notification.titre }}</strong>
+          <span class="lab-table__secondary">Patient : {{ notification.patient.get_full_name|default:notification.patient.username }} · {{ notification.date|date:"d/m/Y à H:i" }}</span>
+        </div>
+        <a class="lab-btn lab-btn--soft lab-btn--small" href="{{ notification.url }}">Ouvrir la demande →</a>
+      </article>
+    {% empty %}
+      <div class="lab-empty"><span class="lab-empty__icon">✓</span><h3>Aucune alerte</h3><p>Les résultats validés et les rejets d’échantillons apparaîtront ici.</p></div>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

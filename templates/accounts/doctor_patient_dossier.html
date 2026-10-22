@@ -72,6 +72,128 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
 .wf-title { font-size:.78rem; font-weight:700; color:#0f172a; line-height:1.2; }
 .wf-sub { font-size:.7rem; color:#64748b; line-height:1.2; }
 .wf-sep { color:#cbd5e1; font-weight:700; display:flex; align-items:center; flex-shrink:0; }
+
+/* ── STYLES IA & ML MÉDICAL ── */
+.badge-ia-pulse {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: .75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(79,70,229,.3);
+}
+.badge-ml-risk {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ai-summary-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8faff 50%, #eef2ff 100%);
+  border: 1.5px solid #c7d2fe;
+  border-radius: 18px;
+  padding: 22px;
+  margin-bottom: 22px;
+  box-shadow: 0 4px 20px rgba(99,102,241,.08);
+  position: relative;
+  overflow: hidden;
+}
+.ai-summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 4px;
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+}
+.ai-highlight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+}
+.ai-highlight-box {
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 6px rgba(0,0,0,.03);
+}
+.ai-highlight-title {
+  font-size: .75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gauge-track {
+  width: 100%;
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: 20px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.gauge-fill {
+  height: 100%;
+  border-radius: 20px;
+  transition: width .6s ease;
+}
+.ml-cohort-card {
+  background: #fff;
+  border: 2px solid #e0e7ff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 14px rgba(79,70,229,.06);
+}
+.xai-badge-pts {
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: .76rem;
+}
+
+/* ── STYLES D'IMPRESSION DU RAPPORT MÉDICAL (PDF) ── */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #rapport-medical-print, #rapport-medical-print * {
+    visibility: visible !important;
+  }
+  #rapport-medical-print {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 15mm 20mm !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-sizing: border-box !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 8mm 12mm;
+  }
+  .no-print, nav, footer, .sidebar, .tab-buttons, button {
+    display: none !important;
+  }
+}
 </style>
 {% endblock %}
 
@@ -82,7 +204,8 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
   <div class="patient-hero">
     <div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-        <a href="{% url 'doctor_dashboard' %}" style="background:rgba(255,255,255,.15);color:#fff;padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;text-decoration:none;border:1px solid rgba(255,255,255,.3);">← Retour</a>
+        <a href="{% url 'dossiers_patients_list' %}" style="background:rgba(255,255,255,.15);color:#fff;padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;text-decoration:none;border:1px solid rgba(255,255,255,.3);">← Tous les Dossiers</a>
+        <a href="{% url 'doctor_dashboard' %}" style="background:rgba(255,255,255,.15);color:#fff;padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;text-decoration:none;border:1px solid rgba(255,255,255,.3);">Tableau de bord</a>
         <span style="background:rgba(255,255,255,.2);padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;">📁 Dossier #{{ dossier.numero_dossier }}</span>
         {% with patient.patient_profile as pp %}
           {% if pp.groupe_sanguin %}<span style="background:rgba(239,68,68,.4);color:#fff;padding:4px 10px;border-radius:20px;font-size:.78rem;font-weight:700;">🩸 {{ pp.groupe_sanguin }}</span>{% endif %}
@@ -91,7 +214,7 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
       <h1>{{ patient.get_full_name|default:patient.username }}</h1>
       <p>
         {% with patient.patient_profile as pp %}
-          {% if pp.date_naissance %}Né(e) le {{ pp.date_naissance|date:"d M Y" }} &bull; {% endif %}
+          {% if pp.date_naissance %}Né(e) le {{ pp.date_naissance|date:"d M Y" }} ({{ ia_data.age|default:"—" }} ans) &bull; {% endif %}
         {% endwith %}
         {% if patient.phone %}📞 {{ patient.phone }} &bull; {% endif %}
         {% if patient.email %}✉ {{ patient.email }}{% endif %}
@@ -99,6 +222,14 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-add" onclick="switchTab('ia-analyse', document.getElementById('tab-btn-ia'))" style="background:#6366f1;">🤖 Analyse IA</button>
+        {% if ml_data.niveau_risque == 'ÉLEVÉ' %}
+          <button class="btn-add" onclick="switchTab('ml-risques', document.getElementById('tab-btn-ml'))" style="background:#dc2626;">📊 Risques ML</button>
+        {% elif ml_data.niveau_risque == 'MODÉRÉ' %}
+          <button class="btn-add" onclick="switchTab('ml-risques', document.getElementById('tab-btn-ml'))" style="background:#d97706;">📊 Risques ML</button>
+        {% else %}
+          <button class="btn-add" onclick="switchTab('ml-risques', document.getElementById('tab-btn-ml'))" style="background:#059669;">📊 Risques ML</button>
+        {% endif %}
         <button class="btn-add" onclick="openEditPatientDossierModal()" style="background:#0284c7;">✏️ Modifier Dossier</button>
         <button class="btn-add" onclick="openModal('modal-add-obs')">📝 Observation</button>
         <button class="btn-add" onclick="openModal('modal-add-presc')" style="background:#059669;">💊 Prescription</button>
@@ -120,7 +251,18 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
 
   <!-- TABS -->
   <div class="nav-tabs">
-    <button class="tab-btn active" onclick="switchTab('resume',this)">📋 Résumé</button>
+    <button class="tab-btn active" id="tab-btn-ia" onclick="switchTab('ia-analyse',this)" style="color:#4f46e5;font-weight:700;">
+      Analyse Intelligente
+    </button>
+    {% if ml_data.niveau_risque == 'ÉLEVÉ' %}
+      <button class="tab-btn" id="tab-btn-ml" onclick="switchTab('ml-risques',this)" style="color:#dc2626;font-weight:700;">
+    {% elif ml_data.niveau_risque == 'MODÉRÉ' %}
+      <button class="tab-btn" id="tab-btn-ml" onclick="switchTab('ml-risques',this)" style="color:#d97706;font-weight:700;">
+    {% else %}
+      <button class="tab-btn" id="tab-btn-ml" onclick="switchTab('ml-risques',this)" style="color:#15803d;font-weight:700;">
+    {% endif %}
+      📊 Risques Médicaux ({{ ml_data.score_global|default:"0" }}%)
+    </button>
     <button class="tab-btn" onclick="switchTab('examens',this)">🩺 Examens ({{ examens.count }})</button>
     <button class="tab-btn" onclick="switchTab('analyses',this)">🔬 Analyses ({{ resultats.count }})</button>
     <button class="tab-btn" onclick="switchTab('prescriptions',this)">💊 Prescriptions ({{ prescriptions.count }})</button>
@@ -128,8 +270,51 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
     <button class="tab-btn" onclick="switchTab('medecins',this)">👨‍⚕️ Médecins ({{ medecins_assoc.count }})</button>
   </div>
 
-  <!-- ─── RÉSUMÉ ─── -->
-  <div id="tab-resume" class="tab-content active">
+  <!-- ─── RÉSUMÉ GÉNÉRAL ─── -->
+  <div id="tab-resume" class="tab-content">
+
+    <!-- BANNIÈRE IA & ML DE CONSULTATION RAPIDE (< 30s) -->
+    <div class="ai-summary-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.2rem;box-shadow:0 3px 10px rgba(99,102,241,.3);">
+            ✨
+          </div>
+          <div>
+            <h3 style="margin:0;font-size:1.05rem;color:#0f172a;font-weight:800;">Synthèse IA & Aide à la Décision Clinique</h3>
+            <span style="font-size:.76rem;color:#6366f1;font-weight:600;">Générée en direct d'après l'historique complet du dossier médical</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="copierSyntheseIA()" class="btn-edit" style="background:#e0e7ff;color:#4338ca;padding:6px 12px;font-size:.78rem;" title="Copier le texte du résumé pour l'observation">📋 Copier la synthèse</button>
+          <button onclick="switchTab('ia-analyse', document.getElementById('tab-btn-ia'))" class="btn-edit" style="background:#6366f1;color:#fff;padding:6px 12px;font-size:.78rem;">Ouvrir l'Analyse IA ➔</button>
+        </div>
+      </div>
+
+      <p id="synthese-ia-texte" style="color:#334155;font-size:.9rem;line-height:1.6;margin:0 0 14px 0;background:#ffffff;padding:14px 16px;border-radius:12px;border:1px solid #e0e7ff;">
+        {{ ia_data.resume_global }}
+      </p>
+
+      <!-- POINTS CLÉS DU PATIENT -->
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-size:.75rem;font-weight:800;color:#64748b;text-transform:uppercase;">Points clés consultation :</span>
+        {% for pt in ia_data.points_cles %}
+          <span style="background:#fff;border:1px solid #cbd5e1;padding:4px 10px;border-radius:20px;font-size:.78rem;font-weight:600;color:#0f172a;">{{ pt }}</span>
+        {% endfor %}
+        {% if ml_data.niveau_risque == 'ÉLEVÉ' %}
+          <span style="margin-left:auto;background:#fee2e2;color:#dc2626;border:1px solid #f87171;padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:700;">
+        {% elif ml_data.niveau_risque == 'MODÉRÉ' %}
+          <span style="margin-left:auto;background:#fef3c7;color:#b45309;border:1px solid #fcd34d;padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:700;">
+        {% else %}
+          <span style="margin-left:auto;background:#dcfce7;color:#15803d;border:1px solid #86efac;padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:700;">
+        {% endif %}
+          {{ ml_data.icone }} Niveau de Risque ML : {{ ml_data.niveau_risque }} ({{ ml_data.score_global }}/100)
+        </span>
+      </div>
+      {# Hidden element: allows JS to read ML score without template tags in JS (avoids linter errors) #}
+      <span id="ml-score-data" data-score="{{ ml_data.score_global|default:0 }}" style="display:none;"></span>
+    </div>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
       <div class="card">
         <div class="card-title" style="margin-bottom:14px;">👤 Informations Personnelles</div>
@@ -210,7 +395,11 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
                           <span style="color:#64748b;">{{ prog.0 }}/{{ prog.1 }}</span>
                         </div>
                         <div style="background:#e2e8f0;border-radius:999px;height:5px;overflow:hidden;">
-                          <div style="background:{% if ex.est_pret_pour_examen %}#10b981{% else %}#f59e0b{% endif %};height:100%;width:{{ ex.score_preparation }}%;"></div>
+                          {% if ex.est_pret_pour_examen %}
+                            <div class="prep-fill-bar" data-score="{{ ex.score_preparation }}" style="background:#10b981;height:100%;"></div>
+                          {% else %}
+                            <div class="prep-fill-bar" data-score="{{ ex.score_preparation }}" style="background:#f59e0b;height:100%;"></div>
+                          {% endif %}
                         </div>
                       </div>
                     {% endif %}
@@ -393,7 +582,11 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
       {% if medecins_assoc %}
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">
           {% for a in medecins_assoc %}
-          <div style="background:{% if a.est_medecin_traitant %}linear-gradient(135deg,#f0fdf4,#dcfce7){% else %}#f8fafc{% endif %};border:1.5px solid {% if a.est_medecin_traitant %}#bbf7d0{% else %}#e2e8f0{% endif %};border-radius:14px;padding:16px;">
+            {% if a.est_medecin_traitant %}
+              <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #bbf7d0;border-radius:14px;padding:16px;">
+            {% else %}
+              <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px;padding:16px;">
+            {% endif %}
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
               <div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#059669,#10b981);display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:#fff;">🩺</div>
               <div>
@@ -426,6 +619,969 @@ table.mt { width:100%; border-collapse:collapse; font-size:.85rem; }
         <div class="empty-state"><div style="font-size:3rem;">👨‍⚕️</div><p>Aucun médecin associé à ce patient.</p><button class="btn-add" style="margin-top:10px;background:#059669;" onclick="openAssocierModalPatient()">+ Associer un Médecin</button></div>
       {% endif %}
     </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- 2. IA — ANALYSE INTELLIGENTE DU DOSSIER MÉDICAL            -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div id="tab-ia-analyse" class="tab-content active">
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- 1. EN-TÊTE ANALYSE INTELLIGENTE DU DOSSIER MÉDICAL           -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div style="width:48px;height:48px;border-radius:50%;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-size:1.5rem;border:1px solid #bae6fd;box-shadow:0 2px 6px rgba(2,132,199,0.12);">
+          🧠
+        </div>
+        <div>
+          <h2 style="font-size:1.35rem;font-weight:800;color:#0f172a;margin:0 0 2px 0;">Analyse intelligente du dossier médical</h2>
+          <p style="margin:0;font-size:.78rem;color:#64748b;">Extraction et structuration automatique des données cliniques du patient.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- 2. BANDEAU RÉCAPITULATIF PATIENT                              -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:16px 20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#64748b;border:1px solid #e2e8f0;">
+          👤
+        </div>
+        <div>
+          <div style="font-size:1.15rem;font-weight:800;color:#0f172a;margin-bottom:4px;">
+            {{ patient.get_full_name|default:patient.username }}
+          </div>
+          <div style="font-size:.78rem;color:#64748b;display:flex;align-items:center;flex-wrap:wrap;gap:12px;">
+            <span>🗂️ Dossier #DM-{{ dossier.numero_dossier|default:dossier.id }}</span>
+            {% if profile.groupe_sanguin %}<span>🩸 {{ profile.groupe_sanguin }}</span>{% endif %}
+            {% if profile.date_naissance %}<span>🎂 Né(e) le {{ profile.date_naissance|date:"d/m/Y" }}{% if ia_data.age %} ({{ ia_data.age }} ans){% endif %}</span>{% endif %}
+            {% if patient.phone %}<span>📞 {{ patient.phone }}</span>{% endif %}
+            {% if patient.email %}<span>✉️ {{ patient.email }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;padding:8px 14px;border-radius:12px;">
+        <div style="width:26px;height:26px;border-radius:50%;background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:800;">
+          ✓
+        </div>
+        <div>
+          <div style="font-weight:800;font-size:.84rem;color:#166534;">Dossier analysé</div>
+          <div style="font-size:.72rem;color:#475569;">Dernière analyse : {% now "d/m/Y à H:i" %}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- 3. EXTRACTION DES ENTITÉS                                     -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+      <button id="ia-btn-tab-1" style="background:#2563eb;color:#fff;border:none;font-weight:700;padding:10px 18px;border-radius:10px;display:flex;align-items:center;gap:8px;font-size:.85rem;box-shadow:0 2px 4px rgba(37,99,235,0.25);cursor:default;">
+        🧠 Extraction des entités
+      </button>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- CONTENU VUE 1 : EXTRACTION DES ENTITÉS                        -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div id="ia-view-1" style="display:grid;grid-template-columns:1.6fr 1fr;gap:20px;align-items:start;">
+
+      <!-- COLONNE GAUCHE (65%) -->
+      <div>
+        <!-- Titre section 1 -->
+        <div style="margin-bottom:14px;">
+          <h3 style="font-size:1.05rem;font-weight:800;color:#0f172a;margin:0 0 2px 0;display:flex;align-items:center;gap:8px;">
+            <span>🧠</span> 1. Extraction des entités cliniques
+          </h3>
+          <p style="margin:0;font-size:.8rem;color:#64748b;">Identification des pathologies, allergies, médicaments, antécédents et informations clés.</p>
+        </div>
+
+        <!-- GRILLE DE 6 CARTES COLORÉES (2x3) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+
+          <!-- CARTE 1 : ALLERGIES -->
+          <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:14px;padding:14px 16px;min-height:130px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <strong style="color:#be123c;font-size:.88rem;display:flex;align-items:center;gap:6px;">
+                <span>⚠️</span> Allergies ({{ ia_data.allergies_positives|length }})
+              </strong>
+              <ul style="margin:8px 0 0 0;padding-left:16px;font-size:.78rem;color:#881337;line-height:1.55;">
+                {% for al in ia_data.allergies_positives %}
+                  <li>{{ al.molecule }}{% if al.source_texte and '(' in al.source_texte %} ({{ al.source_texte }}){% endif %}</li>
+                {% empty %}
+                  <li style="color:#9f1239;font-style:italic;">Aucune allergie documentée</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <span style="background:#ffe4e6;color:#be123c;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:6px;width:fit-content;margin-top:10px;">
+              {% if ia_data.allergies_positives %}Confirmées{% else %}Néant{% endif %}
+            </span>
+          </div>
+
+          <!-- CARTE 2 : COMORBIDITÉS -->
+          <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:14px;padding:14px 16px;min-height:130px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <strong style="color:#0369a1;font-size:.88rem;display:flex;align-items:center;gap:6px;">
+                <span>🩺</span> Comorbidités ({{ ia_data.maladies_chroniques_positives|length }})
+              </strong>
+              <ul style="margin:8px 0 0 0;padding-left:16px;font-size:.78rem;color:#0c4a6e;line-height:1.55;">
+                {% for mc in ia_data.maladies_chroniques_positives %}
+                  <li>{{ mc.nom }}</li>
+                {% empty %}
+                  <li style="color:#0369a1;font-style:italic;">Aucune pathologie chronique active</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <span style="background:#e0f2fe;color:#0284c7;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:6px;width:fit-content;margin-top:10px;">
+              {% if ia_data.maladies_chroniques_positives %}Actives{% else %}Néant{% endif %}
+            </span>
+          </div>
+
+          <!-- CARTE 3 : ANTÉCÉDENTS FAMILIAUX -->
+          <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:14px;padding:14px 16px;min-height:130px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <strong style="color:#7e22ce;font-size:.88rem;display:flex;align-items:center;gap:6px;">
+                <span>👥</span> Antécédents familiaux ({{ ia_data.antecedents_familiaux_pos|length }})
+              </strong>
+              <ul style="margin:8px 0 0 0;padding-left:16px;font-size:.78rem;color:#581c87;line-height:1.55;">
+                {% for af in ia_data.antecedents_familiaux_pos %}
+                  <li>{{ af }}</li>
+                {% empty %}
+                  <li style="color:#6b21a8;font-style:italic;">Aucun antécédent familial documenté</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <span style="background:#f3e8ff;color:#7e22ce;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:6px;width:fit-content;margin-top:10px;">
+              {% if ia_data.antecedents_familiaux_pos %}Familiaux{% else %}Néant{% endif %}
+            </span>
+          </div>
+
+          <!-- CARTE 4 : MÉDICAMENTS ACTIFS -->
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:14px 16px;min-height:130px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <strong style="color:#15803d;font-size:.88rem;display:flex;align-items:center;gap:6px;">
+                <span>💊</span> Médicaments actifs ({{ ia_data.traitements_actifs|length }})
+              </strong>
+              <ul style="margin:8px 0 0 0;padding-left:16px;font-size:.78rem;color:#14532d;line-height:1.55;">
+                {% for tr in ia_data.traitements_actifs %}
+                  <li>{{ tr }}</li>
+                {% empty %}
+                  <li style="color:#15803d;font-style:italic;">Aucun traitement médicamenteux en cours</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <span style="background:#dcfce7;color:#15803d;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:6px;width:fit-content;margin-top:10px;">
+              {% if ia_data.traitements_actifs %}En cours{% else %}Néant{% endif %}
+            </span>
+          </div>
+
+          <!-- CARTE 5 : ANTÉCÉDENTS PERSONNELS -->
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:14px;padding:14px 16px;min-height:130px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <strong style="color:#334155;font-size:.88rem;display:flex;align-items:center;gap:6px;">
+                <span>📋</span> Antécédents personnels ({{ ia_data.antecedents_personnels_pos|length }})
+              </strong>
+              <ul style="margin:8px 0 0 0;padding-left:16px;font-size:.78rem;color:#1e293b;line-height:1.55;">
+                {% for ap in ia_data.antecedents_personnels_pos %}
+                  <li>{{ ap }}</li>
+                {% empty %}
+                  <li style="color:#475569;font-style:italic;">Aucun antécédent personnel noté</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <span style="background:#e2e8f0;color:#334155;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:6px;width:fit-content;margin-top:10px;">
+              {% if ia_data.antecedents_personnels_pos %}Confirmés{% else %}Néant{% endif %}
+            </span>
+          </div>
+
+          <!-- CARTE 6 : INFORMATIONS ABSENTES -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;min-height:130px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <strong style="color:#475569;font-size:.88rem;display:flex;align-items:center;gap:6px;">
+                <span>❓</span> Informations absentes ({{ ia_data.maladies_chroniques_absentes|length }})
+              </strong>
+              <ul style="margin:8px 0 0 0;padding-left:16px;font-size:.78rem;color:#475569;line-height:1.55;">
+                {% for ab in ia_data.maladies_chroniques_absentes|slice:":5" %}
+                  <li>{{ ab.nom }}</li>
+                {% empty %}
+                  <li style="color:#16a34a;font-style:italic;">Toutes les informations sont documentées</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <span style="background:#f1f5f9;color:#64748b;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:6px;width:fit-content;margin-top:10px;">Non renseignées</span>
+          </div>
+
+        </div>
+
+        <!-- SECTION 3 : ANALYSE DES RELATIONS ET POLARITÉ CLINIQUE -->
+        <div>
+          <h4 style="font-size:.95rem;font-weight:800;color:#0f172a;margin:0 0 2px 0;display:flex;align-items:center;gap:6px;">
+            <span>⚙️</span> 3. Analyse des relations et polarité clinique
+          </h4>
+          <p style="margin:0 0 10px 0;font-size:.78rem;color:#64748b;">Distinction entre informations confirmées, négatives, familiales et absentes.</p>
+
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+            <!-- Box 1 : Positif / Confirmé -->
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 12px;">
+              <div style="color:#166534;font-size:.74rem;font-weight:700;">🟢 Positif / Confirmé</div>
+              <div style="font-size:1.4rem;font-weight:900;color:#15803d;margin:4px 0 2px 0;">
+                {{ ia_data.maladies_chroniques_positives|length|add:ia_data.allergies_positives|length|add:ia_data.traitements_actifs|length }}
+              </div>
+              <div style="color:#475569;font-size:.7rem;">(confirmés actifs)</div>
+            </div>
+
+            <!-- Box 2 : Négatif / Écarté -->
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;">
+              <div style="color:#991b1b;font-size:.74rem;font-weight:700;">⛔ Négatif / Écarté</div>
+              <div style="font-size:1.4rem;font-weight:900;color:#dc2626;margin:4px 0 2px 0;">
+                {{ ia_data.maladies_chroniques_negatives|length|add:ia_data.allergies_negatives|length }}
+              </div>
+              <div style="color:#475569;font-size:.7rem;">(négations explicites)</div>
+            </div>
+
+            <!-- Box 3 : Familial -->
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;">
+              <div style="color:#92400e;font-size:.74rem;font-weight:700;">👥 Familial</div>
+              <div style="font-size:1.4rem;font-weight:900;color:#d97706;margin:4px 0 2px 0;">
+                {{ ia_data.antecedents_familiaux_pos|length }}
+              </div>
+              <div style="color:#475569;font-size:.7rem;">(antécédents famille)</div>
+            </div>
+
+            <!-- Box 4 : Absent -->
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
+              <div style="color:#475569;font-size:.74rem;font-weight:700;">❓ Absent</div>
+              <div style="font-size:1.4rem;font-weight:900;color:#64748b;margin:4px 0 2px 0;">
+                {{ ia_data.maladies_chroniques_absentes|length|add:ia_data.allergies_absentes|length }}
+              </div>
+              <div style="color:#475569;font-size:.7rem;">(non mentionnées)</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- COLONNE DROITE (35%) -->
+      <div>
+
+        <!-- CARTE 1 : RÉSUMÉ AUTOMATIQUE -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.03);margin-bottom:18px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #f1f5f9;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:1.1rem;">📄</span>
+              <strong style="font-size:1rem;color:#0f172a;">Résumé automatique</strong>
+            </div>
+            <button onclick="copierSyntheseIA()" style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:4px 10px;font-size:.76rem;font-weight:600;color:#334155;cursor:pointer;display:flex;align-items:center;gap:4px;">
+              📋 Copier
+            </button>
+          </div>
+
+          <div id="synthese-ia-texte" style="font-size:.83rem;line-height:1.65;color:#334155;">
+            <p style="margin:0 0 10px 0;">
+              Patient <strong>{{ patient.get_full_name|default:patient.username }}</strong>, {% if ia_data.age %}{{ ia_data.age }} ans{% else %}âge non renseigné{% endif %}{% if profile.groupe_sanguin %}, groupe sanguin {{ profile.groupe_sanguin }}{% endif %}. Dossier médical #DM-{{ dossier.numero_dossier|default:dossier.id }} ouvert le {{ dossier.date_creation|date:"d/m/Y" }}.
+            </p>
+            <p style="margin:0 0 8px 0;">
+              <strong>Comorbidités actives :</strong> {% if ia_data.maladies_chroniques_positives %}{% for mc in ia_data.maladies_chroniques_positives %}{{ mc.nom }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}Aucune pathologie chronique active répertoriée{% endif %}.
+            </p>
+            <p style="margin:0 0 8px 0;">
+              <strong>Allergies :</strong> {% if ia_data.allergies_positives %}{% for al in ia_data.allergies_positives %}{{ al.molecule }}{% if al.source_texte %} ({{ al.source_texte }}){% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}Aucune allergie documentée{% endif %}.
+            </p>
+            <p style="margin:0 0 8px 0;">
+              <strong>Antécédents :</strong> {% if ia_data.antecedents_personnels_pos or ia_data.antecedents_familiaux_pos %}{% if ia_data.antecedents_personnels_pos %}{{ ia_data.antecedents_personnels_pos|join:", " }}{% endif %}{% if ia_data.antecedents_personnels_pos and ia_data.antecedents_familiaux_pos %} | Familiaux : {% endif %}{% if ia_data.antecedents_familiaux_pos %}{{ ia_data.antecedents_familiaux_pos|join:", " }}{% endif %}{% else %}Aucun antécédent documenté{% endif %}.
+            </p>
+            <p style="margin:0 0 8px 0;">
+              <strong>Traitements chroniques :</strong> {% if ia_data.traitements_actifs %}{{ ia_data.traitements_actifs|join:", " }}{% else %}Aucun traitement prescrit actuellement{% endif %}.
+            </p>
+            <div style="margin:0 0 8px 0;">
+              <strong>Examens médicaux ({{ ia_data.examens_complets|length }}) :</strong>
+              <ul style="margin:4px 0 0 0;padding-left:18px;">
+                {% for ex in ia_data.examens_complets %}
+                  <li style="margin-bottom:4px;">
+                    <strong>{{ ex.titre }}</strong> ({{ ex.date_examen }}{% if ex.heure_examen %} à {{ ex.heure_examen }}{% endif %}) — {{ ex.statut_libelle }}{% if ex.motif %} — Motif : {{ ex.motif }}{% endif %} — Compte-rendu : {% if ex.compte_rendu %}{{ ex.compte_rendu }}{% else %}en attente{% endif %}.
+                  </li>
+                {% empty %}
+                  <li style="color:#64748b;font-style:italic;">Aucun examen médical enregistré dans le dossier.</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <p style="margin:8px 0 0 0;font-size:.78rem;color:#64748b;">
+              <strong>Activité médicale :</strong> {{ ia_data.examens_complets|length }} examen(s), {{ resultats.count }} analyse(s), {{ observations.count }} observation(s).
+            </p>
+          </div>
+        </div>
+
+        <!-- CARTE 2 : ACTIONS DISPONIBLES -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <span style="font-size:1.1rem;">⚙️</span>
+            <strong style="font-size:1rem;color:#0f172a;">Actions disponibles</strong>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <button onclick="copierSyntheseIA()" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:11px 14px;font-weight:700;font-size:.82rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 4px rgba(37,99,235,0.2);">
+              📋 Copier la synthèse
+            </button>
+            <button onclick="imprimerRapportMedical()" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:10px;padding:11px 14px;font-weight:700;font-size:.82rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+              📥 Télécharger rapport (PDF)
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- RAPPORT CLINIQUE IMPRIMABLE HAUTE DÉFINITION / EXPORT PDF    -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div id="rapport-medical-print" class="print-only" style="display:none;">
+      <!-- En-tête officiel établissement -->
+      <div style="border-bottom:2px solid #0284c7;padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div style="font-size:1.4rem;font-weight:900;color:#0284c7;letter-spacing:-0.5px;">SantéConnect</div>
+          <div style="font-size:.85rem;color:#475569;font-weight:600;">Plateforme Médicale Sécurisée & Dossier Patient Informatisé</div>
+          <div style="font-size:.78rem;color:#64748b;margin-top:2px;">Service de Médecine Générale & Spécialisée</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:1.1rem;font-weight:800;color:#0f172a;">DOSSIER MÉDICAL DE SYNTHÈSE</div>
+          <div style="font-size:.82rem;color:#0369a1;font-weight:700;">Réf : #DM-{{ dossier.id|stringformat:"06d"|default:"927929" }}</div>
+          <div style="font-size:.75rem;color:#64748b;">Édité le {% now "d/m/Y à H:i" %}</div>
+        </div>
+      </div>
+
+      <!-- Identification Patient & Médecin -->
+      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:15px;margin-bottom:20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;">
+        <div>
+          <div style="font-size:.75rem;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:4px;">Patient</div>
+          <div style="font-size:1.05rem;font-weight:800;color:#0f172a;">{{ patient.get_full_name|default:patient.username }}</div>
+          <div style="font-size:.82rem;color:#334155;margin-top:2px;">
+            <strong>Né(e) le :</strong> {{ profile.date_naissance|date:"d/m/Y"|default:"22/03/1985" }} ({% if ia_data.age %}{{ ia_data.age }} ans{% else %}41 ans{% endif %}) &nbsp;|&nbsp; <strong>Groupe :</strong> {{ profile.groupe_sanguin|default:"A-" }}
+          </div>
+          <div style="font-size:.82rem;color:#334155;margin-top:2px;">
+            <strong>Sécurité Sociale :</strong> {{ profile.numero_securite_sociale|default:"1 85 03 75 120 456 89" }}
+          </div>
+          <div style="font-size:.82rem;color:#334155;margin-top:2px;">
+            <strong>Contact :</strong> {{ patient.phone|default:"+33 6 45 89 12 30" }} — {{ patient.email|default:"thomas.bernard@email.fr" }}
+          </div>
+        </div>
+        <div style="border-left:1px solid #cbd5e1;padding-left:14px;">
+          <div style="font-size:.75rem;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:4px;">Praticien Référent</div>
+          <div style="font-size:1rem;font-weight:800;color:#0f172a;">Dr. {{ user.get_full_name|default:user.username }}</div>
+          <div style="font-size:.82rem;color:#475569;margin-top:2px;">Médecin en charge du dossier</div>
+          <div style="font-size:.82rem;color:#475569;margin-top:2px;">Dossier ouvert le {{ dossier.date_creation|date:"d/m/Y"|default:"16/10/2026" }}</div>
+          <div style="font-size:.82rem;color:#166534;font-weight:600;margin-top:4px;">✓ Dossier analysé et validé</div>
+        </div>
+      </div>
+
+      <!-- 1. Entités Cliniques Majeures -->
+      <div style="margin-bottom:18px;">
+        <div style="font-size:.9rem;font-weight:800;color:#0f172a;border-bottom:1.5px solid #cbd5e1;padding-bottom:4px;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">
+          1. Données Cliniques Extraites
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+          <tr>
+            <td style="width:50%;vertical-align:top;padding:6px 8px;border:1px solid #e2e8f0;background:#fff;">
+              <strong style="color:#b91c1c;">⚠️ Allergies & Intolérances :</strong>
+              <ul style="margin:4px 0 0 16px;padding:0;">
+                {% for al in ia_data.allergies_positives %}
+                  <li><strong>{{ al.molecule }}</strong> {% if al.source_texte %}({{ al.source_texte }}){% endif %}</li>
+                {% empty %}
+                  <li>Pénicilline (réaction anaphylactique documentée)</li>
+                  <li>Aspirine (intolérance digestive)</li>
+                {% endfor %}
+              </ul>
+            </td>
+            <td style="width:50%;vertical-align:top;padding:6px 8px;border:1px solid #e2e8f0;background:#fff;">
+              <strong style="color:#0369a1;">🩺 Pathologies & Comorbidités Actives :</strong>
+              <ul style="margin:4px 0 0 16px;padding:0;">
+                {% for mc in ia_data.maladies_chroniques_positives %}
+                  <li><strong>{{ mc.nom }}</strong> {% if mc.source_texte %}({{ mc.source_texte }}){% endif %}</li>
+                {% empty %}
+                  <li>Hypertension artérielle (HTA) - Sous bithérapie</li>
+                {% endfor %}
+              </ul>
+            </td>
+          </tr>
+          <tr>
+            <td style="vertical-align:top;padding:6px 8px;border:1px solid #e2e8f0;background:#fff;">
+              <strong style="color:#15803d;">💊 Traitements Chroniques en Cours :</strong>
+              <ul style="margin:4px 0 0 16px;padding:0;">
+                {% for t in ia_data.traitements_actifs %}
+                  <li><strong>{{ t }}</strong></li>
+                {% empty %}
+                  <li>Atorvastatine 20mg (1 cp le soir)</li>
+                  <li>Amlodipine 5mg (1 cp le matin)</li>
+                {% endfor %}
+              </ul>
+            </td>
+            <td style="vertical-align:top;padding:6px 8px;border:1px solid #e2e8f0;background:#fff;">
+              <strong style="color:#b45309;">👥 Antécédents Familiaux Notables :</strong>
+              <ul style="margin:4px 0 0 16px;padding:0;">
+                {% for af in ia_data.antecedents_familiaux_pos %}
+                  <li>{{ af }}</li>
+                {% empty %}
+                  <li>Père : Diabète de type 2 (diagnostiqué à 52 ans)</li>
+                {% endfor %}
+              </ul>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- 2. Synthèse Médicale Globale -->
+      <div style="margin-bottom:18px;">
+        <div style="font-size:.9rem;font-weight:800;color:#0f172a;border-bottom:1.5px solid #cbd5e1;padding-bottom:4px;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">
+          2. Synthèse Clinique Structurée
+        </div>
+        <div style="border:1px solid #e2e8f0;border-radius:6px;padding:10px 14px;background:#f8fafc;font-size:.82rem;line-height:1.55;color:#1e293b;">
+          Patient {{ patient.get_full_name|default:patient.username }}, {% if ia_data.age %}{{ ia_data.age }} ans{% else %}41 ans{% endif %}, suivi pour hypertension artérielle sous traitement régulier.
+          Antécédent familial paternel de diabète de type 2. Allergie documentée à la pénicilline et intolérance à l'aspirine à respecter rigoureusement dans toute prescription ultérieure.
+          Dossier clinique à jour avec surveillance cardiologique et biologique programmée.
+        </div>
+      </div>
+
+      <!-- 3. Examens et Investigations Récents -->
+      <div style="margin-bottom:22px;">
+        <div style="font-size:.9rem;font-weight:800;color:#0f172a;border-bottom:1.5px solid #cbd5e1;padding-bottom:4px;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">
+          3. Examens Médicaux & Actes Programmés
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:.78rem;border:1px solid #e2e8f0;">
+          <thead>
+            <tr style="background:#f1f5f9;">
+              <th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:left;">Examen</th>
+              <th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:left;">Date</th>
+              <th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:left;">Statut</th>
+              <th style="padding:6px 8px;border:1px solid #e2e8f0;text-align:left;">Motif / Compte-rendu</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ex in ia_data.examens_complets %}
+            <tr>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;font-weight:700;">{{ ex.titre }}</td>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;">{{ ex.date_examen }}</td>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;">{{ ex.statut_libelle }}</td>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;">{{ ex.motif|default:ex.compte_rendu|default:"Suivi régulier" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;font-weight:700;">Échographie cardiaque</td>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;">31/10/2026</td>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;">Planifié</td>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;">Évaluation fonction cardiaque et cinétique ventriculaire</td>
+            </tr>
+            <tr>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;font-weight:700;">Coloscopie totale avec sédation</td>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;">20/10/2026</td>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;">Planifié</td>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;">Bilan digestif de contrôle</td>
+            </tr>
+            <tr>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;font-weight:700;">Bilan biologique complet</td>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;">17/10/2026</td>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;">En cours</td>
+              <td style="padding:5px 8px;border:1px solid #e2e8f0;">NFS, bilan lipidique, glycémie à jeun, créatininémie</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mentions Légales & Signature -->
+      <div style="border-top:1.5px solid #cbd5e1;padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end;">
+        <div style="max-width:55%;font-size:.7rem;color:#64748b;line-height:1.4;">
+          <strong>Notice de confidentialité :</strong> Ce document contient des informations médicales protégées par le secret professionnel (Art. L.1110-4 du Code de la santé publique). Il est destiné exclusivement au patient et aux professionnels de santé assurant sa prise en charge.
+        </div>
+        <div style="text-align:center;min-width:220px;">
+          <div style="font-size:.78rem;color:#334155;margin-bottom:40px;">Fait le {% now "d/m/Y" %}<br><strong>Cachet et Signature du Médecin</strong></div>
+          <div style="font-size:.78rem;font-weight:700;color:#0f172a;border-top:1px dashed #94a3b8;padding-top:4px;">Dr. {{ user.get_full_name|default:user.username }}</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- 3. ML — DÉTECTION DES RISQUES MÉDICAUX & PROFILS           -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div id="tab-ml-risques" class="tab-content">
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- 1. EN-TÊTE PATIENT (STYLE IMAGE)                              -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:20px 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div style="width:52px;height:52px;border-radius:50%;background:#e0f2fe;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:#0284c7;border:1px solid #bae6fd;">
+          👤
+        </div>
+        <div>
+          <h2 style="font-size:1.35rem;font-weight:800;color:#0f172a;margin:0 0 4px 0;">{{ patient.get_full_name|default:patient.username }}</h2>
+          <div style="font-size:.82rem;color:#64748b;display:flex;align-items:center;flex-wrap:wrap;gap:14px;">
+            <span>📄 Dossier #DM-{{ dossier.numero_dossier|default:dossier.id }}</span>
+            {% if ia_data.age %}<span>👤 {{ ia_data.age }} ans</span>{% elif profile.date_naissance %}<span>👤 {{ profile.age }} ans</span>{% endif %}
+            {% if profile.groupe_sanguin %}<span>🩸 Groupe sanguin : {{ profile.groupe_sanguin }}</span>{% endif %}
+            {% if patient.phone %}<span>📞 {{ patient.phone }}</span>{% endif %}
+            {% if patient.email %}<span>✉️ {{ patient.email }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:#64748b;margin-bottom:4px;">
+          <span style="background:#f1f5f9;border:1px solid #e2e8f0;padding:3px 10px;border-radius:8px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">{{ ml_data.taux_completude|default:"100" }} % ⌵</span>
+          <span style="background:#f1f5f9;border:1px solid #e2e8f0;padding:3px 8px;border-radius:8px;cursor:pointer;">↓</span>
+          <span style="background:#f1f5f9;border:1px solid #e2e8f0;padding:3px 10px;border-radius:8px;font-weight:600;cursor:pointer;">📤 Partager</span>
+          <span style="background:#f1f5f9;border:1px solid #e2e8f0;padding:3px 8px;border-radius:8px;cursor:pointer;">⛶</span>
+        </div>
+        {% if ml_data.donnees_insuffisantes %}
+          <div style="display:flex;align-items:center;gap:10px;background:#fef3c7;border:1px solid #fde68a;padding:6px 14px;border-radius:12px;">
+            <div style="width:24px;height:24px;border-radius:50%;background:#d97706;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;">
+              !
+            </div>
+            <div>
+              <div style="font-weight:800;font-size:.82rem;color:#92400e;">Données partielles ({{ ml_data.taux_completude }}%)</div>
+              <div style="font-size:.7rem;color:#64748b;">Dernière analyse : {% now "d/m/Y à H:i" %}</div>
+            </div>
+          </div>
+        {% else %}
+          <div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;padding:6px 14px;border-radius:12px;">
+            <div style="width:24px;height:24px;border-radius:50%;background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;">
+              ✓
+            </div>
+            <div>
+              <div style="font-weight:800;font-size:.82rem;color:#166534;">Dossier complet ({{ ml_data.taux_completude }}%)</div>
+              <div style="font-size:.7rem;color:#64748b;">Dernière analyse : {% now "d/m/Y à H:i" %}</div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- 2. SOUS-ONGLETS NAVIGATION (STYLE IMAGE)                      -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+      <button style="background:#0284c7;color:#fff;border:none;font-weight:700;padding:9px 18px;border-radius:12px;display:flex;align-items:center;gap:8px;font-size:.82rem;box-shadow:0 2px 6px rgba(2,132,199,0.3);cursor:pointer;">
+        🏠 Vue d'ensemble
+      </button>
+      <button style="background:#fff;color:#475569;border:1px solid #e2e8f0;font-weight:600;padding:9px 18px;border-radius:12px;display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer;">
+        ⚖️ Facteurs de risque
+      </button>
+      <button style="background:#fff;color:#475569;border:1px solid #e2e8f0;font-weight:600;padding:9px 18px;border-radius:12px;display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer;">
+        📑 Profil clinique
+      </button>
+      <button style="background:#fff;color:#475569;border:1px solid #e2e8f0;font-weight:600;padding:9px 18px;border-radius:12px;display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer;">
+        📝 Alertes & Données manquantes
+      </button>
+      <button style="background:#fff;color:#475569;border:1px solid #e2e8f0;font-weight:600;padding:9px 18px;border-radius:12px;display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer;">
+        ⚠️ Recommandations
+      </button>
+    </div>
+
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <!-- 3. CONTENU VUE D'ENSEMBLE                                     -->
+    <!-- ───────────────────────────────────────────────────────────── -->
+    <div id="ml-view-1">
+
+      <!-- LIGNE 1 : 3 CARTES DU HAUT -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:stretch;margin-bottom:20px;">
+
+        <!-- CARTE 1 : NIVEAU DE RISQUE GLOBAL -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.03);display:flex;align-items:center;justify-content:space-between;position:relative;">
+          <span style="position:absolute;top:16px;right:18px;color:#94a3b8;font-size:.9rem;cursor:pointer;" title="Score calculé à partir des données cliniques">ℹ️</span>
+          <div style="display:flex;align-items:center;gap:18px;">
+            <!-- SVG Donut Jauge -->
+            <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">
+              <div style="position:relative;width:95px;height:95px;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 100 100" width="95" height="95" style="transform:rotate(-90deg);">
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#f1f5f9" stroke-width="8" />
+                  {% if ml_data.niveau_risque == 'ÉLEVÉ' %}
+                    <circle id="ml-gauge-circle" cx="50" cy="50" r="40" fill="none" stroke="#dc2626" stroke-width="8" stroke-dasharray="251.3" stroke-dashoffset="50" stroke-linecap="round" />
+                  {% elif ml_data.niveau_risque == 'MODÉRÉ' %}
+                    <circle id="ml-gauge-circle" cx="50" cy="50" r="40" fill="none" stroke="#f59e0b" stroke-width="8" stroke-dasharray="251.3" stroke-dashoffset="150" stroke-linecap="round" />
+                  {% elif ml_data.niveau_risque == 'FAIBLE' %}
+                    <circle id="ml-gauge-circle" cx="50" cy="50" r="40" fill="none" stroke="#16a34a" stroke-width="8" stroke-dasharray="251.3" stroke-dashoffset="200" stroke-linecap="round" />
+                  {% else %}
+                    <circle id="ml-gauge-circle" cx="50" cy="50" r="40" fill="none" stroke="#64748b" stroke-width="8" stroke-dasharray="251.3" stroke-dashoffset="251.3" stroke-linecap="round" />
+                  {% endif %}
+                </svg>
+                <div style="position:absolute;text-align:center;">
+                  <div style="font-size:1.25rem;font-weight:900;color:#0f172a;line-height:1;">
+                    {{ ml_data.score_global|default:"0" }}<span style="font-size:.7rem;font-weight:700;color:#64748b;"> / 100</span>
+                  </div>
+                </div>
+              </div>
+              {% if ml_data.niveau_risque == 'ÉLEVÉ' %}
+                <span style="background:#dc2626;color:#fff;font-size:.72rem;font-weight:700;padding:3px 12px;border-radius:20px;margin-top:6px;box-shadow:0 2px 4px rgba(220,38,38,0.25);">
+                  Risque élevé
+                </span>
+              {% elif ml_data.niveau_risque == 'MODÉRÉ' %}
+                <span style="background:#f59e0b;color:#fff;font-size:.72rem;font-weight:700;padding:3px 12px;border-radius:20px;margin-top:6px;box-shadow:0 2px 4px rgba(245,158,11,0.25);">
+                  Risque modéré
+                </span>
+              {% elif ml_data.niveau_risque == 'FAIBLE' %}
+                <span style="background:#16a34a;color:#fff;font-size:.72rem;font-weight:700;padding:3px 12px;border-radius:20px;margin-top:6px;box-shadow:0 2px 4px rgba(22,163,74,0.25);">
+                  Risque faible
+                </span>
+              {% else %}
+                <span style="background:#64748b;color:#fff;font-size:.72rem;font-weight:700;padding:3px 12px;border-radius:20px;margin-top:6px;box-shadow:0 2px 4px rgba(100,116,139,0.25);">
+                  Données partielles
+                </span>
+              {% endif %}
+            </div>
+            <div>
+              <h3 style="font-size:.98rem;font-weight:800;color:#0f172a;margin:0 0 6px 0;white-space:nowrap;">Niveau de risque global</h3>
+              <p style="margin:0;font-size:.78rem;color:#64748b;line-height:1.45;">
+                {% if ml_data.donnees_insuffisantes %}
+                  Score suspendu : complétez les données indispensables pour l'évaluation.
+                {% else %}
+                  Basé sur l'analyse des {{ ml_data.facteurs_explicatifs|length }} facteur(s) du dossier et le modèle.
+                {% endif %}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARTE 2 : PROFIL CLINIQUE SIMILAIRE -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.03);display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:flex-start;gap:16px;">
+            <div style="width:44px;height:44px;border-radius:50%;background:#f5f3ff;color:#8b5cf6;display:flex;align-items:center;justify-content:center;font-size:1.3rem;border:1px solid #ddd6fe;flex-shrink:0;">
+              🎯
+            </div>
+            <div>
+              <div style="font-size:.82rem;color:#64748b;font-weight:600;margin-bottom:2px;">Profil clinique similaire</div>
+              <div style="font-size:1.75rem;font-weight:900;color:#0f172a;line-height:1.1;">
+                {% if ml_data.meilleure_cohorte and ml_data.meilleure_cohorte.similarite_pct %}
+                  {{ ml_data.meilleure_cohorte.similarite_pct }}%
+                {% else %}
+                  {{ ml_data.taux_completude|default:"0" }}%
+                {% endif %}
+              </div>
+              <div style="font-size:.76rem;color:#64748b;margin-bottom:8px;">de similarité</div>
+              <span style="background:#e0f2fe;color:#0284c7;font-size:.74rem;font-weight:700;padding:4px 12px;border-radius:12px;display:inline-block;">
+                {% if ml_data.meilleure_cohorte and ml_data.meilleure_cohorte.cohorte.nom %}
+                  {{ ml_data.meilleure_cohorte.cohorte.nom }}
+                {% else %}
+                  Profil préventif standard
+                {% endif %}
+              </span>
+            </div>
+          </div>
+          <div style="color:#94a3b8;font-size:1.3rem;font-weight:800;">›</div>
+        </div>
+
+        <!-- CARTE 3 : PRÉDICTION DU MODÈLE -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,0.03);display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:flex-start;gap:16px;">
+            <div style="width:44px;height:44px;border-radius:50%;background:#ecfdf5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:1.3rem;border:1px solid #a7f3d0;flex-shrink:0;">
+              🛡️
+            </div>
+            <div>
+              <div style="font-size:.82rem;color:#64748b;font-weight:600;margin-bottom:2px;">Prédiction du modèle</div>
+              <div style="font-size:1.75rem;font-weight:900;color:#0f172a;line-height:1.1;">
+                {% if ml_data.random_forest_prediction and ml_data.random_forest_prediction.score_proba is not None %}
+                  0,{{ ml_data.random_forest_prediction.score_proba|floatformat:0 }}
+                {% elif ml_data.score_global %}
+                  0,{{ ml_data.score_global }}
+                {% else %}
+                  —
+                {% endif %}
+              </div>
+              <div style="font-size:.76rem;color:#64748b;margin-bottom:8px;">
+                {% if ml_data.random_forest_prediction and ml_data.random_forest_prediction.score_proba is not None %}
+                  ({{ ml_data.random_forest_prediction.score_proba }}% de risque)
+                {% elif ml_data.score_global %}
+                  ({{ ml_data.score_global }}% de risque)
+                {% else %}
+                  (Inférence suspendue)
+                {% endif %}
+              </div>
+              {% if ml_data.random_forest_prediction and ml_data.random_forest_prediction.score_proba >= 60 or ml_data.niveau_risque == 'ÉLEVÉ' %}
+                <span style="background:#fef2f2;color:#dc2626;font-size:.74rem;font-weight:700;padding:4px 12px;border-radius:12px;display:inline-block;border:1px solid #fecaca;">
+                  Classe prédite : Risque élevé
+                </span>
+              {% elif ml_data.random_forest_prediction and ml_data.random_forest_prediction.score_proba >= 30 or ml_data.niveau_risque == 'MODÉRÉ' %}
+                <span style="background:#fffbeb;color:#b45309;font-size:.74rem;font-weight:700;padding:4px 12px;border-radius:12px;display:inline-block;border:1px solid #fde68a;">
+                  Classe prédite : Risque modéré
+                </span>
+              {% elif ml_data.niveau_risque == 'FAIBLE' %}
+                <span style="background:#f0fdf4;color:#16a34a;font-size:.74rem;font-weight:700;padding:4px 12px;border-radius:12px;display:inline-block;border:1px solid #bbf7d0;">
+                  Classe prédite : Risque faible
+                </span>
+              {% else %}
+                <span style="background:#f1f5f9;color:#64748b;font-size:.74rem;font-weight:700;padding:4px 12px;border-radius:12px;display:inline-block;border:1px solid #cbd5e1;">
+                  Données insuffisantes
+                </span>
+              {% endif %}
+            </div>
+          </div>
+          <div style="color:#94a3b8;font-size:1.3rem;font-weight:800;">›</div>
+        </div>
+
+      </div>
+
+      <!-- LIGNE 2 : 2 GRANDES CARTES -->
+      <div style="display:grid;grid-template-columns:1.05fr 1fr;gap:18px;align-items:stretch;margin-bottom:20px;">
+
+        <!-- CARTE GAUCHE : PRINCIPAUX FACTEURS DE RISQUE -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:22px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+            <div style="width:32px;height:32px;border-radius:50%;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-size:1rem;">
+              ⚠️
+            </div>
+            <h3 style="font-size:1.05rem;font-weight:800;color:#0f172a;margin:0;">Principaux facteurs de risque</h3>
+          </div>
+          <p style="margin:0 0 18px 0;font-size:.78rem;color:#64748b;">Facteurs qui influencent le plus l'évaluation du risque.</p>
+
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            {% for f in ml_data.facteurs_explicatifs %}
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:.82rem;">
+                  <span style="font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px;">
+                    {% if 'Cardiovasculaire' in f.domaine or 'Hypertension' in f.facteur %}
+                      <span style="width:22px;height:22px;border-radius:50%;background:#fee2e2;color:#dc2626;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;">❤️</span>
+                    {% elif 'Diabète' in f.facteur or 'Métabolique' in f.domaine %}
+                      <span style="width:22px;height:22px;border-radius:50%;background:#ffedd5;color:#ea580c;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;">🩸</span>
+                    {% elif 'Allergie' in f.facteur or 'Allergologie' in f.domaine %}
+                      <span style="width:22px;height:22px;border-radius:50%;background:#fee2e2;color:#b91c1c;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;">⚠️</span>
+                    {% elif 'Asthme' in f.facteur or 'Respiratoire' in f.domaine %}
+                      <span style="width:22px;height:22px;border-radius:50%;background:#e0f2fe;color:#0284c7;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;">🫁</span>
+                    {% elif 'Âge' in f.facteur or 'Gériatrie' in f.domaine or 'Démographie' in f.domaine %}
+                      <span style="width:22px;height:22px;border-radius:50%;background:#d1fae5;color:#059669;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;">👤</span>
+                    {% else %}
+                      <span style="width:22px;height:22px;border-radius:50%;background:#fef3c7;color:#d97706;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;">⚡</span>
+                    {% endif %}
+                    {{ f.facteur }}
+                  </span>
+                  {% if f.points >= 20 %}
+                    <strong style="color:#dc2626;font-weight:800;">+{{ f.points }} pts</strong>
+                  {% elif f.points >= 15 %}
+                    <strong style="color:#ea580c;font-weight:800;">+{{ f.points }} pts</strong>
+                  {% else %}
+                    <strong style="color:#d97706;font-weight:800;">+{{ f.points }} pts</strong>
+                  {% endif %}
+                </div>
+                <div style="height:7px;background:#f1f5f9;border-radius:10px;overflow:hidden;">
+                  {% if f.points >= 20 %}
+                    <div style="width:75%;height:100%;background:#f87171;border-radius:10px;"></div>
+                  {% elif f.points >= 15 %}
+                    <div style="width:55%;height:100%;background:#fb923c;border-radius:10px;"></div>
+                  {% else %}
+                    <div style="width:40%;height:100%;background:#fbbf24;border-radius:10px;"></div>
+                  {% endif %}
+                </div>
+              </div>
+            {% empty %}
+              <div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;padding:20px;text-align:center;color:#64748b;font-size:.85rem;">
+                🟢 Aucun facteur de sur-risque majeur détecté dans le dossier actuel.
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- CARTE DROITE : POURQUOI CE RÉSULTAT ? -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:22px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.03);display:flex;flex-direction:column;justify-content:space-between;">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+              <div style="width:32px;height:32px;border-radius:50%;background:#eff6ff;color:#2563eb;display:flex;align-items:center;justify-content:center;font-size:1.05rem;">
+                💡
+              </div>
+              <h3 style="font-size:1.05rem;font-weight:800;color:#0f172a;margin:0;">Pourquoi ce résultat ?</h3>
+            </div>
+            <p style="margin:0 0 16px 0;font-size:.78rem;color:#64748b;">Les éléments suivants ont le plus influencé la prédiction.</p>
+
+            <div style="display:flex;flex-direction:column;gap:12px;font-size:.82rem;color:#334155;">
+              {% for f in ml_data.facteurs_explicatifs %}
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                  <span style="color:#2563eb;font-weight:800;font-size:.9rem;line-height:1.2;">✓</span>
+                  <span>{{ f.justification }} (impact de {{ f.points }} points).</span>
+                </div>
+              {% empty %}
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                  <span style="color:#16a34a;font-weight:800;font-size:.9rem;line-height:1.2;">✓</span>
+                  <span>Aucune anomalie pathologique sévère documentée dans le dossier.</span>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                  <span style="color:#16a34a;font-weight:800;font-size:.9rem;line-height:1.2;">✓</span>
+                  <span>Profil clinique sans facteur aggravant pénalisant.</span>
+                </div>
+              {% endfor %}
+              {% if ia_data.age %}
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                  <span style="color:#2563eb;font-weight:800;font-size:.9rem;line-height:1.2;">✓</span>
+                  <span>L'âge du patient ({{ ia_data.age }} ans) est intégré dans l'analyse statistique.</span>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;margin-top:18px;">
+            <div style="width:24px;height:24px;border-radius:50%;background:#0284c7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;flex-shrink:0;">
+              ℹ
+            </div>
+            <div style="font-size:.76rem;color:#0369a1;line-height:1.4;">
+              Le modèle se base sur les données disponibles dans le dossier médical pour évaluer le risque.
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- LIGNE 3 : 2 GRANDES CARTES -->
+      <div style="display:grid;grid-template-columns:1.05fr 1fr;gap:18px;align-items:stretch;margin-bottom:10px;">
+
+        <!-- CARTE GAUCHE : DONNÉES MANQUANTES & ALERTES -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:22px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+            <div style="width:32px;height:32px;border-radius:50%;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-size:1rem;">
+              ⚠️
+            </div>
+            <h3 style="font-size:1.05rem;font-weight:800;color:#0f172a;margin:0;">Données manquantes & alertes</h3>
+          </div>
+          <p style="margin:0 0 16px 0;font-size:.78rem;color:#64748b;">Éléments à compléter ou à vérifier pour une évaluation plus précise.</p>
+
+          <!-- 2 mini boîtes côte à côte -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+            <!-- Boîte 1 : Informations manquantes -->
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 14px;">
+              <div style="color:#b91c1c;font-size:.78rem;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                <span>❗</span> Informations manquantes ({{ ml_data.donnees_manquantes|length }})
+              </div>
+              <ul style="margin:0;padding-left:14px;font-size:.74rem;color:#1e3a8a;line-height:1.55;">
+                {% for dm in ml_data.donnees_manquantes %}
+                  <li>{{ dm }}</li>
+                {% empty %}
+                  <li style="color:#166534;">Dossier complet</li>
+                {% endfor %}
+              </ul>
+            </div>
+
+            <!-- Boîte 2 : À vérifier -->
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 14px;">
+              <div style="color:#92400e;font-size:.78rem;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                <span>❗</span> À vérifier ({% if ml_data.alertes_specifiques %}{{ ml_data.alertes_specifiques|length }}{% else %}1{% endif %})
+              </div>
+              <ul style="margin:0;padding-left:14px;font-size:.74rem;color:#1e3a8a;line-height:1.55;">
+                {% for al in ml_data.alertes_specifiques %}
+                  <li>{{ al.titre }} ({{ al.detail }})</li>
+                {% empty %}
+                  <li>Validation périodique du dossier</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+
+          <!-- Bannière verte Aucune alerte urgente détectée -->
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;">
+            <div style="width:24px;height:24px;border-radius:50%;background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;flex-shrink:0;">
+              ✓
+            </div>
+            <div>
+              <strong style="color:#166534;font-size:.78rem;">Aucune alerte urgente détectée</strong>
+              <div style="font-size:.72rem;color:#475569;">Les données actuelles ne montrent pas de risque immédiat.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARTE DROITE : CONCLUSION DE L'ANALYSE DES RISQUES -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:22px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.03);display:flex;flex-direction:column;justify-content:space-between;">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+              <div style="width:32px;height:32px;border-radius:50%;background:#eff6ff;color:#2563eb;display:flex;align-items:center;justify-content:center;font-size:1.05rem;">
+                🎯
+              </div>
+              <h3 style="font-size:1.05rem;font-weight:800;color:#0f172a;margin:0;">Conclusion de l'analyse des risques</h3>
+            </div>
+
+            <!-- Bloc Alerte selon le niveau réel -->
+            {% if ml_data.niveau_risque == 'ÉLEVÉ' %}
+              <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 16px;margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <strong style="color:#b91c1c;font-size:.82rem;display:flex;align-items:center;gap:6px;">
+                    <span>🔴</span> Risque élevé
+                  </strong>
+                  <span style="background:#fee2e2;color:#b91c1c;border:1px solid #f87171;font-size:.75rem;font-weight:800;padding:2px 10px;border-radius:12px;">
+                    {{ ml_data.score_global }} / 100
+                  </span>
+                </div>
+                <div style="font-size:.76rem;color:#7f1d1d;line-height:1.45;">
+                  {{ ml_data.recommandation_prioritaire }} Le cumul de facteurs identifiés nécessite une vigilance médicale renforcée et un suivi clinique rapproché.
+                </div>
+              </div>
+            {% elif ml_data.niveau_risque == 'MODÉRÉ' %}
+              <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 16px;margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <strong style="color:#b45309;font-size:.82rem;display:flex;align-items:center;gap:6px;">
+                    <span>⚠️</span> Risque modéré
+                  </strong>
+                  <span style="background:#fef3c7;color:#b45309;border:1px solid #fcd34d;font-size:.75rem;font-weight:800;padding:2px 10px;border-radius:12px;">
+                    {{ ml_data.score_global }} / 100
+                  </span>
+                </div>
+                <div style="font-size:.76rem;color:#475569;line-height:1.45;">
+                  {{ ml_data.recommandation_prioritaire }} Le patient présente des facteurs nécessitant un contrôle périodique et une vérification des constantes.
+                </div>
+              </div>
+            {% elif ml_data.niveau_risque == 'FAIBLE' %}
+              <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 16px;margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <strong style="color:#166534;font-size:.82rem;display:flex;align-items:center;gap:6px;">
+                    <span>🟢</span> Risque faible
+                  </strong>
+                  <span style="background:#dcfce7;color:#166534;border:1px solid #86efac;font-size:.75rem;font-weight:800;padding:2px 10px;border-radius:12px;">
+                    {{ ml_data.score_global }} / 100
+                  </span>
+                </div>
+                <div style="font-size:.76rem;color:#14532d;line-height:1.45;">
+                  {{ ml_data.recommandation_prioritaire }} Aucune anomalie critique détectée d'après les données actuellement renseignées.
+                </div>
+              </div>
+            {% else %}
+              <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;padding:12px 16px;margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <strong style="color:#475569;font-size:.82rem;display:flex;align-items:center;gap:6px;">
+                    <span>⚠️</span> Données insuffisantes
+                  </strong>
+                  <span style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-size:.75rem;font-weight:800;padding:2px 10px;border-radius:12px;">
+                    {{ ml_data.score_global|default:"0" }} / 100
+                  </span>
+                </div>
+                <div style="font-size:.76rem;color:#475569;line-height:1.45;">
+                  {{ ml_data.recommandation_prioritaire }} Veuillez compléter les variables indispensables (âge, antécédents, allergies) pour activer l'analyse prédictive.
+                </div>
+              </div>
+            {% endif %}
+
+            <!-- Recommandations du système -->
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <div style="width:20px;height:20px;border-radius:50%;background:#0284c7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;">
+                  ✓
+                </div>
+                <strong style="font-size:.84rem;color:#0f172a;">Recommandations du système</strong>
+              </div>
+              <ul style="margin:0;padding-left:26px;font-size:.76rem;color:#475569;line-height:1.55;">
+                {% if ml_data.donnees_manquantes %}
+                  <li>Compléter les <strong>informations</strong> manquantes dans le dossier ({% for dm in ml_data.donnees_manquantes|slice:":2" %}{{ dm }}{% if not forloop.last %}, {% endif %}{% endfor %}).</li>
+                {% endif %}
+                {% if ml_data.niveau_risque == 'ÉLEVÉ' %}
+                  <li>Programmer un contrôle clinique et biologique rapproché des comorbidités actives.</li>
+                  <li>Vérifier la tolérance des traitements et les interactions médicamenteuses potentielles.</li>
+                {% elif ml_data.niveau_risque == 'MODÉRÉ' %}
+                  <li>Surveiller les paramètres cardiovasculaires et métaboliques périodiquement.</li>
+                  <li>Réévaluer le risque lors de la prochaine consultation ou examen.</li>
+                {% else %}
+                  <li>Poursuivre le suivi médical régulier et les bilans de prévention recommandés.</li>
+                {% endif %}
+                <li>Réévaluer les indicateurs lors de l'ajout de nouveaux examens ou analyses.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
   </div>
 </div>
 
@@ -1084,6 +2240,95 @@ async function submitObservation() {
   showAlert('obs-success','obs-error', data.success, data.errors ? JSON.stringify(data.errors) : 'Erreur');
   if(data.success) setTimeout(() => { closeModal('modal-add-obs'); location.reload(); }, 900);
 }
+
+// ── FONCTIONS IA & ML ────────────────────────────
+function switchIaSubTab(num) {
+  for (let i = 1; i <= 4; i++) {
+    const v = document.getElementById('ia-view-' + i);
+    const b = document.getElementById('ia-btn-tab-' + i);
+    if (v) v.style.display = (i === num) ? (i === 1 ? 'grid' : 'block') : 'none';
+    if (b) {
+      if (i === num) {
+        b.style.background = '#2563eb';
+        b.style.color = '#fff';
+        b.style.border = 'none';
+        b.style.boxShadow = '0 2px 4px rgba(37,99,235,0.25)';
+      } else {
+        b.style.background = '#fff';
+        b.style.color = '#475569';
+        b.style.border = '1px solid #e2e8f0';
+        b.style.boxShadow = 'none';
+      }
+    }
+  }
+}
+
+function switchMlSubTab(num) {
+  for (let i = 1; i <= 6; i++) {
+    const v = document.getElementById('ml-view-' + i);
+    const b = document.getElementById('ml-btn-tab-' + i);
+    if (v) v.style.display = (i === num) ? 'block' : 'none';
+    if (b) {
+      if (i === num) {
+        b.style.background = '#2563eb';
+        b.style.color = '#fff';
+        b.style.border = 'none';
+        b.style.boxShadow = '0 2px 4px rgba(37,99,235,0.25)';
+      } else {
+        b.style.background = '#fff';
+        b.style.color = '#475569';
+        b.style.border = '1px solid #e2e8f0';
+        b.style.boxShadow = 'none';
+      }
+    }
+  }
+}
+
+function imprimerRapportMedical() {
+  window.print();
+}
+
+function copierSyntheseIA() {
+  const texteElem = document.getElementById('synthese-ia-texte') || document.getElementById('resume-ia-long');
+  if(!texteElem) return;
+  const texte = texteElem.innerText.trim();
+  navigator.clipboard.writeText(texte).then(() => {
+    alert("✓ Synthèse IA copiée dans le presse-papier ! Vous pouvez la coller dans une observation ou compte-rendu.");
+  }).catch(err => {
+    alert("Synthèse IA : " + texte);
+  });
+}
+
+async function actualiserIA() {
+  try {
+    const res = await fetch(`/api/dossier/${PATIENT_ID}/analyse-ia/`);
+    const json = await res.json();
+    if(json.success && json.data) {
+      if(document.getElementById('synthese-ia-texte')) document.getElementById('synthese-ia-texte').innerText = json.data.resume_global;
+      if(document.getElementById('resume-ia-long')) document.getElementById('resume-ia-long').innerText = json.data.resume_global;
+      alert("✓ Analyse IA actualisée avec succès !");
+    }
+  } catch(e) {
+    location.reload();
+  }
+}
+
+// Init exam preparation bars
+document.querySelectorAll('.prep-fill-bar').forEach(function(el) {
+  if (el.dataset.score) el.style.width = el.dataset.score + '%';
+});
+
+// Init ML Gauge (score read from data attribute to avoid template-tag-in-JS issues)
+(function() {
+  var scoreEl = document.getElementById('ml-score-data');
+  var score = scoreEl ? parseInt(scoreEl.getAttribute('data-score'), 10) || 0 : 0;
+  var circle = document.getElementById('ml-gauge-circle');
+  if (circle) {
+    var circumference = 251.3;
+    var offset = circumference - (circumference * score / 100);
+    circle.setAttribute('stroke-dashoffset', offset);
+  }
+})();
 
 // Init dates
 document.getElementById('exam-date').value = today();
