@@ -138,6 +138,58 @@ def cloturer(rdv, *, par, statut, notes=""):
     return rdv
 
 
+def deplacer(rdv, *, nouveau_creneau, par, motif=None):
+    """Déplace un rendez-vous actif vers un autre créneau libre du même médecin.
+
+    Déplacé par le patient : repasse « en attente » (le médecin doit reconfirmer).
+    Déplacé par le médecin ou l'admin : confirmé d'office.
+    """
+    if not peut_annuler(par, rdv):  # mêmes droits que l'annulation
+        raise RendezVousError("Ce rendez-vous ne peut pas être modifié.")
+    if rdv.est_passe:
+        raise RendezVousError("Ce rendez-vous est déjà passé.")
+    if par.is_patient:
+        limite = rdv.creneau.debut - timedelta(hours=delai_annulation_patient())
+        if timezone.now() > limite:
+            raise RendezVousError(
+                f"Modification en ligne impossible moins de {delai_annulation_patient()} h avant "
+                "le rendez-vous. Merci de contacter le cabinet."
+            )
+    if nouveau_creneau.medecin_id != rdv.medecin_id:
+        raise RendezVousError("Le nouveau créneau doit être avec le même médecin.")
+    if nouveau_creneau.pk == rdv.creneau_id:
+        raise RendezVousError("Choisissez un créneau différent de l'actuel.")
+    try:
+        with transaction.atomic():
+            creneau = Creneau.objects.select_for_update().get(pk=nouveau_creneau.pk)
+            if creneau.debut <= timezone.now():
+                raise RendezVousError("Ce créneau est déjà passé.")
+            if creneau.est_bloque:
+                raise RendezVousError("Ce créneau n'est pas ouvert à la réservation.")
+            if creneau.rendez_vous.filter(statut__in=STATUTS_ACTIFS).exists():
+                raise RendezVousError("Ce créneau est déjà réservé, merci d'en choisir un autre.")
+            conflit = (
+                RendezVous.objects.actifs()
+                .filter(patient=rdv.patient, creneau__debut__lt=creneau.fin, creneau__fin__gt=creneau.debut)
+                .exclude(pk=rdv.pk).select_related("creneau").first()
+            )
+            if conflit:
+                raise RendezVousError(f"Le patient a déjà un rendez-vous sur cet horaire ({conflit.creneau}).")
+            ancien = rdv.statut
+            rdv.creneau = creneau
+            if motif is not None and motif.strip():
+                rdv.motif = motif.strip()[:255]
+            if par.is_patient:
+                rdv.statut, rdv.date_confirmation = Statut.EN_ATTENTE, None
+            else:
+                rdv.statut, rdv.date_confirmation = Statut.CONFIRME, timezone.now()
+            rdv.save(update_fields=["creneau", "motif", "statut", "date_confirmation", "date_modification"])
+            _emettre(rdv, ancien, par)
+            return rdv
+    except IntegrityError:
+        raise RendezVousError("Ce créneau vient d'être réservé par quelqu'un d'autre.")
+
+
 # --------------------------------------------------------------------------
 # Créneaux
 # --------------------------------------------------------------------------
@@ -198,6 +250,30 @@ def generer_creneaux(*, medecin, date_debut, date_fin, jours, heure_debut, heure
         nouveaux.append(Creneau(medecin=medecin, debut=debut, fin=fin))
     Creneau.objects.bulk_create(nouveaux)
     return len(nouveaux), ignores
+
+
+def modifier_creneau(creneau, *, par, debut, fin, note=""):
+    """Modifie l'horaire et la note d'un créneau. L'horaire d'un créneau réservé ne change pas
+    (il faut déplacer le rendez-vous) ; seule sa note reste modifiable."""
+    from django.core.exceptions import ValidationError
+
+    if not peut_gerer_creneau(par, creneau):
+        raise RendezVousError("Vous ne pouvez pas modifier ce créneau.")
+    horaire_change = (debut, fin) != (creneau.debut, creneau.fin)
+    if horaire_change:
+        if creneau.rdv_actif is not None:
+            raise RendezVousError(
+                "Ce créneau est réservé : déplacez d'abord le rendez-vous, ou ne modifiez que la note."
+            )
+        if creneau.est_passe or debut <= timezone.now():
+            raise RendezVousError("Impossible de placer un créneau dans le passé.")
+    creneau.debut, creneau.fin, creneau.note = debut, fin, (note or "").strip()[:255]
+    try:
+        creneau.full_clean()
+    except ValidationError as e:
+        raise RendezVousError(" ".join(e.messages))
+    creneau.save()
+    return creneau
 
 
 def basculer_blocage(creneau, *, par):

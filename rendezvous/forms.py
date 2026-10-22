@@ -70,6 +70,15 @@ class AnnulationForm(forms.Form):
         _styler(self)
 
 
+class DeplacementForm(forms.Form):
+    creneau = forms.IntegerField(widget=forms.HiddenInput)
+    motif = forms.CharField(label="Motif de consultation", max_length=255)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _styler(self)
+
+
 class ClotureForm(forms.Form):
     statut = forms.ChoiceField(
         label="Issue du rendez-vous",
@@ -83,29 +92,41 @@ class ClotureForm(forms.Form):
 
 
 class CreneauForm(forms.Form):
-    """Ajout d'un créneau unique."""
+    """Ajout (ou modification, avec `instance`) d'un créneau unique."""
     medecin = MedecinChoiceField(queryset=medecins_qs(), label="Médecin")
     date = forms.DateField(label="Date", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
     heure_debut = forms.TimeField(label="Début", widget=forms.TimeInput(attrs={"type": "time"}, format="%H:%M"))
     heure_fin = forms.TimeField(label="Fin", widget=forms.TimeInput(attrs={"type": "time"}, format="%H:%M"))
     note = forms.CharField(label="Note interne", max_length=255, required=False)
 
-    def __init__(self, *args, user, **kwargs):
+    def __init__(self, *args, user, instance=None, **kwargs):
+        self.instance = instance
+        if instance is not None:
+            debut, fin = timezone.localtime(instance.debut), timezone.localtime(instance.fin)
+            kwargs.setdefault("initial", {}).update({
+                "date": debut.date(), "heure_debut": debut.time(), "heure_fin": fin.time(), "note": instance.note,
+            })
         super().__init__(*args, **kwargs)
         self.user = user
-        if user.is_doctor:
+        if user.is_doctor or instance is not None:  # le médecin d'un créneau existant ne change pas
             del self.fields["medecin"]
         else:
             self.fields["medecin"].queryset = medecins_qs()
+        self.fields["date"].widget.attrs.setdefault("min", timezone.localdate().isoformat())
         _styler(self)
 
     def clean(self):
         data = super().clean()
         if self.errors:
             return data
-        medecin = self.user if self.user.is_doctor else data["medecin"]
         debut = timezone.make_aware(datetime.combine(data["date"], data["heure_debut"]))
         fin = timezone.make_aware(datetime.combine(data["date"], data["heure_fin"]))
+        if fin <= debut:
+            raise forms.ValidationError("L'heure de fin doit être après l'heure de début.")
+        if self.instance is not None:  # la validation métier est faite par services.modifier_creneau
+            self.debut, self.fin = debut, fin
+            return data
+        medecin = self.user if self.user.is_doctor else data["medecin"]
         if debut <= timezone.now():
             raise forms.ValidationError("Impossible de créer un créneau dans le passé.")
         creneau = Creneau(medecin=medecin, debut=debut, fin=fin, note=data.get("note", ""))

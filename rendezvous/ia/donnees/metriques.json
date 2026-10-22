@@ -1,0 +1,564 @@
+{
+  "nb_motifs": 263,
+  "nb_classes": 12,
+  "nb_entrainement": 197,
+  "nb_entrainement_augmente": 985,
+  "nb_test": 66,
+  "accuracy": 0.9394,
+  "f1_macro": 0.9392,
+  "precision_macro": 0.9509,
+  "rappel_macro": 0.9361,
+  "top3_accuracy": 1.0,
+  "f1_reference_naive": 0.016,
+  "f1_sans_lexique": 0.2899,
+  "nb_termes_lexique": 454,
+  "cv_f1_moyenne": 0.9211,
+  "cv_f1_ecart_type": 0.0218,
+  "cv_plis": [
+    0.9198,
+    0.9594,
+    0.9262,
+    0.9018,
+    0.8982
+  ],
+  "par_classe": [
+    {
+      "specialite": "Cardiologie",
+      "precision": 0.778,
+      "rappel": 1.0,
+      "f1": 0.875,
+      "support": 7
+    },
+    {
+      "specialite": "Dermatologie",
+      "precision": 1.0,
+      "rappel": 1.0,
+      "f1": 1.0,
+      "support": 6
+    },
+    {
+      "specialite": "Gastro-entérologie",
+      "precision": 1.0,
+      "rappel": 1.0,
+      "f1": 1.0,
+      "support": 6
+    },
+    {
+      "specialite": "Gynécologie",
+      "precision": 1.0,
+      "rappel": 0.8,
+      "f1": 0.889,
+      "support": 5
+    },
+    {
+      "specialite": "Médecine générale",
+      "precision": 1.0,
+      "rappel": 0.833,
+      "f1": 0.909,
+      "support": 6
+    },
+    {
+      "specialite": "Neurologie",
+      "precision": 1.0,
+      "rappel": 0.8,
+      "f1": 0.889,
+      "support": 5
+    },
+    {
+      "specialite": "ORL",
+      "precision": 0.833,
+      "rappel": 1.0,
+      "f1": 0.909,
+      "support": 5
+    },
+    {
+      "specialite": "Ophtalmologie",
+      "precision": 1.0,
+      "rappel": 1.0,
+      "f1": 1.0,
+      "support": 5
+    },
+    {
+      "specialite": "Pneumologie",
+      "precision": 1.0,
+      "rappel": 1.0,
+      "f1": 1.0,
+      "support": 6
+    },
+    {
+      "specialite": "Psychiatrie",
+      "precision": 1.0,
+      "rappel": 1.0,
+      "f1": 1.0,
+      "support": 4
+    },
+    {
+      "specialite": "Pédiatrie",
+      "precision": 1.0,
+      "rappel": 1.0,
+      "f1": 1.0,
+      "support": 6
+    },
+    {
+      "specialite": "Rhumatologie",
+      "precision": 0.8,
+      "rappel": 0.8,
+      "f1": 0.8,
+      "support": 5
+    }
+  ],
+  "classes": [
+    "Cardiologie",
+    "Dermatologie",
+    "Gastro-entérologie",
+    "Gynécologie",
+    "Médecine générale",
+    "Neurologie",
+    "ORL",
+    "Ophtalmologie",
+    "Pneumologie",
+    "Psychiatrie",
+    "Pédiatrie",
+    "Rhumatologie"
+  ],
+  "matrice_confusion": [
+    [
+      7,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      6,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      6,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      4,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      5,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0,
+      0,
+      0,
+      4,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      5,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      5,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      4,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6,
+      0
+    ],
+    [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      4
+    ]
+  ],
+  "erreurs": [
+    {
+      "motif": "mouvements involontaires des jambes la nuit",
+      "attendu": "Neurologie",
+      "predit": "Cardiologie"
+    },
+    {
+      "motif": "douleurs pendant les rapports",
+      "attendu": "Gynécologie",
+      "predit": "Rhumatologie"
+    },
+    {
+      "motif": "mal de gorge et fièvre légère",
+      "attendu": "Médecine générale",
+      "predit": "ORL"
+    },
+    {
+      "motif": "mal aux poignets et aux chevilles",
+      "attendu": "Rhumatologie",
+      "predit": "Cardiologie"
+    }
+  ],
+  "test_independant": {
+    "nb": 60,
+    "accuracy": 0.7833,
+    "f1_macro": 0.7805,
+    "top3_accuracy": 0.9167,
+    "f1_sans_lexique": 0.6598,
+    "matrice_confusion": [
+      [
+        2,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        0,
+        4,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        4,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        0,
+        4,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        3,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        4,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        3,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        5,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        5
+      ]
+    ],
+    "erreurs": [
+      {
+        "motif": "ma tension monte quand je suis stressé au travail",
+        "attendu": "Cardiologie",
+        "predit": "Psychiatrie"
+      },
+      {
+        "motif": "serrement dans le torse en marchant vite",
+        "attendu": "Cardiologie",
+        "predit": "Rhumatologie"
+      },
+      {
+        "motif": "mes pieds gonflent et je dors avec trois oreillers",
+        "attendu": "Cardiologie",
+        "predit": "Médecine générale"
+      },
+      {
+        "motif": "plaques qui pèlent derrière les oreilles",
+        "attendu": "Dermatologie",
+        "predit": "ORL"
+      },
+      {
+        "motif": "jaunisse et urines foncées",
+        "attendu": "Gastro-entérologie",
+        "predit": "Psychiatrie"
+      },
+      {
+        "motif": "je tousse surtout le matin depuis des mois",
+        "attendu": "Pneumologie",
+        "predit": "Pédiatrie"
+      },
+      {
+        "motif": "douleur sur le côté en inspirant profondément",
+        "attendu": "Pneumologie",
+        "predit": "Dermatologie"
+      },
+      {
+        "motif": "je perds mes mots et j'oublie les rendez-vous",
+        "attendu": "Neurologie",
+        "predit": "Psychiatrie"
+      },
+      {
+        "motif": "j'ai senti une petite boule dans la poitrine en me palpant",
+        "attendu": "Gynécologie",
+        "predit": "Cardiologie"
+      },
+      {
+        "motif": "je pleure tout le temps sans raison",
+        "attendu": "Psychiatrie",
+        "predit": "Médecine générale"
+      },
+      {
+        "motif": "j'ai peur de sortir de chez moi",
+        "attendu": "Psychiatrie",
+        "predit": "Pédiatrie"
+      },
+      {
+        "motif": "brûlures quand je fais pipi",
+        "attendu": "Médecine générale",
+        "predit": "Pneumologie"
+      },
+      {
+        "motif": "j'ai besoin de renouveler mon traitement habituel",
+        "attendu": "Médecine générale",
+        "predit": "Pédiatrie"
+      }
+    ]
+  },
+  "latence_ms_moyenne": 2.09,
+  "latence_ms_p95": 2.84,
+  "temps_entrainement_s": 1.44,
+  "date_evaluation": "2026-10-22T13:03:37+00:00"
+}

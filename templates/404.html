@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}Page introuvable - SantéConnect{% endblock %}
+
+{% block content %}
+<div class="container">
+    <section class="glass-card" style="padding:40px; max-width:640px; margin:40px auto; text-align:center;" aria-labelledby="err-titre">
+        <p style="font-size:3rem; font-weight:800; color:#0369a1; margin:0;" aria-hidden="true">404</p>
+        <h1 id="err-titre" style="font-size:1.6rem; margin:8px 0 12px;">Page introuvable</h1>
+        <p style="color:var(--text-muted); margin-bottom:24px;">
+            Cette page n'existe pas, ou vous n'avez pas les droits pour la consulter.
+        </p>
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+            {% if user.is_authenticated %}
+            <a href="{% url 'dashboard' %}" class="btn btn-primary">Retour au tableau de bord</a>
+            {% else %}
+            <a href="{% url 'login' %}" class="btn btn-primary">Se connecter</a>
+            {% endif %}
+            <a href="{% url 'home' %}" class="btn btn-secondary">Accueil</a>
+        </div>
+    </section>
+</div>
+{% endblock %}

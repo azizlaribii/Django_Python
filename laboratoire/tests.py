@@ -213,7 +213,7 @@ class LaboratoireTests(TestCase):
         self.assertContains(response, self.patient.username)
 
         another_lab = User.objects.create_user(
-            username="lab-reassigned-test", ******, role=User.Role.LABORATOIRE,
+            username="lab-reassigned-test", password="secret", role=User.Role.LABORATOIRE,
         )
         response = self.client.post(
             reverse("laboratoire:demande_reaffecter", args=[self.demande.pk]),
@@ -419,7 +419,7 @@ class LaboratoireTests(TestCase):
 
     def test_laboratory_queue_shows_own_and_unassigned_requests(self):
         another_lab = User.objects.create_user(
-            username="another-lab-test", ******, role=User.Role.LABORATOIRE,
+            username="another-lab-test", password="secret", role=User.Role.LABORATOIRE,
         )
         unassigned = DemandeAnalyse.objects.create(
             patient=self.patient, medecin=self.doctor,
@@ -451,7 +451,7 @@ class LaboratoireTests(TestCase):
         )
 
         other_patient = User.objects.create_user(
-            username="patient-other-test", ******, role=User.Role.PATIENT,
+            username="patient-other-test", password="secret", role=User.Role.PATIENT,
         )
         other_request = DemandeAnalyse.objects.create(
             patient=other_patient, medecin=self.doctor, laboratoire=self.lab,
@@ -616,7 +616,7 @@ class LaboratoireTests(TestCase):
 
     def test_doctor_patient_history_is_limited_to_associated_patients(self):
         other_patient = User.objects.create_user(
-            username="patient-not-associated-lab", ******, role=User.Role.PATIENT,
+            username="patient-not-associated-lab", password="secret", role=User.Role.PATIENT,
         )
         self.client.force_login(self.doctor)
         response = self.client.get(reverse(
@@ -630,7 +630,7 @@ class LaboratoireTests(TestCase):
             name="Biologiste responsable",
         )
         laboratory_member = User.objects.create_user(
-            username="laboratory-member-test", ******, role=User.Role.LABORATOIRE,
+            username="laboratory-member-test", password="secret", role=User.Role.LABORATOIRE,
         )
         team.user_set.add(self.lab, laboratory_member)
         responsible_group.user_set.add(laboratory_member)
@@ -675,7 +675,7 @@ class LaboratoireTests(TestCase):
         with self.assertRaises(ValidationError):
             valider_resultat(resultat=unvalidated, utilisateur=self.lab)
         unrelated_laboratory = User.objects.create_user(
-            username="laboratory-other-team", ******, role=User.Role.LABORATOIRE,
+            username="laboratory-other-team", password="secret", role=User.Role.LABORATOIRE,
         )
         self.client.force_login(unrelated_laboratory)
         response = self.client.get(
@@ -854,7 +854,7 @@ class LaboratoireTests(TestCase):
 
         unauthorized_lab = User.objects.create_user(
             username="legacy-lab-without-validator",
-            ******,
+            password="secret",
             role=User.Role.LABORATOIRE,
         )
         unauthorized_dossier = DossierMedical.objects.create(

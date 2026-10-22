@@ -7,14 +7,14 @@
 <div class="container">
     {% include 'rendezvous/_header.html' %}
 
-    <div class="rdv-kpis">
-        <div class="rdv-kpi"><div class="val" style="color:var(--primary);">{{ stats.a_venir }}</div><div class="lbl">Rendez-vous à venir</div></div>
-        <div class="rdv-kpi"><div class="val" style="color:#059669;">{{ stats.aujourdhui }}</div><div class="lbl">Aujourd'hui</div></div>
-        <div class="rdv-kpi"><div class="val" style="color:#d97706;">{{ stats.en_attente }}</div><div class="lbl">En attente de confirmation</div></div>
-        <div class="rdv-kpi"><div class="val" style="color:#dc2626;">{{ stats.annules }}</div><div class="lbl">Annulés (total)</div></div>
+    <div class="rdv-kpis" role="list" aria-label="Indicateurs">
+        <div class="rdv-kpi" role="listitem"><p class="val" style="color:#0369a1;">{{ stats.a_venir }}</p><p class="lbl">Rendez-vous à venir</p></div>
+        <div class="rdv-kpi" role="listitem"><p class="val" style="color:#047857;">{{ stats.aujourdhui }}</p><p class="lbl">Aujourd'hui</p></div>
+        <div class="rdv-kpi" role="listitem"><p class="val" style="color:#b45309;">{{ stats.en_attente }}</p><p class="lbl">En attente de confirmation</p></div>
+        <div class="rdv-kpi" role="listitem"><p class="val" style="color:#b91c1c;">{{ stats.annules }}</p><p class="lbl">Annulés (total)</p></div>
     </div>
 
-    <form method="get" class="filters-bar" id="rdv-filters">
+    <form method="get" class="filters-bar" id="rdv-filters" role="search" aria-label="Filtrer les rendez-vous">
         <div class="form-group"><label class="form-label" for="f-q">Recherche</label>
             <input type="text" id="f-q" name="q" value="{{ q }}" class="form-input" placeholder="{% if user.is_patient %}Médecin, motif…{% else %}Patient, médecin, motif…{% endif %}"></div>
         <div class="form-group"><label class="form-label" for="f-periode">Période</label>
@@ -43,11 +43,12 @@
 
     <div class="table-responsive">
         <table class="data-table">
+            <caption class="sr-only">Liste des rendez-vous ({{ page_obj.paginator.count }} résultat{{ page_obj.paginator.count|pluralize }})</caption>
             <thead><tr>
-                <th>Date</th>
-                {% if not user.is_patient %}<th>Patient</th>{% endif %}
-                {% if not user.is_doctor %}<th>Médecin</th>{% endif %}
-                <th>Motif</th><th>Statut</th><th>Actions</th>
+                <th scope="col">Date</th>
+                {% if not user.is_patient %}<th scope="col">Patient</th>{% endif %}
+                {% if not user.is_doctor %}<th scope="col">Médecin</th>{% endif %}
+                <th scope="col">Motif</th><th scope="col">Statut</th><th scope="col">Actions</th>
             </tr></thead>
             <tbody>
             {% for r in page_obj %}
@@ -58,11 +59,11 @@
                     <td>{{ r.motif|truncatechars:50 }}</td>
                     <td><span class="status-pill {{ r.classe_statut }}">{{ r.get_statut_display }}</span></td>
                     <td class="actions-col">
-                        <a href="{% url 'rendezvous:rdv_detail' r.pk %}" class="btn-table-edit">Détail</a>
+                        <a href="{% url 'rendezvous:rdv_detail' r.pk %}" class="btn-table-edit" aria-label="Détail du rendez-vous du {{ r.creneau.debut|date:'j F' }} à {{ r.creneau.debut|time:'H:i' }}">Détail</a>
                         {% if r.statut == 'EN_ATTENTE' and not user.is_patient and not r.est_passe %}
                         <form method="post" action="{% url 'rendezvous:rdv_confirmer' r.pk %}">{% csrf_token %}
                             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                            <button type="submit" class="btn-table-activate">Confirmer</button>
+                            <button type="submit" class="btn-table-activate" aria-label="Confirmer le rendez-vous du {{ r.creneau.debut|date:'j F' }} à {{ r.creneau.debut|time:'H:i' }}">Confirmer</button>
                         </form>
                         {% endif %}
                     </td>

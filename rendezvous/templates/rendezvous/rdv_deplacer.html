@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Modifier le rendez-vous #{{ rdv.pk }} - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'rendezvous/rendezvous.css' %}">{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% include 'rendezvous/_header.html' %}
+
+    <section class="rdv-card" aria-labelledby="modif-titre">
+        <h2 id="modif-titre">Modifier le rendez-vous #{{ rdv.pk }}</h2>
+        <p style="margin-bottom:16px;">
+            Actuellement : <strong>{{ rdv.creneau.debut|date:"l j F Y" }} à {{ rdv.creneau.debut|time:"H:i" }}</strong>
+            avec Dr {{ rdv.medecin.get_full_name|default:rdv.medecin.username }}.
+            {% if user.is_patient %}<br><span class="muted">Si vous changez d'horaire, le médecin devra confirmer à nouveau.</span>{% endif %}
+        </p>
+
+        <form method="post" id="form-deplacer">
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="alert alert-error" role="alert">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+            <div class="form-group">
+                <label class="form-label" for="{{ form.motif.id_for_label }}">{{ form.motif.label }}</label>
+                {{ form.motif }}
+                {% for e in form.motif.errors %}<p class="form-error">{{ e }}</p>{% endfor %}
+            </div>
+
+            <fieldset class="slot-fieldset">
+                <legend class="form-label">Nouvel horaire</legend>
+                <nav class="week-nav" aria-label="Navigation entre les semaines">
+                    {% if semaine_prec %}<a class="btn btn-secondary btn-sm" href="?semaine={{ semaine_prec|date:'Y-m-d' }}">← Semaine précédente</a>{% else %}<span></span>{% endif %}
+                    <p class="range">Du {{ lundi|date:"j F" }} au {{ dimanche|date:"j F Y" }}</p>
+                    <a class="btn btn-secondary btn-sm" href="?semaine={{ semaine_suiv|date:'Y-m-d' }}">Semaine suivante →</a>
+                </nav>
+                <div class="slot-radio">
+                    <input type="radio" name="creneau" id="cr-actuel" value="{{ rdv.creneau_id }}" checked>
+                    <label for="cr-actuel">Garder l'horaire actuel ({{ rdv.creneau.debut|date:"D d/m" }} {{ rdv.creneau.debut|time:"H:i" }})</label>
+                </div>
+                <div class="slot-days">
+                    {% for jour in jours %}{% if jour.creneaux %}
+                    <div class="slot-day">
+                        <h3>{{ jour.nom }} <small>{{ jour.date|date:"d/m" }}</small></h3>
+                        <div class="slot-list">
+                            {% for c in jour.creneaux %}
+                            <span class="slot-radio-btn">
+                                <input type="radio" name="creneau" id="cr-{{ c.pk }}" value="{{ c.pk }}">
+                                <label for="cr-{{ c.pk }}"><span class="sr-only">{{ jour.nom }} {{ jour.date|date:"j F" }} à </span>{{ c.debut|time:"H:i" }}</label>
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}{% endfor %}
+                </div>
+                {% if not a_des_creneaux %}<p class="empty-state">Aucun autre créneau libre cette semaine.</p>{% endif %}
+            </fieldset>
+
+            <div style="display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;">
+                <button type="submit" class="btn btn-primary" id="btn-save-move">Enregistrer les modifications</button>
+                <a href="{% url 'rendezvous:rdv_detail' rdv.pk %}" class="btn btn-secondary">Annuler</a>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}

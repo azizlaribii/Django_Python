@@ -10,12 +10,12 @@
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
         <p style="color:var(--text-muted);"><strong style="color:#059669;">{{ nb_libres }}</strong> créneau(x) libre(s) à venir{% if medecin_sel %} pour ce médecin{% endif %}.</p>
         <div style="display:flex; gap:8px;">
-            <a href="{% url 'rendezvous:creneau_generer' %}" class="btn btn-primary btn-sm" id="btn-generate-slots">⚙️ Générer un planning</a>
+            <a href="{% url 'rendezvous:creneau_generer' %}" class="btn btn-primary btn-sm" id="btn-generate-slots"><span aria-hidden="true">⚙️ </span>Générer un planning</a>
             <a href="{% url 'rendezvous:creneau_ajouter' %}" class="btn btn-secondary btn-sm" id="btn-add-slot">+ Créneau unique</a>
         </div>
     </div>
 
-    <form method="get" class="filters-bar">
+    <form method="get" class="filters-bar" role="search" aria-label="Filtrer les créneaux">
         {% if medecins is not None %}
         <div class="form-group"><label class="form-label" for="s-medecin">Médecin</label>
             <select id="s-medecin" name="medecin" class="form-select">
@@ -37,8 +37,9 @@
 
     <div class="table-responsive">
         <table class="data-table">
+            <caption class="sr-only">Créneaux de consultation</caption>
             <thead><tr>
-                <th>Date</th><th>Horaire</th>{% if medecins is not None %}<th>Médecin</th>{% endif %}<th>État</th><th>Patient</th><th>Actions</th>
+                <th scope="col">Date</th><th scope="col">Horaire</th>{% if medecins is not None %}<th scope="col">Médecin</th>{% endif %}<th scope="col">État</th><th scope="col">Patient</th><th scope="col">Actions</th>
             </tr></thead>
             <tbody>
             {% for c in page_obj %}
@@ -56,18 +57,21 @@
                     <td>{% if rdv %}<a href="{% url 'rendezvous:rdv_detail' rdv.pk %}">{{ rdv.patient.get_full_name|default:rdv.patient.username }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
                     <td class="actions-col">
                         {% if etat == 'libre' %}
-                            <a href="{% url 'rendezvous:reserver_creneau' c.pk %}" class="btn-table-activate">Réserver</a>
+                            <a href="{% url 'rendezvous:reserver_creneau' c.pk %}" class="btn-table-activate" aria-label="Réserver le créneau du {{ c.debut|date:'j F' }} à {{ c.debut|time:'H:i' }}">Réserver</a>
+                        {% endif %}
+                        {% if etat != 'passe' %}
+                            <a href="{% url 'rendezvous:creneau_modifier' c.pk %}" class="btn-table-edit" aria-label="Modifier le créneau du {{ c.debut|date:'j F' }} à {{ c.debut|time:'H:i' }}">Modifier</a>
                         {% endif %}
                         {% if etat == 'libre' or etat == 'bloque' %}
                         <form method="post" action="{% url 'rendezvous:creneau_bloquer' c.pk %}">{% csrf_token %}
                             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                            <button type="submit" class="btn-table-suspend">{% if c.est_bloque %}Débloquer{% else %}Bloquer{% endif %}</button>
+                            <button type="submit" class="btn-table-suspend" aria-label="{% if c.est_bloque %}Débloquer{% else %}Bloquer{% endif %} le créneau du {{ c.debut|date:'j F' }} à {{ c.debut|time:'H:i' }}">{% if c.est_bloque %}Débloquer{% else %}Bloquer{% endif %}</button>
                         </form>
                         {% endif %}
                         {% if not c.rendez_vous.all %}
                         <form method="post" action="{% url 'rendezvous:creneau_supprimer' c.pk %}" onsubmit="return confirm('Supprimer ce créneau ?');">{% csrf_token %}
                             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                            <button type="submit" class="btn-table-delete">Supprimer</button>
+                            <button type="submit" class="btn-table-delete" aria-label="Supprimer le créneau du {{ c.debut|date:'j F' }} à {{ c.debut|time:'H:i' }}">Supprimer</button>
                         </form>
                         {% endif %}
                     </td>
