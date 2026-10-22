@@ -373,6 +373,67 @@
 }
 @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
+/* ── IA PANEL ── */
+@keyframes iaSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes iaFadeIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+.ia-card {
+  border-radius: 16px;
+  padding: 20px 24px;
+  animation: iaFadeIn .4s ease;
+  border: 1.5px solid rgba(99,102,241,0.35);
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+  color: #f1f5f9;
+  position: relative;
+  overflow: hidden;
+}
+.ia-card::before {
+  content: '';
+  position: absolute;
+  top: -50px; right: -50px;
+  width: 160px; height: 160px;
+  background: radial-gradient(circle, rgba(99,102,241,0.2) 0%, transparent 70%);
+  pointer-events: none;
+}
+.ia-header { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.ia-badge {
+  display:inline-flex; align-items:center; gap:5px;
+  background: rgba(99,102,241,0.25); border:1px solid rgba(99,102,241,0.5);
+  color:#a5b4fc; font-size:.72rem; font-weight:700;
+  padding:3px 10px; border-radius:20px; text-transform:uppercase; letter-spacing:.04em;
+}
+.ia-confidence-bar {
+  background: rgba(255,255,255,0.12); border-radius:999px; height:8px;
+  overflow:hidden; margin-top:6px; width:100%;
+}
+.ia-confidence-fill {
+  height:100%; border-radius:999px;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+  transition: width .8s cubic-bezier(0.4,0,0.2,1);
+}
+.ia-alert-item {
+  border-radius:10px; padding:12px 16px; margin-top:10px;
+  display:flex; align-items:flex-start; gap:10px; font-size:.87rem;
+}
+.ia-alert-danger  { background:rgba(239,68,68,0.12);  border:1px solid rgba(239,68,68,0.3);  }
+.ia-alert-warning { background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); }
+.ia-alert-info    { background:rgba(99,102,241,0.10); border:1px solid rgba(99,102,241,0.3); }
+.ia-suggest-btn {
+  display:inline-flex; align-items:center; gap:8px;
+  background:linear-gradient(135deg,#6366f1,#4f46e5);
+  color:#fff; border:none; border-radius:10px;
+  padding:10px 20px; font-size:.88rem; font-weight:700;
+  cursor:pointer; margin-top:14px;
+  box-shadow:0 4px 14px rgba(99,102,241,0.35);
+  transition:all .2s ease;
+}
+.ia-suggest-btn:hover { background:linear-gradient(135deg,#4f46e5,#4338ca); transform:translateY(-1px); }
+.ia-suggest-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+.ia-no-suggest {
+  background: rgba(255,255,255,0.06); border-radius:10px;
+  padding:12px 16px; font-size:.85rem; color:#94a3b8; margin-top:10px;
+}
+@media print { #ia-panel { display: none !important; } }
+
 @media print {
   body * { visibility: hidden; }
   .fiche-container, .fiche-container * { visibility: visible; }
@@ -435,6 +496,22 @@
         </span>
         <div style="font-size:.75rem;color:#94a3b8;margin-top:6px;">Dossier #{{ dossier.numero_dossier }}</div>
       </div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════ -->
+    <!-- 🤖 PANNEAU IA — SUGGESTION AUTOMATIQUE DE PROTOCOLE  -->
+    <!-- ═════════════════════════════════════════════════════ -->
+    <div id="ia-panel" style="margin-bottom:24px;">
+      <!-- État de chargement -->
+      <div id="ia-loading" style="background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%);border-radius:16px;padding:18px 24px;display:flex;align-items:center;gap:14px;color:#cbd5e1;">
+        <span style="font-size:1.5rem;animation:iaSpin 1.5s linear infinite;display:inline-block;">⚙️</span>
+        <div>
+          <div style="font-weight:700;color:#fff;font-size:.95rem;">IA en cours d'analyse…</div>
+          <div style="font-size:.8rem;color:#94a3b8;">Analyse du type d'examen et du dossier patient en cours</div>
+        </div>
+      </div>
+      <!-- Résultat IA (injecté par JS) -->
+      <div id="ia-result" style="display:none;"></div>
     </div>
 
     <!-- ═════════════════════════════════════════════════════ -->
@@ -869,6 +946,168 @@ async function validerPrepFiche(id) {
     location.reload();
   }
 }
+
+// ══════════════════════════════════════════════════
+// 🤖 MODULE IA — SUGGESTION AUTOMATIQUE DE PROTOCOLE
+// ══════════════════════════════════════════════════
+const EXAMEN_ID_IA = {{ examen.id }};
+
+function getIaConfidenceColor(score) {
+  if (score >= 90) return '#4ade80';
+  if (score >= 70) return '#818cf8';
+  if (score >= 50) return '#f59e0b';
+  return '#f87171';
+}
+
+function renderIaPanel(ia) {
+  const loading = document.getElementById('ia-loading');
+  const result  = document.getElementById('ia-result');
+  if (!loading || !result) return;
+  loading.style.display = 'none';
+
+  let html = `<div class="ia-card">`;
+
+  // ── En-tête IA
+  html += `
+    <div class="ia-header">
+      <span style="font-size:1.6rem;">🤖</span>
+      <div style="flex:1;">
+        <div style="font-size:1rem;font-weight:800;color:#fff;line-height:1.1;">
+          Assistant IA — Préparation de l'examen
+          <span class="ia-badge" style="margin-left:8px;">● Intelligence Artificielle</span>
+        </div>
+        <div style="font-size:.78rem;color:#94a3b8;margin-top:3px;">
+          Analyse automatique basée sur le type d'examen et le profil du patient
+        </div>
+      </div>
+    </div>`;
+
+  // ── Message IA d'accompagnement
+  if (ia.message_ia) {
+    html += `
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;padding:12px 16px;font-size:.87rem;color:#cbd5e1;line-height:1.6;margin-bottom:14px;">
+        💬 ${ia.message_ia}
+      </div>`;
+  }
+
+  // ── Suggestion de protocole
+  if (ia.suggestions_disponibles && ia.protocole_suggere) {
+    const color = getIaConfidenceColor(ia.confiance);
+    const isAlreadyApplied = ia.protocole_actuel_identique;
+    html += `
+      <div style="margin-bottom:6px;">
+        <div style="font-size:.8rem;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">
+          🎯 Protocole recommandé par l'IA
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div style="flex:1;">
+            <div style="font-size:.95rem;font-weight:700;color:#e2e8f0;">${ia.protocole_nom}</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+              <span style="font-size:.78rem;color:#94a3b8;">Confiance IA :</span>
+              <span style="font-size:.82rem;font-weight:800;color:${color};">${ia.confiance}%</span>
+            </div>
+            <div class="ia-confidence-bar">
+              <div class="ia-confidence-fill" id="ia-conf-bar" style="width:0%;background:linear-gradient(90deg,${color},${color}88);"></div>
+            </div>
+          </div>
+        </div>`;
+
+    if (isAlreadyApplied) {
+      html += `<div style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;background:rgba(74,222,128,0.12);border:1px solid rgba(74,222,128,0.3);color:#4ade80;padding:8px 14px;border-radius:8px;font-size:.84rem;font-weight:700;">
+        ✅ Ce protocole est déjà appliqué
+      </div>`;
+    } else {
+      {% if user.is_doctor or user.is_admin_user %}
+      html += `<button class="ia-suggest-btn" id="ia-apply-btn" onclick="iaAppliquerProtocole('${ia.protocole_suggere}')">
+        ⚡ Appliquer ce protocole IA
+      </button>`;
+      {% else %}
+      html += `<div style="margin-top:10px;font-size:.8rem;color:#64748b;display:flex;align-items:center;gap:6px;">
+        ℹ️ Le médecin peut appliquer ce protocole suggéré
+      </div>`;
+      {% endif %}
+    }
+    html += `</div>`;
+
+    // Alternatives
+    if (ia.protocoles_alternatifs && ia.protocoles_alternatifs.length > 0) {
+      html += `<div style="margin-top:10px;font-size:.78rem;color:#64748b;">
+        Alternatives : `;
+      ia.protocoles_alternatifs.forEach(alt => {
+        html += `<span style="background:rgba(255,255,255,0.07);border-radius:6px;padding:2px 8px;margin-right:4px;">${alt.nom} (${alt.confiance}%)</span>`;
+      });
+      html += `</div>`;
+    }
+
+  } else {
+    html += `<div class="ia-no-suggest">
+      ℹ️ Aucun protocole de préparation standard n'est référencié pour ce type d'examen.
+      Le médecin peut créer des étapes personnalisées.
+    </div>`;
+  }
+
+  // ── Alertes cliniques
+  if (ia.alertes_cliniques && ia.alertes_cliniques.length > 0) {
+    html += `<div style="margin-top:16px;">
+      <div style="font-size:.8rem;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">
+        ⚕️ Alertes cliniques personnalisées (${ia.nb_alertes})
+      </div>`;
+    ia.alertes_cliniques.forEach(alerte => {
+      const cls = alerte.niveau === 'danger' ? 'ia-alert-danger' : 'ia-alert-warning';
+      html += `<div class="ia-alert-item ${cls}">
+        <span style="font-size:1.2rem;flex-shrink:0;">${alerte.icone}</span>
+        <div>
+          <div style="font-weight:700;color:#f8fafc;margin-bottom:3px;">${alerte.titre}</div>
+          <div style="color:#cbd5e1;line-height:1.55;">${alerte.message}</div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  result.innerHTML = html;
+  result.style.display = 'block';
+
+  // Animer la barre de confiance
+  setTimeout(() => {
+    const bar = document.getElementById('ia-conf-bar');
+    if (bar && ia.confiance) bar.style.width = ia.confiance + '%';
+  }, 200);
+}
+
+async function iaAppliquerProtocole(protocoleKey) {
+  const btn = document.getElementById('ia-apply-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Application…'; }
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('protocole_type', protocoleKey);
+  const res = await fetch(`/examens/${EXAMEN_ID_IA}/appliquer-protocole/`, { method:'POST', body:fd });
+  const data = await res.json();
+  if (data.success) {
+    showToast('✅ ' + data.message, true);
+    setTimeout(() => location.reload(), 1200);
+  } else {
+    showToast(data.error || 'Erreur IA.', false);
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ Appliquer ce protocole IA'; }
+  }
+}
+
+// Lancer l'analyse IA automatiquement au chargement
+(async function() {
+  try {
+    const res = await fetch(`/api/examen/${EXAMEN_ID_IA}/ia-suggestion/`);
+    const data = await res.json();
+    if (data.success) {
+      renderIaPanel(data.ia);
+    } else {
+      document.getElementById('ia-loading').style.display = 'none';
+    }
+  } catch(e) {
+    const el = document.getElementById('ia-loading');
+    if (el) el.style.display = 'none';
+  }
+})();
 </script>
 {% endblock %}
 {% endblock %}
