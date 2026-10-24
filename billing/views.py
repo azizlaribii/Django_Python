@@ -60,6 +60,10 @@ def facture_detail(request, pk):
                   {'facture': facture, 'peut_gerer': peut_gerer})
 
 
+def _tarifs_json():
+    return {str(t.pk): {'libelle': t.libelle, 'prix': str(t.prix)}
+            for t in Tarif.objects.filter(actif=True)}
+
 
 @staff_required
 def facture_create(request):
@@ -78,4 +82,4 @@ def facture_create(request):
         return redirect('facture_detail', pk=facture.pk)
 
     return render(request, 'billing/facture_form.html',
-                  {'form': form, 'formset': formset})
+                  {'form': form, 'formset': formset, 'tarifs_json': _tarifs_json()})

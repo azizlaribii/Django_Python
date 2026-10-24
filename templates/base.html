@@ -54,9 +54,9 @@
                 {% endif %}
                 {% if user.is_admin_user or user.is_staff or user.is_superuser %}
                 <a href="{% url 'tarif_list' %}" class="nav-item-link" id="nav-tarifs">Tarifs</a>
-                {% if user.is_admin_user or user.is_doctor or user.is_patient %}
-                <a href="{% url 'facture_list' %}" class="nav-item-link" id="nav-factures">Factures</a>
                 {% endif %}
+                {% if user.is_admin_user or user.is_patient or user.is_doctor and user.is_verified %}
+                <a href="{% url 'facture_list' %}" class="nav-item-link" id="nav-factures">Factures</a>
                 {% endif %}
                 {% endif %}
             </div>
