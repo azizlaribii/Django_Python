@@ -10,7 +10,7 @@
             <p>{{ factures|length }} facture{{ factures|length|pluralize }}</p>
         </div>
         {% if user.is_admin_user or user.is_doctor %}
-        <a href="#" class="btn btn-primary">+ Nouvelle facture</a>
+<a href="{% url 'facture_create' %}" class="btn btn-primary">+ Nouvelle facture</a>
         {% endif %}
     </div>
 

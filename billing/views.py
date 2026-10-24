@@ -1,10 +1,9 @@
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
-
-from .forms import TarifForm
+from django.db import transaction
+from .forms import TarifForm, FactureForm, LigneFormSet
 from .models import Tarif
-from .permissions import admin_required, billing_access_required, factures_visibles
-
+from .permissions import admin_required, staff_required, billing_access_required, factures_visibles
 
 # ───────────── TARIFS (admin seulement) ─────────────
 
@@ -59,3 +58,24 @@ def facture_detail(request, pk):
     peut_gerer = request.user.is_admin_user or request.user.is_doctor
     return render(request, 'billing/facture_detail.html',
                   {'facture': facture, 'peut_gerer': peut_gerer})
+
+
+
+@staff_required
+def facture_create(request):
+    form = FactureForm(request.POST or None, user=request.user)
+    formset = LigneFormSet(request.POST or None, prefix='lignes')
+
+    if request.method == 'POST' and form.is_valid() and formset.is_valid():
+        with transaction.atomic():
+            facture = form.save(commit=False)
+            if request.user.is_doctor:
+                facture.medecin = request.user
+            facture.save()
+            formset.instance = facture
+            formset.save()
+        messages.success(request, f"Facture {facture.numero} créée.")
+        return redirect('facture_detail', pk=facture.pk)
+
+    return render(request, 'billing/facture_form.html',
+                  {'form': form, 'formset': formset})
