@@ -1,0 +1,15 @@
+[run]
+branch = True
+source =
+    laboratoire
+omit =
+    laboratoire/tests.py
+    laboratoire/migrations/*
+
+[report]
+show_missing = True
+skip_covered = True
+precision = 1
+
+[html]
+directory = htmlcov/laboratoire

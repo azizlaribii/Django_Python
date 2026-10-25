@@ -28,13 +28,8 @@
     <div class="lab-panel__head"><h2>Évolution dans le temps</h2></div>
     <form method="get" class="lab-filter">
       <div>
-        <label for="analysis-filter">Analyse</label>
-        <select id="analysis-filter" name="analyse">
-          <option value="">Toutes les analyses</option>
-          {% for type in types_analyse %}
-            <option value="{{ type.pk }}" {% if selected_type == type.pk|stringformat:"s" %}selected{% endif %}>{{ type.nom }}</option>
-          {% endfor %}
-        </select>
+        {{ filter_form.analyse.label_tag }}{{ filter_form.analyse }}
+        {% if filter_form.analyse.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.analyse.errors }}</div>{% endif %}
       </div>
       <button class="lab-btn lab-btn--primary" type="submit">Afficher</button>
       {% if selected_type %}<a class="lab-btn lab-btn--soft" href="{% url 'laboratoire:doctor_patient_history' patient.pk %}">Réinitialiser</a>{% endif %}

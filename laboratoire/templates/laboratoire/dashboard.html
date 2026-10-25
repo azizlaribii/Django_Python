@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tableau de bord laboratoire — SantéConnect{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="lab-shell">
+  <header class="lab-hero">
+    <div class="lab-hero__copy">
+      <span class="lab-hero__eyebrow">Espace laboratoire</span>
+      <h1>Tableau de bord</h1>
+      <p>Retrouvez les prélèvements à traiter, les résultats à saisir et l’activité récente de votre laboratoire.</p>
+    </div>
+    <div class="lab-hero__actions">
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:prelevement_list' %}">Ouvrir tous les prélèvements</a>
+    </div>
+  </header>
+
+  <section class="lab-stats lab-dashboard-stats" aria-label="Résumé des prélèvements">
+    <article class="lab-stat">
+      <span class="lab-stat__icon">▤</span>
+      <span><strong class="lab-stat__number">{{ stats_prelevements.total }}</strong><span class="lab-stat__label">Prélèvements au total</span></span>
+    </article>
+    <article class="lab-stat">
+      <span class="lab-stat__icon">◷</span>
+      <span><strong class="lab-stat__number">{{ stats_prelevements.a_effectuer }}</strong><span class="lab-stat__label">À effectuer</span></span>
+    </article>
+    <article class="lab-stat">
+      <span class="lab-stat__icon">↪</span>
+      <span><strong class="lab-stat__number">{{ stats_prelevements.a_receptionner }}</strong><span class="lab-stat__label">À réceptionner</span></span>
+    </article>
+    <article class="lab-stat">
+      <span class="lab-stat__icon">⌛</span>
+      <span><strong class="lab-stat__number">{{ stats_prelevements.resultats_a_saisir }}</strong><span class="lab-stat__label">Résultats à saisir</span></span>
+    </article>
+  </section>
+
+  <section class="lab-workflow-dashboard" aria-labelledby="lab-dashboard-queue-title">
+    <div class="lab-workflow-dashboard__heading">
+      <div>
+        <span class="lab-summary-kicker">Accès rapide</span>
+        <h2 id="lab-dashboard-queue-title">Choisir une file de travail</h2>
+      </div>
+    </div>
+    <div class="lab-workflow-dashboard__grid">
+      <a class="lab-workflow-card" href="{% url 'laboratoire:prelevement_list' %}?onglet=a_traiter&amp;statut=A_EFFECTUER">
+        <span class="lab-workflow-card__step">Étape 1</span>
+        <strong class="lab-workflow-card__count">{{ stats_prelevements.a_effectuer }}</strong>
+        <span class="lab-workflow-card__title">Prélèvements à effectuer</span>
+        <span class="lab-workflow-card__description">Voir les prélèvements en attente de prise en charge.</span>
+      </a>
+      <a class="lab-workflow-card" href="{% url 'laboratoire:prelevement_list' %}?onglet=a_traiter&amp;statut=PRELEVE">
+        <span class="lab-workflow-card__step">Étape 2</span>
+        <strong class="lab-workflow-card__count">{{ stats_prelevements.a_receptionner }}</strong>
+        <span class="lab-workflow-card__title">À réceptionner</span>
+        <span class="lab-workflow-card__description">Confirmer la réception ou enregistrer un refus motivé.</span>
+      </a>
+      <a class="lab-workflow-card" href="{% url 'laboratoire:prelevement_list' %}?onglet=resultats&amp;statut=RECU">
+        <span class="lab-workflow-card__step">Étape 3</span>
+        <strong class="lab-workflow-card__count">{{ stats_prelevements.resultats_a_saisir }}</strong>
+        <span class="lab-workflow-card__title">Résultats à saisir</span>
+        <span class="lab-workflow-card__description">Saisir et valider les résultats des prélèvements reçus.</span>
+      </a>
+      <a class="lab-workflow-card" href="{% url 'laboratoire:prelevement_list' %}?onglet=clotures&amp;statut=TERMINE">
+        <span class="lab-workflow-card__step">Historique</span>
+        <strong class="lab-workflow-card__count">{{ stats_prelevements.termines }}</strong>
+        <span class="lab-workflow-card__title">Prélèvements terminés</span>
+        <span class="lab-workflow-card__description">Consulter les prélèvements clôturés.</span>
+      </a>
+      <a class="lab-workflow-card lab-workflow-card--warning" href="{% url 'laboratoire:prelevement_list' %}?onglet=clotures&amp;statut=REJETE">
+        <span class="lab-workflow-card__step">À surveiller</span>
+        <strong class="lab-workflow-card__count">{{ stats_prelevements.refuses }}</strong>
+        <span class="lab-workflow-card__title">Prélèvements refusés</span>
+        <span class="lab-workflow-card__description">Consulter les motifs et les reprises à organiser.</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="lab-panel lab-dashboard-recent">
+    <div class="lab-panel__head">
+      <div>
+        <span class="lab-summary-kicker">À traiter en priorité</span>
+        <h2>Prélèvements récents</h2>
+      </div>
+      <a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:prelevement_list' %}">Voir la liste complète</a>
+    </div>
+    <div class="lab-table-wrap">
+      <table class="lab-table lab-dashboard-table">
+        <thead>
+          <tr><th>Code</th><th>Patient</th><th>Type</th><th>Créé le</th><th>Statut</th><th>File</th></tr>
+        </thead>
+        <tbody>
+          {% for prelevement in prelevements_recents %}
+          <tr>
+            <td><span class="lab-code">{{ prelevement.code_prelevement }}</span></td>
+            <td>
+              <span class="lab-table__primary">{{ prelevement.demande.patient.get_full_name|default:prelevement.demande.patient.username }}</span>
+              <span class="lab-table__secondary">{{ prelevement.demande.get_priorite_display }}</span>
+            </td>
+            <td>{{ prelevement.get_type_prelevement_display }}{% if prelevement.precision_type %}<span class="lab-table__secondary">{{ prelevement.precision_type }}</span>{% endif %}</td>
+            <td>{{ prelevement.date_creation|date:"d/m/Y H:i" }}</td>
+            <td><span class="lab-badge {% if prelevement.statut == 'RECU' %}lab-badge--progress{% elif prelevement.statut == 'PRELEVE' %}lab-badge--progress{% else %}lab-badge--pending{% endif %}">{% if prelevement.statut == "RECU" %}Prélèvement reçu{% else %}{{ prelevement.get_statut_display }}{% endif %}</span></td>
+            <td>
+              {% if prelevement.statut == "RECU" %}
+              <a class="lab-btn lab-btn--primary lab-btn--small" href="{% url 'laboratoire:prelevement_list' %}?onglet=resultats&amp;statut=RECU">Saisir les résultats</a>
+              {% elif prelevement.statut == "PRELEVE" %}
+              <a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:prelevement_list' %}?onglet=a_traiter&amp;statut=PRELEVE">Ouvrir la file</a>
+              {% else %}
+              <a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:prelevement_list' %}?onglet=a_traiter&amp;statut=A_EFFECTUER">Ouvrir la file</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6"><div class="lab-empty"><span class="lab-empty__icon">✓</span><h3>Aucun prélèvement en attente</h3><p>Les nouveaux prélèvements à prendre en charge apparaîtront ici.</p></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

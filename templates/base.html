@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="fr">
 
@@ -19,18 +19,18 @@
 
 <body>
 
-    <!-- Navigation Bar -->
-    <nav class="navbar" id="main-navbar">
-        <div class="container navbar-inner">
-            <div class="navbar-brand-section">
-                <a href="{% url 'home' %}" class="logo-brand" id="brand-logo-link">
-                    <span class="logo-icon">🩺</span>
-                    <span class="logo-text">Santé<strong style="color: var(--primary);">Connect</strong></span>
-                </a>
-            </div>
+  <!-- Navigation Bar -->
+  <nav class="navbar" id="main-navbar">
+    <div class="container navbar-inner">
+      <div class="navbar-brand-section">
+        <a href="{% url 'home' %}" class="logo-brand" id="brand-logo-link">
+          <span class="logo-icon">🩺</span>
+          <span class="logo-text">Santé<strong style="color: var(--primary);">Connect</strong></span>
+        </a>
+      </div>
 
-            <div class="nav-links" id="main-nav-links">
-                <a href="{% url 'home' %}" class="nav-item-link" id="nav-home">Accueil</a>
+      <div class="nav-links" id="main-nav-links">
+        <a href="{% url 'home' %}" class="nav-item-link" id="nav-home">Accueil</a>
 
                 {% if user.is_authenticated %}
                 <a href="{% url 'dashboard' %}" class="nav-item-link" id="nav-dashboard">Tableau de bord</a>
@@ -101,9 +101,67 @@
                 Administration).</p>
             <p style="margin-top: 6px; font-size: 0.8rem; color: #64748b;">Construit avec Django 6 & Python 3.14</p>
         </div>
-    </footer>
+        {% else %}
+        {% if user.is_laboratory %}
+        <a href="{% url 'laboratoire:prelevement_list' %}" class="nav-item-link" id="nav-laboratoire">Prélèvements</a>
+        {% else %}
+        <a href="{% url 'laboratoire:demande_list' %}" class="nav-item-link" id="nav-laboratoire">Analyses</a>
+        {% endif %}
+        {% endif %}
+        {% endif %}
+        {% if user.is_patient %}
+        <a href="{% url 'laboratoire:mes_resultats' %}" class="nav-item-link" id="nav-patient-results">Mes résultats</a>
+        {% endif %}
+        {% if user.is_admin_user or user.is_staff or user.is_superuser %}
+        <a href="{% url 'tarif_list' %}" class="nav-item-link" id="nav-tarifs">Tarifs</a>
 
-    {% block extra_js %}{% endblock %}
+        {% endif %}
+        {% endif %}
+      </div>
+
+      <div class="navbar-user-actions" id="nav-user-actions">
+        {% if user.is_authenticated %}
+        <div class="nav-user-badge" id="nav-user-profile">
+          <span class="badge-role {{ user.role }}">{{ user.get_role_display }}</span>
+          <a href="{% url 'profile' %}" class="nav-user-name-link" id="nav-profile-edit" title="Mon profil">{{ user.get_full_name|default:user.username }}</a>
+        </div>
+        <a href="{% url 'logout' %}" class="nav-logout-btn" id="btn-nav-logout">Déconnexion</a>
+        {% else %}
+        <a href="{% url 'login' %}" class="btn btn-outline btn-sm" id="btn-nav-login">Connexion</a>
+        <a href="{% url 'register' %}" class="btn btn-primary btn-sm" id="btn-nav-register">Créer un compte</a>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  <!-- Global Messages / Alerts -->
+  <div class="container messages-container">
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}" role="alert" id="alert-msg-{{ forloop.counter }}">
+      <span>{{ message }}</span>
+      <button type="button" onclick="this.parentElement.remove()"
+        style="background: none; border: none; cursor: pointer; font-size: 1.1rem; color: inherit; margin-left: 10px;">✕</button>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  <!-- Main Content Block -->
+  <main style="flex: 1; padding: 24px 0 60px;">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>© 2026 SantéConnect — Système de Gestion Multi-Comptes Médicaux (Docteurs, Laboratoires, Patients &
+        Administration).</p>
+      <p style="margin-top: 6px; font-size: 0.8rem; color: #64748b;">Construit avec Django 6 & Python 3.14</p>
+    </div>
+  </footer>
+
+  {% block extra_js %}{% endblock %}
 </body>
 
 </html>

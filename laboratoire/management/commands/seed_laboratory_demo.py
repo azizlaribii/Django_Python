@@ -1,17 +1,24 @@
 from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
-from django.contrib.auth.models import Group
 from django.db import transaction
+from django.utils import timezone
+from decimal import Decimal
 
 from accounts.models import AssociationMedecinPatient, User
 from laboratoire.models import (
+    AnalyseDemandee,
+    CompteRendu,
     DemandeAnalyse,
     HistoriqueAction,
+    Prelevement,
+    Resultat,
+    TypeAnalyse,
 )
+from laboratoire.services import changer_statut, creer_prelevements, synchroniser
 
 
 class Command(BaseCommand):
-    help = "Prépare des comptes et des demandes de démonstration pour le module Laboratoire."
+    help = "Prépare trois demandes fictives pour tester le workflow du Laboratoire."
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -23,87 +30,108 @@ class Command(BaseCommand):
         except User.DoesNotExist as error:
             raise CommandError("Les comptes de démonstration n’ont pas pu être créés.") from error
 
-        former_biologist = User.objects.filter(username="bio_pasteur").first()
-        if former_biologist:
-            for group_name in (
-                "Équipe Laboratoire Pasteur",
-                "Biologistes et responsables de validation",
-            ):
-                group = Group.objects.filter(name=group_name).first()
-                if group:
-                    group.user_set.remove(former_biologist)
-            has_audit_history = (
-                HistoriqueAction.objects.filter(utilisateur=former_biologist).exists()
-                or former_biologist.resultats_saisis.exists()
-                or former_biologist.resultats_valides.exists()
-                or former_biologist.demandes_laboratoire.exists()
-                or former_biologist.analyses_realisees.exists()
-                or former_biologist.mouvements_stock.exists()
+        type_analyse = TypeAnalyse.objects.filter(actif=True).first()
+        if type_analyse is None:
+            raise CommandError(
+                "Aucune analyse active dans le catalogue. Ajoutez une analyse avant de préparer la démo."
             )
-            if has_audit_history:
-                former_biologist.set_unusable_password()
-                former_biologist.is_active = False
-                former_biologist.save(update_fields=["password", "is_active"])
-                self.stdout.write(self.style.WARNING(
-                    "bio_pasteur a été désactivé pour préserver ses résultats et son historique."
-                ))
-            else:
-                former_biologist.delete()
-                self.stdout.write("Ancien compte bio_pasteur supprimé.")
-
-        laboratory_team, _ = Group.objects.get_or_create(
-            name="Équipe Laboratoire Pasteur",
-        )
-        laboratory_team.user_set.add(laboratory)
-        self.stdout.write("Compte de démonstration du laboratoire : labo_pasteur.")
 
         AssociationMedecinPatient.objects.get_or_create(
             medecin=doctor,
             patient=patient,
-            defaults={"est_medecin_traitant": True, "notes": "Association de démonstration laboratoire."},
+            defaults={
+                "est_medecin_traitant": True,
+                "notes": "Association de démonstration laboratoire.",
+            },
         )
 
-        demande_ids = {}
-        for code, label in (
-            ("ANNULATION", "DEMO_LABO: à annuler par le médecin"),
-            ("PARCOURS", "DEMO_LABO: parcours complet"),
-        ):
-            demande, _ = DemandeAnalyse.objects.get_or_create(
-                medecin=doctor,
+        self._supprimer_anciennes_donnees_demo()
+        scenarios = (
+            ("01", "À traiter", Prelevement.Statut.A_EFFECTUER),
+            ("02", "Résultats à saisir", Prelevement.Statut.RECU),
+            ("03", "Résultats publiés", Prelevement.Statut.TERMINE),
+        )
+
+        for numero, label, sample_status in scenarios:
+            demande = DemandeAnalyse.objects.create(
                 patient=patient,
-                commentaire=label,
-                defaults={
-                    "laboratoire": laboratory,
-                    "priorite": DemandeAnalyse.Priorite.URGENTE if code == "PARCOURS"
-                    else DemandeAnalyse.Priorite.NORMALE,
-                    "cree_par": doctor,
-                },
+                medecin=doctor,
+                laboratoire=laboratory,
+                priorite=DemandeAnalyse.Priorite.NORMALE,
+                cree_par=doctor,
+                commentaire=f"DEMO_LABO: {numero}/3 — {label}",
             )
-            if demande.laboratoire_id != laboratory.pk:
-                previous_laboratory_id = demande.laboratoire_id
-                demande.laboratoire = laboratory
-                demande.save(update_fields=["laboratoire"])
-                HistoriqueAction.objects.create(
-                    utilisateur=None,
-                    type_action="DEMANDE_LABO_DEMO_REAFFECTEE",
-                    objet_concerne="DemandeAnalyse",
-                    objet_id=demande.pk,
-                    details={
-                        "ancien_laboratoire_id": previous_laboratory_id,
-                        "laboratoire_id": laboratory.pk,
-                    },
+            analyse = AnalyseDemandee.objects.create(
+                demande=demande,
+                type_analyse=type_analyse,
+            )
+            prelevement = creer_prelevements(demande, utilisateur=laboratory)[0]
+
+            if sample_status in (Prelevement.Statut.RECU, Prelevement.Statut.TERMINE):
+                changer_statut(
+                    prelevement,
+                    Prelevement.Statut.PRELEVE,
+                    laboratory,
                 )
-            demande_ids[code] = demande.pk
+                prelevement = changer_statut(
+                    prelevement,
+                    Prelevement.Statut.RECU,
+                    laboratory,
+                )
+
+            if sample_status == Prelevement.Statut.TERMINE:
+                Resultat.objects.create(
+                    analyse_demandee=analyse,
+                    prelevement=prelevement,
+                    valeur=self._valeur_demo(type_analyse),
+                    unite=type_analyse.unite,
+                    saisi_par=laboratory,
+                    valide_par=laboratory,
+                    statut=Resultat.Statut.VALIDE,
+                    date_validation=timezone.now(),
+                )
+                synchroniser(prelevement, utilisateur=laboratory)
+
+            HistoriqueAction.objects.create(
+                utilisateur=doctor,
+                type_action="DEMANDE_LABO_DEMO_CREEE",
+                objet_concerne="DemandeAnalyse",
+                objet_id=demande.pk,
+                details={"scenario": label, "donnees_fictives": True},
+            )
+            self.stdout.write(f"Demande #{demande.pk} : {label}.")
 
         self.stdout.write("")
-        self.stdout.write(self.style.SUCCESS("Données de démonstration du laboratoire prêtes."))
+        self.stdout.write(self.style.SUCCESS("Trois scénarios de démonstration sont prêts."))
         self.stdout.write(
             "Comptes : dr_moreau / docteur123, labo_pasteur / labo123, "
             "patient_martin / patient123, admin / admin123"
         )
-        self.stdout.write(f"Demande à annuler : #{demande_ids['ANNULATION']}")
-        self.stdout.write(f"Demande du parcours complet : #{demande_ids['PARCOURS']}")
-        self.stdout.write(
-            "Aucune donnée médicale n’est supprimée; l’ancien compte biologiste est "
-            "supprimé uniquement s’il n’a aucune trace liée, sinon il est désactivé."
+
+    @staticmethod
+    def _valeur_demo(type_analyse):
+        minimum = type_analyse.valeur_reference_min
+        maximum = type_analyse.valeur_reference_max
+        if minimum is not None and maximum is not None:
+            return str((minimum + maximum) / Decimal("2"))
+        if minimum is not None:
+            return str(minimum)
+        if maximum is not None:
+            return str(maximum)
+        return "1.0"
+
+    def _supprimer_anciennes_donnees_demo(self):
+        demande_ids = list(
+            DemandeAnalyse.objects.filter(
+                commentaire__startswith="DEMO_LABO:",
+            ).values_list("pk", flat=True)
         )
+        if not demande_ids:
+            return
+
+        Resultat.objects.filter(
+            analyse_demandee__demande_id__in=demande_ids,
+        ).delete()
+        Prelevement.objects.filter(demande_id__in=demande_ids).delete()
+        CompteRendu.objects.filter(demande_id__in=demande_ids).delete()
+        DemandeAnalyse.objects.filter(pk__in=demande_ids).delete()

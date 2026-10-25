@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Comparaison et résumé IA — Laboratoire{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="lab-shell">
+  <p><a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:demande_detail' demande.pk %}">← Retour à la demande</a></p>
+  <header class="lab-hero">
+    <div class="lab-hero__copy">
+      <span class="lab-hero__eyebrow">Compte rendu médical · Demande #{{ demande.pk }}</span>
+      <h1>Comparaison des résultats</h1>
+      <p>Le médecin compare les résultats et leur historique. L’IA prépare un résumé descriptif à relire avant approbation ; elle ne produit ni diagnostic ni conseil.</p>
+    </div>
+    <div class="lab-hero__actions">
+      {% if compte_rendu %}
+      <span class="lab-badge {% if lecture_seule %}lab-badge--done{% else %}lab-badge--pending{% endif %}">{{ compte_rendu.get_statut_display }}</span>
+      <span class="lab-badge {% if compte_rendu.source == 'ia' %}lab-badge--ai{% else %}lab-badge--neutral{% endif %}">{% if compte_rendu.source == "ia" %}Généré par IA{% else %}Ancienne version (non IA){% endif %}</span>
+      {% else %}
+      <span class="lab-badge lab-badge--neutral">Comparaison disponible</span>
+      {% endif %}
+    </div>
+  </header>
+
+  <section class="lab-panel lab-summary-panel">
+    <div class="lab-panel__head">
+      <div>
+        <span class="lab-summary-kicker">Résultats publiés</span>
+        <h2>Votre comparaison avec l’historique</h2>
+        <p class="lab-summary-intro">Comparez les résultats publiés aux résultats antérieurs validés du même patient et de la même analyse, dans une unité compatible.</p>
+      </div>
+      <span class="lab-summary-count"><strong>{{ lignes|length }}</strong><span>résultat{{ lignes|length|pluralize:"s" }} publié{{ lignes|length|pluralize:"s" }}</span></span>
+    </div>
+    <div class="lab-evolution-stats" aria-label="Statistiques de comparaison">
+      <article><strong>{{ stats_evolution.comparables }}</strong><span>comparaisons calculables</span></article>
+      <article><strong>{{ stats_evolution.stable }}</strong><span>stables (±5 %)</span></article>
+      <article><strong>{{ stats_evolution.en_hausse }}</strong><span>en hausse</span></article>
+      <article><strong>{{ stats_evolution.en_baisse }}</strong><span>en baisse</span></article>
+      <article><strong>{{ stats_evolution.insuffisantes }}</strong><span>données insuffisantes</span></article>
+    </div>
+    <div class="lab-summary-outliers {% if not has_outliers %}is-clear{% endif %}" role="status">
+      <strong>Valeurs hors références</strong>
+        {% if has_outliers %}
+          {% for ligne in lignes %}
+            {% if ligne.statut == "bas" or ligne.statut == "élevé" %}
+          <span class="lab-badge lab-badge--rejected">{{ ligne.analyse }} : {{ ligne.statut }}</span>
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          <span>Aucune valeur hors références.</span>
+        {% endif %}
+    </div>
+    <p class="lab-summary-scroll-hint">Sur petit écran, faites défiler le tableau horizontalement pour consulter toutes les colonnes.</p>
+    <div class="lab-table-wrap">
+      <table class="lab-table lab-summary-table">
+        <thead>
+          <tr>
+            <th>Analyse</th>
+              <th>Résultat actuel</th>
+            <th>Unité</th>
+            <th>Références</th>
+              <th>Position</th>
+              <th>Résultat précédent</th>
+              <th>Tendance descriptive</th>
+              <th>Variation</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for ligne in lignes %}
+            <tr>
+              <td><strong>{{ ligne.analyse }}</strong><span class="lab-table__secondary">{{ ligne.date_actuelle|date:"d/m/Y H:i" }}</span></td>
+              <td>{{ ligne.valeur }}</td>
+              <td>{{ ligne.unite|default:"—" }}</td>
+              <td>{{ ligne.reference }}</td>
+              <td><span class="lab-badge {% if ligne.statut == 'normal' %}lab-badge--done{% elif ligne.statut == 'bas' or ligne.statut == 'élevé' %}lab-badge--rejected{% else %}lab-badge--neutral{% endif %}">{{ ligne.statut|capfirst }}</span></td>
+              <td>
+                {% if ligne.date_precedente %}
+                  <strong>{{ ligne.valeur_precedente }} {{ ligne.unite_precedente }}</strong>
+                  <span class="lab-table__secondary">{{ ligne.date_precedente|date:"d/m/Y H:i" }}</span>
+              {% else %}
+                  <span class="lab-table__secondary">Aucun résultat précédent comparable</span>
+              {% endif %}
+            </td>
+              <td>
+                {% if ligne.tendance == "stable" %}
+                <span class="lab-badge lab-badge--done">Stable</span>
+                {% elif ligne.tendance == "en hausse" %}
+                <span class="lab-badge lab-badge--progress">En hausse</span>
+                {% elif ligne.tendance == "en baisse" %}
+                <span class="lab-badge lab-badge--pending">En baisse</span>
+                {% else %}
+                <span class="lab-badge lab-badge--neutral">Insuffisante</span>
+                {% endif %}
+              </td>
+              <td>{% if ligne.variation_pct is not None %}<strong>{{ ligne.variation_pct }} %</strong>{% else %}<span class="lab-table__secondary">Non calculable</span>{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8"><div class="lab-empty"><h3>Aucun résultat validé à comparer</h3><p>Les résultats apparaîtront ici après leur validation par le laboratoire.</p></div></td></tr>
+            {% endfor %}
+          </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% if compte_rendu %}
+  <section class="lab-panel lab-summary-editor">
+    <div class="lab-panel__head">
+      <div>
+        <span class="lab-summary-kicker">{% if lecture_seule %}Version approuvée{% elif compte_rendu.source == "ia" %}Résumé IA à vérifier{% else %}Résumé IA{% endif %}</span>
+        <h2>Résumé descriptif des résultats et de leur comparaison</h2>
+        {% if compte_rendu.source == "ia" or lecture_seule %}
+        <p class="lab-summary-intro">Créé le {{ compte_rendu.cree_le|date:"d/m/Y à H:i" }}{% if lecture_seule %} · Approuvé le {{ compte_rendu.approuve_le|date:"d/m/Y à H:i" }}{% endif %}</p>
+        {% else %}
+        <p class="lab-summary-intro">Un ancien brouillon est conservé, mais aucun résumé IA n’a encore été généré.</p>
+        {% endif %}
+      </div>
+      <span class="lab-badge {% if compte_rendu.source == 'ia' %}lab-badge--ai{% else %}lab-badge--neutral{% endif %}">{% if compte_rendu.source == "ia" %}Généré par IA{% else %}Ancienne version (non IA){% endif %}</span>
+    </div>
+    <div class="lab-panel__body">
+      {% if compte_rendu.source == "ia" or lecture_seule %}
+      <article class="lab-summary-preview" aria-label="Résumé descriptif généré">
+        <p class="lab-summary-preview__label">{% if lecture_seule %}Résumé approuvé{% else %}Résumé généré{% endif %}</p>
+        <div class="lab-summary-preview__text">{{ texte_final|linebreaksbr }}</div>
+      </article>
+      {% else %}
+      <div class="lab-ai-note" role="status">
+        <strong>Aucun résumé IA n’a encore été généré</strong>
+        <p>Le brouillon précédent n’était pas généré par IA ; il est masqué et ne peut pas être approuvé. Le tableau de comparaison reste disponible. {% if not resume_ia_configuree %}Pour activer Gemini, ajoutez <code>GOOGLE_API_KEY</code> et <code>GEMINI_MODEL=gemini-3.8-flash</code> dans <code>.env</code> à la racine du projet, puis redémarrez Django.{% endif %}</p>
+      </div>
+      {% endif %}
+      {% if not lecture_seule %}
+        {% if compte_rendu.source == "ia" %}
+        <p class="lab-summary-field-hint">Vérifiez le texte IA en le comparant aux résultats validés et à leur historique. Le médecin reste responsable de l’approbation.</p>
+        <form method="post" class="lab-actions">
+          {% csrf_token %}
+          <button class="lab-btn lab-btn--primary" type="submit" name="action" value="approuver">Approuver le résumé IA</button>
+        </form>
+        {% endif %}
+        {% if resume_ia_configuree %}
+        <form method="post" action="{% url 'laboratoire:generer_resume' demande.pk %}" class="lab-actions">
+          {% csrf_token %}
+          <button class="lab-btn {% if compte_rendu.source == 'ia' %}lab-btn--soft{% else %}lab-btn--primary{% endif %}" type="submit">{% if compte_rendu.source == "ia" %}Régénérer le résumé IA{% else %}Générer le résumé IA maintenant{% endif %}</button>
+        </form>
+        {% elif compte_rendu.source == "ia" %}
+        <p class="lab-ai-note" role="status">Aucun résumé local de remplacement n’est généré. Configurez <code>GOOGLE_API_KEY</code> ou <code>ANTHROPIC_API_KEY</code> dans le fichier privé <code>.env</code>.</p>
+        {% endif %}
+      {% endif %}
+      {% if note_medecin %}
+      <aside class="lab-summary-note">
+        <h3>Observations du médecin</h3>
+        <p>{{ note_medecin|linebreaksbr }}</p>
+      </aside>
+      {% endif %}
+    </div>
+  </section>
+  {% else %}
+  <section class="lab-panel lab-summary-editor">
+    <div class="lab-panel__head">
+      <div>
+        <span class="lab-summary-kicker">Résumé par IA</span>
+        <h2>Résumé descriptif de la comparaison</h2>
+        <p class="lab-summary-intro">Le médecin consulte d’abord la comparaison ci-dessus ; l’IA rédige ensuite un résumé à relire avant approbation.</p>
+      </div>
+    </div>
+    <div class="lab-panel__body">
+      {% if resume_ia_configuree %}
+      <form method="post" action="{% url 'laboratoire:generer_resume' demande.pk %}" class="lab-actions">
+        {% csrf_token %}
+        <button class="lab-btn lab-btn--primary" type="submit">Générer le résumé IA de cette comparaison</button>
+      </form>
+      {% else %}
+      <p class="lab-ai-note" role="status">Configurez <code>GOOGLE_API_KEY</code> ou <code>ANTHROPIC_API_KEY</code> dans le fichier privé <code>.env</code> pour générer le résumé. La comparaison reste consultable.</p>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

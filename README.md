@@ -57,6 +57,31 @@ Si le projet n'a pas d'environnement virtuel `venv`, ignorez la première comman
 
 Ouvrez [http://127.0.0.1:8000/login/](http://127.0.0.1:8000/login/), puis testez les rôles séparément. Le module détaillé se trouve à [http://127.0.0.1:8000/laboratoire/](http://127.0.0.1:8000/laboratoire/).
 
+### SmartResult IA (optionnel)
+
+Le médecin compare les résultats publiés avec leur historique ; l’IA génère ensuite un seul résumé descriptif de cette comparaison, que le médecin relit et approuve. Les graphiques d’évolution ont été retirés de cette page. Les anciens brouillons produits par règles sont masqués et ne peuvent pas être approuvés comme des résumés IA ; un bouton **Générer le résumé IA maintenant** les remplace après une génération réussie. Les résultats dont l’unité ou les références sont incohérentes restent inclus dans le résumé comme non comparables ; leurs données ne sont pas présentées comme une comparaison valide et elles ne bloquent pas les autres résultats. Sans clé API, la comparaison reste accessible, mais aucun résumé local n’est créé. **Postman et Django n’utilisent pas les mêmes variables d’environnement** : le fait que la requête Postman fonctionne ne configure pas le serveur. Pour activer Gemini, copiez `.env.example` vers `.env` à la racine du projet, remplacez le placeholder de `GOOGLE_API_KEY` par une clé privée, puis définissez `GEMINI_MODEL=gemini-3.8-flash` et `GEMINI_FALLBACK_MODEL=gemini-3.5-flash-lite`. Si le modèle principal répond HTTP 503 (indisponibilité temporaire), Django essaie une fois le modèle de repli ; les autres erreurs ne déclenchent pas de repli. `config/settings.py` charge ces valeurs avec `python-dotenv` ; les variables Windows déjà définies restent prioritaires. `.env` est ignoré par Git. Ne partagez jamais la clé. Redémarrez Django après modification du fichier.
+
+Le code appelle l’endpoint Interactions `https://generativelanguage.googleapis.com/v1beta/interactions` avec l’en-tête `x-goog-api-key` et les champs `model`, `input`, `system_instruction` et `store: false`. Le modèle Gemini par défaut est `gemini-3.8-flash`. Si les clés Gemini et Anthropic sont toutes deux définies, Gemini est prioritaire ; Anthropic reste utilisé si seule sa clé est définie. Le résumé reste un brouillon soumis à la relecture et à l’approbation du médecin. Le système exige une formulation descriptive sans diagnostic ni recommandation et rejette certaines formulations détectées ; cette vérification automatique ne remplace pas la relecture médicale.
+
+Le résumé généré utilise les valeurs publiées, références et comparaisons calculées avec les résultats antérieurs. Seules ces données descriptives pseudonymisées sont transmises au fournisseur ; aucune identité du patient n’est envoyée. Le service écrit dans la console Django le fournisseur, le modèle, la durée, le statut HTTP ou le code d’échec, ainsi que la longueur du texte de sortie. Il ne journalise ni clé, ni identité, ni résultats, ni contenu de réponse. Le compte rendu garde la source **Généré par IA**. Si la clé manque, si le fournisseur échoue ou si sa réponse est rejetée, un message d’erreur s’affiche et aucun brouillon de remplacement par règles n’est enregistré.
+
+La page du compte rendu compare aussi les résultats validés aux résultats antérieurs du même patient et de la même analyse prescrits par le même médecin. Une comparaison n’est faite que si les unités sont identiques après normalisation de la casse et des espaces ; aucune conversion d’unité n’est supposée. La variation est calculée en pourcentage par rapport à la valeur précédente ; **stable** signifie une variation absolue inférieure ou égale à 5 %, sinon la tendance est affichée comme **en hausse** ou **en baisse**. Ce seuil est descriptif, pas clinique. Une valeur antérieure nulle, une unité incompatible, une valeur numérique invalide ou des références incohérentes rendent la tendance insuffisante.
+
+Le médecin ne rédige pas le résumé dans l’application : il consulte la comparaison structurée et approuve le brouillon IA. Un résumé déjà approuvé ne peut pas être remplacé depuis l’interface.
+
+Pour tester le même contrat dans Postman, créez une requête `POST` vers `https://generativelanguage.googleapis.com/v1beta/interactions`, ajoutez les en-têtes `Content-Type: application/json` et `x-goog-api-key: {{GEMINI_API_KEY}}`, puis sélectionnez **Body > raw > JSON** :
+
+```json
+{
+  "model": "gemini-3.8-flash",
+  "input": "[{\"analyse\":\"CRP\",\"valeur\":\"4\",\"unite\":\"mg/L\",\"reference\":\"0 à 5 mg/L\",\"statut\":\"normal\",\"valeur_precedente\":\"2\",\"unite_precedente\":\"mg/L\",\"evolution\":\"en hausse · +100.00%\"},{\"analyse\":\"Glycémie\",\"valeur\":\"0.95\",\"unite\":\"g/L\",\"reference\":\"0.70 à 1.10 g/L\",\"statut\":\"normal\",\"valeur_precedente\":\"0.90\",\"unite_precedente\":\"g/L\",\"evolution\":\"en hausse · +5.56%\"}]",
+  "system_instruction": "Rédige en français un résumé clair et concis avec une courte introduction et une liste à puces, une puce par analyse. Recopie exactement les valeurs, unités, références et évolutions fournies. Ne calcule, ne convertis et n’invente rien. Reste descriptif, sans diagnostic, explication des causes, conseil, recommandation ni suggestion de traitement. Termine par : « Résumé généré par IA, à vérifier et approuver par le médecin. »",
+  "store": false
+}
+```
+
+Dans Postman, définissez `GEMINI_API_KEY` dans un environnement local privé, pas dans une collection partagée. Consultez la réponse dans l’onglet **Pretty > JSON** ; les étapes `thought`, les signatures et les statistiques de jetons font partie de la réponse technique, tandis que le résumé lisible se trouve dans `steps` sous un élément `model_output` puis `content[].text`. La réponse doit contenir `"status": "completed"`. Ce statut confirme que l’API a répondu, pas que les données sont médicalement validées. Pour vérifier le parcours Django, utilisez ensuite un compte médecin, comparez les résultats publiés à leur historique, générez le résumé IA, puis vérifiez qu’il apparaît comme brouillon **Généré par IA** avant approbation.
+
 ### Comptes de test
 
 | Acteur | Identifiant | Mot de passe | Ce qu’il peut vérifier dans le module |
@@ -68,15 +93,19 @@ Ouvrez [http://127.0.0.1:8000/login/](http://127.0.0.1:8000/login/), puis testez
 
 Le compte `labo_pasteur` est un opérateur. Pour lui donner aussi les responsabilités biologiques, connectez-vous à Django Admin, ouvrez **Authentification et autorisation > Groupes**, puis ajoutez-le au groupe **Biologiste responsable**. Seuls les membres de ce groupe peuvent valider ou rejeter un résultat, valider une correction et télécharger le compte rendu PDF signé pour les demandes de leur équipe. La migration crée le groupe automatiquement, mais n’y affecte aucun compte.
 
+### Contrôles de saisie des formulaires laboratoire
+
+Les limites et règles métier sont contrôlées côté serveur ; les attributs HTML aident aussi à corriger les saisies avant l’envoi. Les formulaires vérifient notamment les champs obligatoires et leurs longueurs, les valeurs numériques et unités des résultats, les références et seuils cohérents, la précision d’un type d’échantillon « Autre », les motifs de rejet proposés, ainsi que l’ordre et le format des dates des filtres. Pour vérifier ces contrôles, essayez une date de fin antérieure à la date de début, un résultat numérique mal formé, une unité différente de celle du catalogue ou un motif d’annulation trop court ; le formulaire doit afficher une erreur et ne pas enregistrer la saisie invalide.
+
 ### Parcours pas à pas — test manuel
 
 Après le seed, les demandes affichées dans **Analyses** portent le commentaire `DEMO_LABO` et sont attribuées à `labo_pasteur` (la commande réattribue ces seules demandes de démonstration si nécessaire). Le catalogue est administré uniquement par le rôle **Administrateur**. Créez d’abord les types d’analyse nécessaires avant de prescrire une nouvelle demande.
 
 1. **Administrateur — configurer le laboratoire**
-   Connectez-vous avec `admin` / `admin123`, puis utilisez les raccourcis du tableau de bord pour ouvrir le **Catalogue des analyses**, les **Bilans prédéfinis** et les **Paramètres du laboratoire**. Ajoutez une analyse (par exemple `TEST-GLY`) avec unité, références, seuils critiques et tarif. Créez un bilan (par exemple lipidique) et sélectionnez les analyses qui le composent. Renseignez les coordonnées, l’en-tête/signature PDF, les motifs de rejet et le délai d’alerte urgente.
+   Connectez-vous avec `admin` / `admin123`, puis ouvrez le **Catalogue des analyses** ou les **Bilans prédéfinis**. Les formulaires d’ajout et de modification s’ouvrent dans une fenêtre modale et affichent les erreurs de validation sans perdre les champs saisis. Les références et seuils sont numériques, et le tarif ne peut pas être négatif. Une analyse comprend son code unique, son nom, sa catégorie d’échantillon, son unité, ses références, ses seuils critiques, son tarif et son état actif. Un bilan comprend un nom unique, une description et au moins une analyse active. Les actions sont inscrites dans l’historique.
 
 2. **Administrateur — modifier et désactiver**
-   Dans le catalogue ou la liste des bilans, ouvrez **Modifier**, changez des champs, puis désactivez l’élément en décochant **Actif**. Il reste consultable, mais n’est plus proposé pour une nouvelle prescription ou un nouveau bilan. Les comptes Laboratoire n’ont pas accès à ces écrans de configuration.
+   Dans le catalogue ou la liste des bilans, ouvrez **Modifier** pour mettre à jour les champs. **Archiver** demande une confirmation, puis retire l’élément de la liste active sans supprimer les références ni l’historique. Utilisez **Voir les analyses archivées** ou **Voir les bilans archivés** pour les réactiver. Les analyses désactivées ne peuvent pas être ajoutées à de nouveaux bilans. Les comptes Laboratoire n’ont pas accès à ces écrans de configuration.
 
 3. **Médecin — Create/Read/Update de la demande**
    Déconnectez-vous, puis connectez-vous avec `dr_moreau` / `docteur123`. Dans **Analyses**, créez une prescription avec l’analyse active créée par l’administrateur ou sélectionnez le bilan prédéfini. Modifiez la demande encore en attente (par exemple le commentaire), enregistrez, puis vérifiez les changements.
@@ -94,7 +123,7 @@ Après le seed, les demandes affichées dans **Analyses** portent le commentaire
    Enregistrez, vérifiez les informations puis utilisez **Modifier** pour changer une remarque. Un prélèvement marqué **Rejeté** doit obligatoirement avoir un motif.
 
 6. **Laboratoire — Create/Read/Update d’un résultat**
-   Sous l’analyse active de votre prescription, choisissez **Saisir pour DEMO-TUBE-01** et saisissez une valeur, avec une observation facultative. Le résultat apparaît en attente de validation; les résultats dépassant une référence sont signalés et les seuils critiques configurés sont clairement marqués. Essayez **Corriger** pour vérifier l’Update et l’enregistrement de l’ancienne/nouvelle valeur dans l’historique.
+   Sous l’analyse active de votre prescription, choisissez **Saisir pour DEMO-TUBE-01** et saisissez une valeur, avec une observation facultative. Les nombres mal formés et les unités différentes de celles du catalogue sont signalés avant publication ; les résultats qualitatifs restent acceptés. Le résultat apparaît en attente de validation ; les résultats dépassant une référence sont signalés et les seuils critiques configurés sont clairement marqués. Essayez **Corriger** pour vérifier l’Update et l’enregistrement de l’ancienne/nouvelle valeur dans l’historique.
 
 7. **Biologiste responsable — validation, rejet et nouvelle validation**
    Ajoutez d’abord `labo_pasteur` au groupe **Biologiste responsable** depuis Django Admin. Dans **File de validation**, validez ou rejetez les résultats avec un commentaire obligatoire. Une correction d’un résultat validé repasse à **Correction à valider** et exige une nouvelle validation. L’opérateur peut corriger et renvoyer un résultat rejeté, mais ne peut pas valider, rejeter ni modifier un résultat déjà validé.
@@ -120,6 +149,19 @@ python manage.py test laboratoire
 ```
 
 Cette suite vérifie les prescriptions et les rôles, l’affichage de la file laboratoire, la confidentialité patient, le rejet d’un prélèvement sans motif, les valeurs hors référence, les permissions de validation, la correction avec revalidation et la traçabilité. Pour vérifier l’ensemble du projet, lancez `python manage.py test`.
+
+Pour mesurer uniquement la couverture du code applicatif du module Laboratoire, installez l’outil de développement et lancez :
+
+```powershell
+py -3.14 -m pip install -r requirements-dev.txt
+py -3.14 -m coverage run --rcfile=.coveragerc manage.py test laboratoire.tests
+py -3.14 -m coverage report --rcfile=.coveragerc
+py -3.14 -m coverage html --rcfile=.coveragerc
+```
+
+Le rapport texte affiche le pourcentage global et le détail des lignes manquantes. Le rapport HTML détaillé est créé dans `htmlcov/laboratoire/index.html`. La configuration active la couverture des branches, mesure seulement le paquet `laboratoire` et exclut ses tests et migrations ; les fichiers de rapport restent ignorés par Git. Le pourcentage doit être relevé après exécution, car il dépend des chemins réellement couverts par les tests.
+
+Mesure effectuée le 25/10/2026 : **64,3 % de couverture globale** (49 tests exécutés). Ce taux inclut la couverture des branches et peut évoluer avec les tests ou le code.
 
 > La configuration de base actuelle utilise SQLite (`db.sqlite3`). MySQL n’est pas activé par ces commandes.
 
@@ -159,7 +201,6 @@ Cette suite vérifie les prescriptions et les rôles, l’affichage de la file l
 - Les demandes urgentes encore ouvertes dépassant le délai configuré sont signalées dans la file de demandes.
 - Les médecins créent les demandes, le laboratoire saisit les résultats et seuls les comptes Laboratoire peuvent les valider. L’administrateur technique peut consulter mais ne valide pas les résultats.
 - Une correction d’un résultat déjà validé est conservée dans l’historique et soumise à une nouvelle validation. Les demandes sont annulées logiquement et les types d’analyses peuvent être désactivés plutôt que supprimés.
-
 ### Espace médecin — analyses de laboratoire
 - Depuis le tableau de bord médecin, ouvrez **Mes demandes laboratoire** pour prescrire ou suivre vos demandes, modifier/annuler une demande encore en attente et consulter ses résultats.
 - Chaque patient associé dispose d’un historique des résultats validés ; choisissez une analyse pour comparer ses valeurs numériques dans le temps. Les valeurs hors référence sont mises en évidence.

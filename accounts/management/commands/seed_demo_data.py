@@ -95,7 +95,7 @@ class Command(BaseCommand):
         plab1, _ = LaboratoryProfile.objects.get_or_create(user=lab1)
         plab1.nom_laboratoire = "Laboratoire d'Analyses Biologiques Pasteur"
         plab1.numero_agrement = "AGR-LAB-2024-88"
-        plab1.responsable = "Dr. Philippe Laurent (Biologiste)"
+        plab1.responsable = "Dr. Philippe Laurent"
         plab1.services_offerts = "Hématologie, Biochimie, Immunologie, Microbiologie, Tests PCR"
         plab1.save()
 
@@ -165,4 +165,3 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("[OK] Comptes Patients crees : patient_martin, patient_bernard / patient123"))
         self.stdout.write(self.style.SUCCESS("[OK] Base de donnees initialisee avec succes !"))
-

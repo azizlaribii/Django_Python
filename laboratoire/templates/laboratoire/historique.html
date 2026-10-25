@@ -14,8 +14,8 @@
   </header>
   <form method="get" class="lab-filter lab-history-filter" role="search">
     <div>
-      <label for="history-q">Rechercher dans le journal</label>
-      <input id="history-q" type="search" name="q" value="{{ q }}" placeholder="Utilisateur, action ou objet">
+      {{ filter_form.q.label_tag }}{{ filter_form.q }}
+      {% if filter_form.q.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.q.errors }}</div>{% endif %}
     </div>
     <button class="lab-btn lab-btn--primary" type="submit">Rechercher</button>
   </form>

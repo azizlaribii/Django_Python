@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Saisie des résultats — Laboratoire{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">
+{% endblock %}
+{% block content %}
+<div class="lab-shell">
+  <p><a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:prelevement_list' %}?onglet=resultats&amp;statut=RECU">← Retour à la liste des résultats à saisir</a></p>
+  <header class="lab-hero">
+    <div class="lab-hero__copy">
+      <span class="lab-hero__eyebrow">Espace laboratoire · {{ prelevement.code_prelevement }}</span>
+      <h1>Saisie des résultats</h1>
+      <p>Renseignez les résultats du prélèvement reçu avant de les enregistrer ou de les valider.</p>
+      <p>Enregistrez un brouillon privé, puis validez et publiez les résultats après vérification.</p>
+    </div>
+  </header>
+
+  <div class="lab-result-context" aria-label="Contexte du prélèvement">
+    <div><span>Patient</span><strong>{{ prelevement.demande.patient.get_full_name|default:prelevement.demande.patient.username }}</strong></div>
+    <div><span>Médecin prescripteur</span><strong>{{ prelevement.demande.medecin.get_full_name|default:prelevement.demande.medecin.username }}</strong></div>
+    <div><span>Demande</span><strong>#{{ prelevement.demande_id }}</strong></div>
+    <div><span>Prélèvement</span><strong>{{ prelevement.code_prelevement }}</strong></div>
+  </div>
+
+  <form method="post" class="lab-form lab-result-form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="lab-form__nonfield" role="alert">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    {% for row in resultat_rows %}
+      <section class="lab-panel lab-result-entry">
+        <div class="lab-panel__head">
+          <h2>{{ row.analyse.type_analyse.nom }} <span class="lab-code">{{ row.analyse.type_analyse.code }}</span></h2>
+          {% if row.brouillon %}
+            <span class="lab-badge lab-badge--pending">Brouillon · enregistré le {{ row.brouillon.date_saisie|date:"d/m/Y H:i" }}</span>
+          {% else %}
+            <span class="lab-badge lab-badge--neutral">À saisir</span>
+          {% endif %}
+        </div>
+        <div class="lab-panel__body">
+          {% for field in row.fields %}
+            <div class="lab-form__field">
+              {{ field.label_tag }}
+              {{ field }}
+              {% if field.help_text %}<span class="lab-form__help">{{ field.help_text }}</span>{% endif %}
+              {% if field.errors %}<div class="lab-form__errors" role="alert">{{ field.errors }}</div>{% endif %}
+            </div>
+          {% endfor %}
+          {% if row.brouillon %}
+            <p class="lab-table__secondary">Dernière modification : {{ row.brouillon.date_modification|date:"d/m/Y H:i" }} · Non publié</p>
+          {% endif %}
+        </div>
+      </section>
+    {% endfor %}
+
+    <div class="lab-actions lab-result-actions">
+      <button class="lab-btn lab-btn--soft" type="submit" name="action" value="brouillon">Enregistrer le brouillon</button>
+      <button class="lab-btn lab-btn--primary" type="submit" name="action" value="valider">Valider et publier les résultats</button>
+      <a class="lab-btn lab-btn--soft" href="{% url 'laboratoire:prelevement_list' %}?onglet=resultats&amp;statut=RECU">Annuler</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

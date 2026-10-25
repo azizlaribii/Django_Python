@@ -31,8 +31,8 @@ class CustomUserManager(BaseUserManager):
 class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = 'ADMIN', 'Administrateur'
-        DOCTEUR = 'DOCTEUR', 'Docteur'
-        LABORATOIRE = 'LABORATOIRE', 'Laboratoire'
+        DOCTEUR = 'DOCTEUR', 'Médecin'
+        LABORATOIRE = 'LABORATOIRE', 'Laborantin'
         PATIENT = 'PATIENT', 'Patient'
 
     role = models.CharField(
@@ -142,7 +142,7 @@ class LaboratoryProfile(models.Model):
     responsable = models.CharField(
         max_length=120,
         blank=True,
-        verbose_name="Biologiste / Responsable"
+        verbose_name="Responsable du laboratoire"
     )
     services_offerts = models.TextField(
         blank=True,
@@ -633,4 +633,3 @@ class ObservationMedicale(models.Model):
 
     def __str__(self):
         return f"{self.titre} — {self.dossier.patient.get_full_name()} ({self.date_observation})"
-

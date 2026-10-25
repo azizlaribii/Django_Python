@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Catalogue d’analyses — Laboratoire{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
 {% block content %}
 <div class="lab-shell">
   <header class="lab-hero">
@@ -11,38 +12,112 @@
       <p>Gérez les examens, unités et plages de référence utilisés lors des prescriptions.</p>
     </div>
     <div class="lab-hero__actions">
-      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:demande_list' %}">← Demandes</a>
+      {% if can_manage_catalog %}
+      {% if archives_affichees %}
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:type_list' %}">Voir les analyses actives</a>
+      {% else %}
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:type_list' %}?archives=1">Voir les analyses archivées</a>
+      {% endif %}
       <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:bilan_list' %}">Bilans prédéfinis</a>
-      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:parametres' %}">Paramètres</a>
-      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:type_create' %}">＋ Ajouter une analyse</a>
+      <button class="lab-btn lab-btn--white" type="button" data-open-catalog-dialog
+        data-catalog-url="{% url 'laboratoire:type_create' %}?modal=1" data-catalog-title="Ajouter une analyse">＋ Ajouter une analyse</button>
+      {% endif %}
     </div>
   </header>
   <section class="lab-panel">
     <div class="lab-panel__head">
-      <h2>Analyses disponibles</h2>
+      <h2>{% if archives_affichees %}Analyses archivées{% else %}Analyses disponibles{% endif %}</h2>
       <span class="lab-badge lab-badge--neutral">{{ types|length }} référence{{ types|length|pluralize:"s" }}</span>
     </div>
     <div class="lab-table-wrap">
       <table class="lab-table">
-        <thead><tr><th>Code</th><th>Analyse</th><th>Unité</th><th>Références</th><th>Seuils critiques</th><th>Tarif</th><th>Statut</th><th></th></tr></thead>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Analyse</th>
+            <th>Unité</th>
+            <th>Références</th>
+            <th>Seuils critiques</th>
+            <th>Tarif</th>
+            <th>Statut</th>
+            <th></th>
+          </tr>
+        </thead>
         <tbody>
           {% for item in types %}
-            <tr>
-              <td><span class="lab-code">{{ item.code }}</span></td>
-              <td><span class="lab-table__primary">{{ item.nom }}</span>{% if item.description %}<span class="lab-table__secondary lab-catalog-desc">{{ item.description|truncatechars:100 }}</span>{% endif %}</td>
-              <td>{{ item.unite|default:"—" }}</td>
-              <td>{{ item.valeur_reference_min|default_if_none:"—" }} – {{ item.valeur_reference_max|default_if_none:"—" }}</td>
-              <td>{{ item.seuil_critique_bas|default_if_none:"—" }} – {{ item.seuil_critique_haut|default_if_none:"—" }}</td>
-              <td>{% if item.tarif is not None %}{{ item.tarif }} €{% else %}—{% endif %}</td>
-              <td>{% if item.actif %}<span class="lab-badge lab-badge--done">Actif</span>{% else %}<span class="lab-badge lab-badge--neutral">Désactivé</span>{% endif %}</td>
-              <td><a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:type_update' item.pk %}">Modifier</a></td>
-            </tr>
+          <tr>
+            <td><span class="lab-code">{{ item.code }}</span></td>
+            <td class="lab-analyse-cell">
+              <span class="lab-table__primary lab-analyse-trigger">{{ item.nom }}</span>
+              {% if item.description %}<span class="lab-table__secondary">{{ item.description|truncatechars:60 }}</span>{% endif %}
+              <div class="lab-analyse-dropdown" role="tooltip">
+                <div class="lab-analyse-dropdown__header">{{ item.nom }}</div>
+                <dl class="lab-analyse-dropdown__grid">
+                  <dt>Code</dt><dd>{{ item.code }}</dd>
+                  <dt>Unite</dt><dd>{{ item.unite|default:"" }}</dd>
+                  <dt>References</dt><dd>{{ item.valeur_reference_min|default_if_none:"" }} a {{ item.valeur_reference_max|default_if_none:"" }} {{ item.unite }}</dd>
+                  <dt>Seuils critiques</dt><dd>{{ item.seuil_critique_bas|default_if_none:"" }} a {{ item.seuil_critique_haut|default_if_none:"" }}</dd>
+                </dl>
+                {% if can_manage_catalog %}
+                <div class="lab-analyse-dropdown__actions">
+                  <button class="lab-btn lab-btn--soft lab-btn--small" type="button" data-open-catalog-dialog
+                    data-catalog-url="{% url 'laboratoire:type_update' item.pk %}?modal=1" data-catalog-title="Modifier {{ item.nom }}">Modifier</button>
+                </div>
+                {% endif %}
+              </div>
+            </td>
+            <td>{{ item.unite|default:"—" }}</td>
+            <td>{{ item.valeur_reference_min|default_if_none:"—" }} – {{ item.valeur_reference_max|default_if_none:"—" }}</td>
+            <td>{{ item.seuil_critique_bas|default_if_none:"—" }} – {{ item.seuil_critique_haut|default_if_none:"—" }}
+            </td>
+            <td>{% if item.tarif is not None %}{{ item.tarif }} €{% else %}—{% endif %}</td>
+            <td>{% if item.actif %}<span class="lab-badge lab-badge--done">Actif</span>{% else %}<span
+                class="lab-badge lab-badge--neutral">Désactivé</span>{% endif %}</td>
+            <td>
+              {% if can_manage_catalog %}
+              <div class="lab-catalog-actions">
+                <button class="lab-btn lab-btn--soft lab-btn--small" type="button" data-open-catalog-dialog
+                  data-catalog-url="{% url 'laboratoire:type_update' item.pk %}?modal=1" data-catalog-title="Modifier {{ item.nom }}">Modifier</button>
+                <form method="post" action="{% url 'laboratoire:type_toggle_active' item.pk %}"{% if item.actif %} data-confirm-archive="Archiver « {{ item.nom }} » ? Elle disparaîtra de la liste active, mais sera conservée dans les archives et l’historique."{% endif %}>
+                  {% csrf_token %}
+                  <button class="lab-btn {% if item.actif %}lab-btn--danger{% else %}lab-btn--success{% endif %} lab-btn--small" type="submit">
+                    {% if item.actif %}Archiver{% else %}Réactiver{% endif %}
+                  </button>
+                </form>
+              </div>
+              {% else %}
+              —
+              {% endif %}
+            </td>
+          </tr>
           {% empty %}
-            <tr><td colspan="8"><div class="lab-empty"><span class="lab-empty__icon">🧪</span><h3>Le catalogue est vide</h3><p>Ajoutez les analyses proposées par votre établissement.</p><a class="lab-btn lab-btn--primary" href="{% url 'laboratoire:type_create' %}">＋ Ajouter une analyse</a></div></td></tr>
+          <tr>
+            <td colspan="8">
+              <div class="lab-empty"><span class="lab-empty__icon">🧪</span>
+                <h3>{% if archives_affichees %}Aucune analyse archivée{% else %}Le catalogue est vide{% endif %}</h3>
+                <p>{% if archives_affichees %}Les analyses archivées apparaîtront ici et pourront être réactivées.{% else %}Ajoutez les analyses proposées par votre établissement.{% endif %}</p>
+                {% if can_manage_catalog %}<button class="lab-btn lab-btn--primary" type="button" data-open-catalog-dialog
+                  data-catalog-url="{% url 'laboratoire:type_create' %}?modal=1" data-catalog-title="Ajouter une analyse">＋ Ajouter une analyse</button>{% endif %}
+              </div>
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </section>
 </div>
+{% if can_manage_catalog %}
+<dialog class="lab-prescription-dialog lab-catalog-dialog" data-catalog-dialog aria-labelledby="catalog-dialog-title">
+  <div class="lab-prescription-dialog__head">
+    <h2 id="catalog-dialog-title" data-catalog-title>Gestion du catalogue</h2>
+    <button type="button" class="lab-btn lab-btn--soft lab-btn--small" data-close-catalog-dialog aria-label="Fermer">✕</button>
+  </div>
+  <div data-catalog-form-container aria-live="polite"></div>
+</dialog>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if can_manage_catalog %}<script src="{% static 'laboratoire/catalogue_modal.js' %}" defer></script>{% endif %}
 {% endblock %}

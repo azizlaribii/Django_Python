@@ -1,29 +1,39 @@
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import BooleanField, Case, Count, IntegerField, Q, Value, When
-from django.http import HttpResponse
+from django.db.models import (
+    BooleanField, Case, Count, IntegerField, Prefetch, Q, Value, When,
+)
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.dateparse import parse_date
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from accounts.models import AssociationMedecinPatient, ResultatLaboratoire
 
 from .forms import (
     BilanPredefiniForm,
-    DemandeAnnulationAdminForm,
-    DemandeReaffectationForm,
+    DemandeAnnulationForm,
+    DemandeListFilterForm,
     DemandeAnalyseForm,
+    DoctorHistoryFilterForm,
+    HistoriqueFilterForm,
     ParametresLaboratoireForm,
-    PrelevementForm,
+    PrelevementListFilterForm,
+    PrelevementResultatsForm,
     RapportFilterForm,
+    RejetPrelevementForm,
     RejetResultatForm,
+    ResultatsPatientFilterForm,
     ResultatForm,
     SupervisionFilterForm,
     TypeAnalyseForm,
@@ -31,6 +41,7 @@ from .forms import (
 from .models import (
     AnalyseDemandee,
     BilanPredefini,
+    CompteRendu,
     DemandeAnalyse,
     HistoriqueAction,
     ParametresLaboratoire,
@@ -43,19 +54,35 @@ from .permissions import (
     can_manage_catalog,
     catalogue_requis,
     consultation_requise,
+    demandes_visibles,
+    exiger,
     is_lab,
+    is_lab_responsable,
+    is_admin,
     laboratory_team_user_ids,
     laboratoire_requis,
-    is_lab_responsable,
     patient_requis,
+    peut,
+    prelevements_visibles,
+    resultats_visibles,
 )
 from .services import (
     annuler_demande,
+    changer_statut,
+    corriger_resultat,
+    creer_prelevements,
     enregistrer_action,
-    enregistrer_prelevement,
+    enregistrer_resultats_brouillon,
     enregistrer_resultat,
-    rejeter_resultat,
+    envoyer_resultats,
+    refaire_prelevement,
+    synchroniser,
     valider_resultat,
+)
+from .services_resume import (
+    ResumeAPIError,
+    generer_resume,
+    preparer_donnees,
 )
 from .reporting import export_csv, export_xlsx, get_report_data
 from .pdf import build_report_pdf
@@ -69,6 +96,7 @@ def _type_analyse_details(item):
         "nom": item.nom,
         "description": item.description,
         "unite": item.unite,
+        "type_echantillon": item.type_echantillon,
         "valeur_reference_min": (
             str(item.valeur_reference_min) if item.valeur_reference_min is not None else None
         ),
@@ -179,6 +207,7 @@ def _history_detail_sections(details):
         "nom": "Nom",
         "description": "Description",
         "unite": "Unité",
+        "type_echantillon": "Type d’échantillon",
         "valeur_reference_min": "Référence minimale",
         "valeur_reference_max": "Référence maximale",
         "seuil_critique_bas": "Seuil critique bas",
@@ -290,29 +319,80 @@ def _prepare_history_action(action):
 
 def _demande_visible(user, queryset=None):
     queryset = queryset if queryset is not None else DemandeAnalyse.objects.all()
-    if user.is_laboratory:
-        return queryset.filter(
-            Q(laboratoire__in=laboratory_team_user_ids(user))
-            | Q(laboratoire__isnull=True)
-        )
-    if user.is_doctor:
-        return queryset.filter(medecin=user)
-    if user.is_admin_user:
-        return queryset
-    return queryset.none()
+    visible_ids = demandes_visibles(user).values("pk")
+    return queryset.filter(pk__in=visible_ids)
+
+
+def _onglet_prelevement(statut):
+    if statut in {
+        Prelevement.Statut.A_EFFECTUER,
+        Prelevement.Statut.PRELEVE,
+    }:
+        return "a_traiter"
+    if statut == Prelevement.Statut.RECU:
+        return "resultats"
+    return "clotures"
+
+
+def _redirect_prelevement_list(onglet, statut=None):
+    query = {"onglet": onglet}
+    if statut:
+        query["statut"] = statut
+    return redirect(
+        f"{reverse('laboratoire:prelevement_list')}?{urlencode(query)}"
+    )
 
 
 @consultation_requise
 def demande_list(request):
+    exiger(request.user, "lire_demande")
+    if request.user.is_laboratory:
+        return redirect("laboratoire:prelevement_list")
     demandes = _demande_visible(
         request.user,
-        DemandeAnalyse.objects.select_related("patient", "medecin", "laboratoire"),
+        DemandeAnalyse.objects.select_related("patient", "medecin", "laboratoire")
+        .annotate(
+            nombre_analyses=Count(
+                "analyses",
+                filter=~Q(analyses__statut=AnalyseDemandee.Statut.ANNULEE),
+                distinct=True,
+            ),
+        )
+        .prefetch_related(
+            Prefetch(
+                "analyses",
+                queryset=AnalyseDemandee.objects.select_related(
+                    "type_analyse",
+                ).exclude(
+                    statut=AnalyseDemandee.Statut.ANNULEE,
+                ).prefetch_related(Prefetch(
+                    "resultats",
+                    queryset=resultats_visibles(request.user).select_related(
+                        "prelevement",
+                    ),
+                )),
+            ),
+            Prefetch(
+                "prelevements",
+                queryset=Prelevement.objects.prefetch_related(Prefetch(
+                    "analyses",
+                    queryset=AnalyseDemandee.objects.select_related(
+                        "type_analyse",
+                    ).prefetch_related(Prefetch(
+                        "resultats",
+                        queryset=resultats_visibles(request.user),
+                    )),
+                )),
+            ),
+        ),
     )
-    q = request.GET.get("q", "").strip()
-    statut = request.GET.get("statut", "")
-    priorite = request.GET.get("priorite", "")
-    date_debut = parse_date(request.GET.get("date_debut", "") or "")
-    date_fin = parse_date(request.GET.get("date_fin", "") or "")
+    filter_form = DemandeListFilterForm(request.GET)
+    filters = filter_form.cleaned_data if filter_form.is_valid() else {}
+    q = filters.get("q", "")
+    statut = filters.get("statut", "")
+    priorite = filters.get("priorite", "")
+    date_debut = filters.get("date_debut")
+    date_fin = filters.get("date_fin")
     if q:
         demandes = demandes.filter(
             Q(patient__first_name__icontains=q)
@@ -331,6 +411,37 @@ def demande_list(request):
     delai_alerte = ParametresLaboratoire.objects.filter(pk=1).values_list(
         "delai_alerte_urgente_minutes", flat=True,
     ).first() or 60
+    stats_prelevements = None
+    demandes_avec_resultats_publies = set()
+    if request.user.is_doctor:
+        demandes_avec_resultats_publies = set(
+            Resultat.objects.filter(
+                analyse_demandee__demande__medecin=request.user,
+                statut=Resultat.Statut.VALIDE,
+            ).values_list(
+                "analyse_demandee__demande_id",
+                flat=True,
+            ).distinct()
+        )
+    if request.user.is_laboratory:
+        prelevements = prelevements_visibles(request.user)
+        stats_prelevements = {
+            "a_preparer": prelevements.filter(
+                statut=Prelevement.Statut.A_EFFECTUER,
+            ).count(),
+            "a_receptionner": prelevements.filter(
+                statut=Prelevement.Statut.PRELEVE,
+            ).count(),
+            "resultats_a_saisir": prelevements.filter(
+                statut=Prelevement.Statut.RECU,
+            ).count(),
+            "termines": prelevements.filter(
+                statut=Prelevement.Statut.TERMINE,
+            ).count(),
+            "refuses": prelevements.filter(
+                statut=Prelevement.Statut.REJETE,
+            ).count(),
+        }
     demandes = demandes.annotate(
         priorite_tri=Case(
             When(priorite=DemandeAnalyse.Priorite.URGENTE, then=Value(0)),
@@ -354,6 +465,7 @@ def demande_list(request):
     ).order_by("priorite_tri", "-date_demande", "-pk")
     return render(request, "laboratoire/demande_list.html", {
         "demandes": demandes,
+        "filter_form": filter_form,
         "q": q,
         "statut": statut,
         "priorite": priorite,
@@ -362,8 +474,15 @@ def demande_list(request):
         "date_debut": request.GET.get("date_debut", ""),
         "date_fin": request.GET.get("date_fin", ""),
         "delai_alerte_urgente": delai_alerte,
+        "stats_prelevements": stats_prelevements,
+        "demandes_avec_resultats_publies": demandes_avec_resultats_publies,
+        "ia_resume_configuree": bool(
+            getattr(settings, "GOOGLE_API_KEY", "").strip()
+            or getattr(settings, "GEMINI_API_KEY", "").strip()
+            or getattr(settings, "ANTHROPIC_API_KEY", "").strip()
+        ),
         "can_create": request.user.is_doctor,
-        "can_manage_catalog": can_manage_catalog(request.user),
+        "can_work": peut(request.user, "changer_statut"),
         "can_validate": can_validate_results(request.user),
         "can_reject_results": can_validate_results(request.user),
         "stats": {
@@ -380,38 +499,8 @@ def demande_list(request):
 def supervision(request):
     form = SupervisionFilterForm(request.GET)
     filters = form.cleaned_data if form.is_valid() else {}
-    delai_alerte = ParametresLaboratoire.objects.filter(pk=1).values_list(
-        "delai_alerte_urgente_minutes", flat=True,
-    ).first() or 60
     demandes = DemandeAnalyse.objects.select_related(
-        "patient", "medecin", "laboratoire",
-    ).annotate(
-        urgent_en_retard=Case(
-            When(
-                priorite=DemandeAnalyse.Priorite.URGENTE,
-                statut__in=[
-                    DemandeAnalyse.Statut.EN_ATTENTE,
-                    DemandeAnalyse.Statut.EN_COURS,
-                ],
-                date_demande__lt=timezone.now() - timedelta(minutes=delai_alerte),
-                then=Value(True),
-            ),
-            default=Value(False),
-            output_field=BooleanField(),
-        ),
-        nombre_echantillons_rejetes=Count(
-            "prelevements",
-            filter=Q(prelevements__statut=Prelevement.Statut.REJETE),
-            distinct=True,
-        ),
-        nombre_resultats_a_valider=Count(
-            "analyses__resultats",
-            filter=Q(analyses__resultats__statut__in=[
-                Resultat.Statut.EN_ATTENTE_VALIDATION,
-                Resultat.Statut.CORRIGE,
-            ]),
-            distinct=True,
-        ),
+        "patient", "medecin",
     ).prefetch_related("analyses__type_analyse")
     if filters.get("date_debut"):
         demandes = demandes.filter(date_demande__date__gte=filters["date_debut"])
@@ -430,128 +519,22 @@ def supervision(request):
         )
     if filters.get("medecin"):
         demandes = demandes.filter(medecin=filters["medecin"])
-    if filters.get("laboratoire"):
-        demandes = demandes.filter(laboratoire=filters["laboratoire"])
-    if filters.get("bloquees"):
-        demandes = demandes.filter(
-            laboratoire__isnull=True,
-            statut__in=[
-                DemandeAnalyse.Statut.EN_ATTENTE,
-                DemandeAnalyse.Statut.EN_COURS,
-            ],
-        )
-    if filters.get("urgentes_en_retard"):
-        demandes = demandes.filter(urgent_en_retard=True)
-    if filters.get("echantillons_rejetes"):
-        demandes = demandes.filter(nombre_echantillons_rejetes__gt=0)
-    if filters.get("resultats_a_valider"):
-        demandes = demandes.filter(nombre_resultats_a_valider__gt=0)
-
     return render(request, "laboratoire/supervision.html", {
         "form": form,
         "demandes": demandes,
         "nombre_demandes": demandes.count(),
-        "nombre_bloquees": demandes.filter(
-            laboratoire__isnull=True,
-            statut__in=[
-                DemandeAnalyse.Statut.EN_ATTENTE,
-                DemandeAnalyse.Statut.EN_COURS,
-            ],
+        "nombre_en_attente": demandes.filter(
+            statut=DemandeAnalyse.Statut.EN_ATTENTE,
         ).count(),
-        "nombre_urgentes_en_retard": demandes.filter(urgent_en_retard=True).count(),
-        "nombre_echantillons_rejetes": Prelevement.objects.filter(
-            demande__in=demandes,
-            statut=Prelevement.Statut.REJETE,
+        "nombre_en_cours": demandes.filter(
+            statut=DemandeAnalyse.Statut.EN_COURS,
         ).count(),
-        "nombre_resultats_a_valider": Resultat.objects.filter(
-            analyse_demandee__demande__in=demandes,
-            statut__in=(Resultat.Statut.EN_ATTENTE_VALIDATION, Resultat.Statut.CORRIGE),
+        "nombre_terminees": demandes.filter(
+            statut=DemandeAnalyse.Statut.TERMINEE,
         ).count(),
-        "delai_alerte_urgente": delai_alerte,
-        "laboratoires": User.objects.filter(
-            role=User.Role.LABORATOIRE, is_active=True,
-        ).order_by("username"),
         "statut_choices": DemandeAnalyse.Statut.choices,
         "priorite_choices": DemandeAnalyse.Priorite.choices,
     })
-
-
-@catalogue_requis
-@require_POST
-def demande_reaffecter(request, pk):
-    demande = get_object_or_404(DemandeAnalyse, pk=pk)
-    form = DemandeReaffectationForm(request.POST)
-    if not form.is_valid():
-        messages.error(request, "Sélectionnez un laboratoire actif pour réaffecter la demande.")
-        return redirect("laboratoire:supervision")
-    if demande.statut not in (
-        DemandeAnalyse.Statut.EN_ATTENTE,
-        DemandeAnalyse.Statut.EN_COURS,
-    ):
-        messages.error(request, "Seule une demande ouverte peut être réaffectée.")
-        return redirect("laboratoire:supervision")
-    nouveau_laboratoire = form.cleaned_data["laboratoire"]
-    ancien_laboratoire_id = demande.laboratoire_id
-    ancien_statut = demande.statut
-    if ancien_laboratoire_id == nouveau_laboratoire.pk:
-        messages.info(request, "Cette demande est déjà affectée à ce laboratoire.")
-        return redirect("laboratoire:supervision")
-    with transaction.atomic():
-        demande.laboratoire = nouveau_laboratoire
-        if demande.statut == DemandeAnalyse.Statut.EN_ATTENTE:
-            demande.statut = DemandeAnalyse.Statut.EN_COURS
-        demande.save(update_fields=["laboratoire", "statut"])
-        enregistrer_action(
-            utilisateur=request.user,
-            action="DEMANDE_REAFFECTEE",
-            objet="DemandeAnalyse",
-            objet_id=demande.pk,
-            details={
-                "ancien_laboratoire_id": ancien_laboratoire_id,
-                "laboratoire_id": nouveau_laboratoire.pk,
-                "ancien_statut": ancien_statut,
-                "statut": demande.statut,
-            },
-        )
-    messages.success(request, f"La demande #{demande.pk} a été réaffectée.")
-    return redirect("laboratoire:supervision")
-
-
-@catalogue_requis
-@require_POST
-def demande_annuler_admin(request, pk):
-    demande = get_object_or_404(DemandeAnalyse, pk=pk)
-    form = DemandeAnnulationAdminForm(request.POST)
-    if not form.is_valid():
-        messages.error(request, "Un motif est obligatoire pour annuler la demande.")
-        return redirect("laboratoire:supervision")
-    if demande.statut not in (
-        DemandeAnalyse.Statut.EN_ATTENTE,
-        DemandeAnalyse.Statut.EN_COURS,
-    ):
-        messages.error(request, "Seule une demande ouverte peut être annulée.")
-        return redirect("laboratoire:supervision")
-    ancien_statut = demande.statut
-    motif = form.cleaned_data["motif"]
-    with transaction.atomic():
-        demande.statut = DemandeAnalyse.Statut.ANNULEE
-        demande.motif_annulation = motif
-        demande.save(update_fields=["statut", "motif_annulation"])
-        demande.analyses.exclude(statut=AnalyseDemandee.Statut.TERMINEE).update(
-            statut=AnalyseDemandee.Statut.ANNULEE,
-        )
-        enregistrer_action(
-            utilisateur=request.user,
-            action="DEMANDE_ANNULEE",
-            objet="DemandeAnalyse",
-            objet_id=demande.pk,
-            details={
-                "avant": {"statut": ancien_statut},
-                "apres": {"statut": demande.statut, "motif_annulation": motif},
-            },
-        )
-    messages.success(request, f"La demande #{demande.pk} a été annulée et tracée.")
-    return redirect("laboratoire:supervision")
 
 
 @catalogue_requis
@@ -588,9 +571,7 @@ def rapports_export(request, format):
 
 @consultation_requise
 def demande_create(request):
-    if not request.user.is_doctor:
-        messages.error(request, "Seul un médecin peut prescrire une demande d’analyses.")
-        return redirect("laboratoire:demande_list")
+    exiger(request.user, "creer_demande")
     form = DemandeAnalyseForm(request.POST or None, user=request.user)
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
@@ -602,6 +583,7 @@ def demande_create(request):
                 AnalyseDemandee(demande=demande, type_analyse=analyse)
                 for analyse in _analyses_selectionnees(form)
             ])
+            creer_prelevements(demande, request.user)
             enregistrer_action(
                 utilisateur=request.user, action="DEMANDE_CREEE",
                 objet="DemandeAnalyse", objet_id=demande.pk,
@@ -613,49 +595,109 @@ def demande_create(request):
                 },
             )
         messages.success(request, "La demande d’analyses a été créée.")
-        return redirect("laboratoire:demande_detail", pk=demande.pk)
-    return render(request, "laboratoire/form.html", {
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "redirect_url": reverse("laboratoire:demande_list"),
+            })
+        return redirect("laboratoire:demande_list")
+    if request.GET.get("modal") == "1":
+        return render(
+            request,
+            "laboratoire/demande_form_modal.html",
+            {
+                "form": form,
+                "form_action": f"{reverse('laboratoire:demande_create')}?modal=1",
+                "submit_label": "Enregistrer la demande",
+            },
+        )
+    return render(request, "laboratoire/demande_form.html", {
         "form": form, "titre": "Nouvelle demande d’analyses",
     })
 
 
 @consultation_requise
+@never_cache
 def demande_detail(request, pk):
     demande = get_object_or_404(
         DemandeAnalyse.objects.select_related("patient", "medecin", "laboratoire"),
         pk=pk,
     )
-    if not _demande_visible(request.user, DemandeAnalyse.objects.filter(pk=pk)).exists():
-        messages.error(request, "Vous n’avez pas accès à cette demande.")
-        return redirect("laboratoire:demande_list")
-    analyses = list(demande.analyses.select_related("type_analyse").prefetch_related(
-        "resultats__prelevement", "resultats__saisi_par", "resultats__valide_par",
-    ))
-    for analyse in analyses:
-        analyse.resultat_prelevement_ids = {
-            resultat.prelevement_id
-            for resultat in analyse.resultats.all()
-            if resultat.prelevement_id is not None
-        }
-        analyse.resultat_sans_prelevement = any(
-            resultat.prelevement_id is None for resultat in analyse.resultats.all()
+    exiger(request.user, "lire_demande", demande=demande)
+    if request.user.is_laboratory:
+        return redirect("laboratoire:prelevement_list")
+    analyses = list(
+        demande.analyses.select_related(
+            "type_analyse", "prelevement",
+        ).prefetch_related(Prefetch(
+            "resultats",
+            queryset=resultats_visibles(request.user).select_related(
+                "prelevement", "saisi_par", "valide_par",
+            ),
+        ))
+    )
+    analyses_retirees = [
+        analyse for analyse in analyses
+        if analyse.statut == AnalyseDemandee.Statut.ANNULEE
+    ]
+    analyses = [
+        analyse for analyse in analyses
+        if analyse.statut != AnalyseDemandee.Statut.ANNULEE
+    ]
+    is_prescriber = (
+        request.user.is_doctor and demande.medecin_id == request.user.pk
+    )
+    samples_not_started = not demande.prelevements.exclude(
+        statut=Prelevement.Statut.A_EFFECTUER,
+    ).exists()
+    can_edit = (
+        is_prescriber
+        and demande.statut == DemandeAnalyse.Statut.EN_ATTENTE
+        and samples_not_started
+    )
+    if not is_prescriber or can_edit:
+        edit_block_message = ""
+    elif demande.statut != DemandeAnalyse.Statut.EN_ATTENTE:
+        edit_block_message = (
+            "Cette demande n’est plus modifiable, car son traitement a commencé."
+        )
+    else:
+        edit_block_message = (
+            "Cette demande n’est plus modifiable, car un prélèvement a été pris en charge."
         )
     return render(request, "laboratoire/demande_detail.html", {
         "demande": demande,
         "analyses": analyses,
+        "analyses_retirees": analyses_retirees,
         "prelevements": demande.prelevements.all(),
-        "can_edit": request.user.is_doctor and demande.medecin_id == request.user.pk
-                    and demande.statut == DemandeAnalyse.Statut.EN_ATTENTE,
+        "can_edit": can_edit,
+        "edit_block_message": edit_block_message,
         "can_work": is_lab(request.user) and demande.statut != DemandeAnalyse.Statut.ANNULEE,
-        "can_validate": can_validate_results(request.user),
+        "can_validate": is_lab(request.user),
+        "compte_rendu": CompteRendu.objects.filter(demande=demande).first(),
+        "can_manage_compte_rendu": peut(
+            request.user,
+            "compte_rendu",
+            demande=demande,
+        ),
+        "has_published_results": Resultat.objects.filter(
+            analyse_demandee__demande=demande,
+            statut=Resultat.Statut.VALIDE,
+        ).exists(),
         "can_download_pdf": (
             (request.user.is_doctor and demande.medecin_id == request.user.pk)
-            or is_lab_responsable(request.user)
+            or is_lab(request.user)
+            or is_admin(request.user)
         )
         and Resultat.objects.filter(
             analyse_demandee__demande=demande,
             statut=Resultat.Statut.VALIDE,
         ).exists(),
+        "ia_resume_configuree": bool(
+            getattr(settings, "GOOGLE_API_KEY", "").strip()
+            or getattr(settings, "GEMINI_API_KEY", "").strip()
+            or getattr(settings, "ANTHROPIC_API_KEY", "").strip()
+        ),
     })
 
 
@@ -712,6 +754,162 @@ def doctor_notifications(request):
     })
 
 
+@login_required
+@require_POST
+def generer_resume_view(request, pk):
+    demande = get_object_or_404(DemandeAnalyse, pk=pk)
+    exiger(request.user, "compte_rendu", demande=demande)
+    compte_rendu = CompteRendu.objects.filter(demande=demande).first()
+    if compte_rendu and compte_rendu.statut == CompteRendu.Statut.APPROUVE:
+        messages.info(request, "Le compte rendu est déjà approuvé et ne peut plus être modifié.")
+        return redirect("laboratoire:compte_rendu", pk=demande.pk)
+
+    lignes = preparer_donnees(demande)
+    if not lignes:
+        messages.error(request, "Aucun résultat publié n’est disponible pour créer le résumé.")
+        return redirect("laboratoire:demande_detail", pk=demande.pk)
+
+    try:
+        generation = generer_resume(lignes)
+    except ResumeAPIError as error:
+        messages.error(request, str(error))
+        return redirect(
+            "laboratoire:compte_rendu"
+            if compte_rendu
+            else "laboratoire:demande_detail",
+            pk=demande.pk,
+        )
+    with transaction.atomic():
+        if compte_rendu is None:
+            compte_rendu = CompteRendu(
+                demande=demande,
+                medecin=request.user,
+            )
+        compte_rendu.texte_genere = generation.texte
+        compte_rendu.texte_final = generation.texte
+        compte_rendu.note_medecin = ""
+        compte_rendu.source = CompteRendu.Source.IA
+        compte_rendu.statut = CompteRendu.Statut.BROUILLON
+        compte_rendu.approuve_le = None
+        compte_rendu.save()
+        enregistrer_action(
+            utilisateur=request.user,
+            action="COMPTE_RENDU_GENERE",
+            objet="CompteRendu",
+            objet_id=compte_rendu.pk,
+            details={
+                "demande_id": demande.pk,
+                "source": compte_rendu.source,
+                "nombre_resultats_publies": len(lignes),
+                "fournisseur_ia": generation.fournisseur,
+                "modele_ia": generation.modele,
+            },
+        )
+    messages.success(
+        request,
+        f"Le résumé descriptif a été généré par {generation.fournisseur}. "
+        "Comparez les résultats puis relisez-le avant approbation.",
+    )
+    return redirect("laboratoire:compte_rendu", pk=demande.pk)
+
+
+@login_required
+@never_cache
+def compte_rendu(request, pk):
+    demande = get_object_or_404(DemandeAnalyse, pk=pk)
+    exiger(request.user, "compte_rendu", demande=demande)
+    compte_rendu = CompteRendu.objects.select_related(
+        "demande",
+        "medecin",
+    ).filter(
+        demande=demande,
+        medecin=request.user,
+    ).first()
+    lignes = preparer_donnees(demande)
+    texte_final = (
+        compte_rendu.texte_final
+        if compte_rendu
+        and (
+            compte_rendu.source == CompteRendu.Source.IA
+            or compte_rendu.statut == CompteRendu.Statut.APPROUVE
+        )
+        else ""
+    )
+    note_medecin = compte_rendu.note_medecin if compte_rendu else ""
+    if request.method == "POST":
+        if compte_rendu is None:
+            messages.error(request, "Générez d’abord le résumé IA.")
+            return redirect("laboratoire:compte_rendu", pk=demande.pk)
+        if compte_rendu.statut == CompteRendu.Statut.APPROUVE:
+            messages.error(request, "Ce compte rendu est approuvé et ne peut plus être modifié.")
+            return redirect("laboratoire:compte_rendu", pk=demande.pk)
+        if request.POST.get("action") == "approuver":
+            if compte_rendu.source != CompteRendu.Source.IA:
+                messages.error(
+                    request,
+                    "Générez d’abord un résumé par IA avant de l’approuver.",
+                )
+                return redirect("laboratoire:compte_rendu", pk=demande.pk)
+            if not compte_rendu.texte_final.strip():
+                messages.error(request, "Le résumé IA est vide et ne peut pas être approuvé.")
+                return redirect("laboratoire:compte_rendu", pk=demande.pk)
+            with transaction.atomic():
+                compte_rendu.statut = CompteRendu.Statut.APPROUVE
+                compte_rendu.approuve_le = timezone.now()
+                compte_rendu.save(update_fields=[
+                    "statut", "approuve_le",
+                ])
+                enregistrer_action(
+                    utilisateur=request.user,
+                    action="COMPTE_RENDU_APPROUVE",
+                    objet="CompteRendu",
+                    objet_id=compte_rendu.pk,
+                    details={
+                        "demande_id": demande.pk,
+                        "source": compte_rendu.source,
+                    },
+                )
+            messages.success(request, "Le compte rendu a été approuvé.")
+            return redirect("laboratoire:compte_rendu", pk=demande.pk)
+        messages.error(request, "Cette action n’est pas disponible.")
+        return redirect("laboratoire:compte_rendu", pk=demande.pk)
+    return render(request, "laboratoire/compte_rendu.html", {
+        "demande": demande,
+        "compte_rendu": compte_rendu,
+        "lignes": lignes,
+        "texte_final": texte_final,
+        "note_medecin": note_medecin,
+        "has_outliers": any(
+            ligne["statut"] in {"bas", "élevé"} for ligne in lignes
+        ),
+        "stats_evolution": {
+            "total": len(lignes),
+            "comparables": sum(
+                ligne["variation_pct"] is not None for ligne in lignes
+            ),
+            "stable": sum(ligne["tendance"] == "stable" for ligne in lignes),
+            "en_hausse": sum(
+                ligne["tendance"] == "en hausse" for ligne in lignes
+            ),
+            "en_baisse": sum(
+                ligne["tendance"] == "en baisse" for ligne in lignes
+            ),
+            "insuffisantes": sum(
+                ligne["tendance"] == "insuffisante" for ligne in lignes
+            ),
+        },
+        "resume_ia_configuree": bool(
+            getattr(settings, "GOOGLE_API_KEY", "").strip()
+            or getattr(settings, "GEMINI_API_KEY", "").strip()
+            or getattr(settings, "ANTHROPIC_API_KEY", "").strip()
+        ),
+        "lecture_seule": (
+            compte_rendu is not None
+            and compte_rendu.statut == CompteRendu.Statut.APPROUVE
+        ),
+    })
+
+
 @consultation_requise
 def doctor_patient_history(request, patient_id):
     if not request.user.is_doctor:
@@ -724,6 +922,7 @@ def doctor_patient_history(request, patient_id):
     patient = association.patient
     resultats = Resultat.objects.filter(
         analyse_demandee__demande__patient=patient,
+        analyse_demandee__demande__medecin=request.user,
         statut=Resultat.Statut.VALIDE,
     ).select_related(
         "analyse_demandee__type_analyse",
@@ -731,9 +930,14 @@ def doctor_patient_history(request, patient_id):
     ).order_by("-date_validation", "-pk")
     types_analyse = TypeAnalyse.objects.filter(
         demandes__demande__patient=patient,
+        demandes__demande__medecin=request.user,
         demandes__resultats__statut=Resultat.Statut.VALIDE,
     ).distinct().order_by("nom")
-    selected_type = request.GET.get("analyse", "")
+    filter_form = DoctorHistoryFilterForm(
+        request.GET, types_analyse=types_analyse,
+    )
+    filters = filter_form.cleaned_data if filter_form.is_valid() else {}
+    selected_type = filters.get("analyse", "")
     if selected_type.isdigit():
         resultats = resultats.filter(analyse_demandee__type_analyse_id=selected_type)
     else:
@@ -771,6 +975,7 @@ def doctor_patient_history(request, patient_id):
 
     return render(request, "laboratoire/doctor_patient_history.html", {
         "patient": patient,
+        "filter_form": filter_form,
         "resultats": resultats,
         "legacy_resultats": ResultatLaboratoire.objects.filter(
             dossier__patient=patient,
@@ -792,7 +997,7 @@ def doctor_patient_history(request, patient_id):
 def doctor_report_pdf(request, pk):
     if request.user.is_doctor:
         demande_lookup = {"medecin": request.user}
-    elif is_lab_responsable(request.user):
+    elif is_lab_responsable(request.user) or is_admin(request.user):
         demande_lookup = {}
     else:
         messages.error(
@@ -807,6 +1012,7 @@ def doctor_report_pdf(request, pk):
             | Q(laboratoire__isnull=True)
         )
     demande = get_object_or_404(demandes, pk=pk, **demande_lookup)
+    exiger(request.user, "lire_demande", demande=demande)
     resultats = Resultat.objects.filter(
         analyse_demandee__demande=demande,
         statut=Resultat.Statut.VALIDE,
@@ -849,7 +1055,7 @@ def doctor_report_pdf(request, pk):
             f"Valeurs de reference : {resultat.valeur_reference or 'Non renseignees'}",
             f"Valide le : {resultat.date_validation:%d/%m/%Y %H:%M}" if resultat.date_validation else "Valide",
             f"Interpretation automatique : {resultat.interpretation_automatique}",
-            f"Biologiste validateur : {resultat.valide_par.get_full_name() or resultat.valide_par.username}" if resultat.valide_par else "Biologiste validateur : Responsable du laboratoire",
+            f"Validé par : {resultat.valide_par.get_full_name() or resultat.valide_par.username}" if resultat.valide_par else "Validé par le laboratoire",
         ])
         if resultat.interpretation:
             lines.append(f"Interpretation : {resultat.interpretation}")
@@ -866,9 +1072,17 @@ def doctor_report_pdf(request, pk):
 
 @patient_requis
 def mes_resultats(request):
-    date_debut = parse_date(request.GET.get("date_debut", "") or "")
-    date_fin = parse_date(request.GET.get("date_fin", "") or "")
-    analyse_id = request.GET.get("analyse", "")
+    types_analyse = TypeAnalyse.objects.filter(
+        demandes__demande__patient=request.user,
+        demandes__resultats__statut=Resultat.Statut.VALIDE,
+    ).distinct().order_by("nom")
+    filter_form = ResultatsPatientFilterForm(
+        request.GET, types_analyse=types_analyse,
+    )
+    filters = filter_form.cleaned_data if filter_form.is_valid() else {}
+    date_debut = filters.get("date_debut")
+    date_fin = filters.get("date_fin")
+    analyse_id = filters.get("analyse", "")
     resultats = Resultat.objects.filter(
         analyse_demandee__demande__patient=request.user,
         statut=Resultat.Statut.VALIDE,
@@ -883,10 +1097,6 @@ def mes_resultats(request):
     if date_fin:
         resultats = resultats.filter(date_validation__date__lte=date_fin)
 
-    types_analyse = TypeAnalyse.objects.filter(
-        demandes__demande__patient=request.user,
-        demandes__resultats__statut=Resultat.Statut.VALIDE,
-    ).distinct().order_by("nom")
     if analyse_id.isdigit() and types_analyse.filter(pk=analyse_id).exists():
         resultats = resultats.filter(analyse_demandee__type_analyse_id=analyse_id)
     else:
@@ -929,9 +1139,10 @@ def mes_resultats(request):
         resultats_legacy = resultats_legacy.filter(date_prescription__gte=date_debut)
     if date_fin:
         resultats_legacy = resultats_legacy.filter(date_prescription__lte=date_fin)
-    if request.GET.get("type_legacy", "").strip():
+    type_legacy = filters.get("type_legacy", "")
+    if type_legacy:
         resultats_legacy = resultats_legacy.filter(
-            type_analyse__icontains=request.GET["type_legacy"].strip(),
+            type_analyse__icontains=type_legacy,
         )
 
     demandes = DemandeAnalyse.objects.filter(
@@ -949,6 +1160,7 @@ def mes_resultats(request):
     ).order_by("-date_validation")
     return render(request, "laboratoire/mes_resultats.html", {
         "resultats": resultats,
+        "filter_form": filter_form,
         "resultats_legacy": resultats_legacy,
         "resultats_count": resultats.count() + resultats_legacy.count(),
         "demandes": demandes,
@@ -981,6 +1193,8 @@ def patient_report_pdf(request, pk):
     if not resultats.exists():
         messages.error(request, "Aucun résultat validé n’est disponible pour ce compte rendu.")
         return redirect("laboratoire:mes_resultats")
+    for resultat in resultats:
+        exiger(request.user, "lire_resultat", resultat=resultat)
 
     parametres = ParametresLaboratoire.objects.filter(pk=1).first()
     lines = [
@@ -1009,7 +1223,7 @@ def patient_report_pdf(request, pk):
             f"Valeurs de reference : {resultat.valeur_reference or 'Non renseignees'}",
             f"Valide le : {resultat.date_validation:%d/%m/%Y %H:%M}" if resultat.date_validation else "Valide",
             f"Interpretation automatique : {resultat.interpretation_automatique}",
-            f"Biologiste validateur : {resultat.valide_par.get_full_name() or resultat.valide_par.username}" if resultat.valide_par else "Responsable du laboratoire",
+            f"Validé par : {resultat.valide_par.get_full_name() or resultat.valide_par.username}" if resultat.valide_par else "Validé par le laboratoire",
         ])
         if resultat.interpretation:
             lines.append(f"Interpretation : {resultat.interpretation}")
@@ -1079,7 +1293,11 @@ def patient_legacy_report_pdf(request, pk):
 @consultation_requise
 def demande_update(request, pk):
     demande = get_object_or_404(DemandeAnalyse, pk=pk, medecin=request.user)
-    if not request.user.is_doctor or demande.statut != DemandeAnalyse.Statut.EN_ATTENTE:
+    exiger(request.user, "annuler_demande", demande=demande)
+    if (
+        demande.statut != DemandeAnalyse.Statut.EN_ATTENTE
+        or demande.prelevements.exclude(statut=Prelevement.Statut.A_EFFECTUER).exists()
+    ):
         messages.error(request, "Cette demande ne peut plus être modifiée.")
         return redirect("laboratoire:demande_detail", pk=pk)
     form = DemandeAnalyseForm(request.POST or None, instance=demande, user=request.user)
@@ -1115,6 +1333,7 @@ def demande_update(request, pk):
                 for item in selected_types if item.pk not in existing_rows
             ]
             AnalyseDemandee.objects.bulk_create(additions)
+            creer_prelevements(demande, request.user)
             enregistrer_action(
                 utilisateur=request.user, action="DEMANDE_MODIFIEE",
                 objet="DemandeAnalyse", objet_id=demande.pk,
@@ -1132,11 +1351,22 @@ def demande_update(request, pk):
                 },
             )
         messages.success(request, "La demande a été mise à jour.")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "redirect_url": reverse("laboratoire:demande_detail", args=[pk]),
+            })
         return redirect("laboratoire:demande_detail", pk=pk)
     form.fields["analyses"].initial = demande.analyses.exclude(
         statut=AnalyseDemandee.Statut.ANNULEE,
     ).values_list("type_analyse_id", flat=True)
-    return render(request, "laboratoire/form.html", {
+    if request.GET.get("modal") == "1":
+        return render(request, "laboratoire/demande_form_modal.html", {
+            "form": form,
+            "form_action": f"{reverse('laboratoire:demande_update', args=[pk])}?modal=1",
+            "submit_label": "Enregistrer les modifications",
+        })
+    return render(request, "laboratoire/demande_form.html", {
         "form": form, "titre": f"Modifier la demande #{demande.pk}",
     })
 
@@ -1145,8 +1375,17 @@ def demande_update(request, pk):
 @require_POST
 def demande_cancel(request, pk):
     demande = get_object_or_404(DemandeAnalyse, pk=pk, medecin=request.user)
+    exiger(request.user, "annuler_demande", demande=demande)
+    form = DemandeAnnulationForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, form.errors["motif"][0])
+        return redirect("laboratoire:demande_detail", pk=pk)
     try:
-        annuler_demande(demande=demande, utilisateur=request.user)
+        annuler_demande(
+            demande=demande,
+            utilisateur=request.user,
+            motif=form.cleaned_data["motif"],
+        )
     except ValidationError as error:
         messages.error(request, error.messages[0])
     else:
@@ -1154,10 +1393,53 @@ def demande_cancel(request, pk):
     return redirect("laboratoire:demande_detail", pk=pk)
 
 
-@catalogue_requis
+@consultation_requise
+@require_POST
+def demande_delete(request, pk):
+    """Supprime définitivement une demande (médecin seulement, sans prélèvement)."""
+    demande = get_object_or_404(DemandeAnalyse, pk=pk, medecin=request.user)
+    exiger(request.user, "annuler_demande", demande=demande)
+
+    # Vérifications de sécurité
+    if demande.statut not in [DemandeAnalyse.Statut.EN_ATTENTE]:
+        messages.error(request, "Seule une demande en attente peut être supprimée.")
+        return redirect("laboratoire:demande_detail", pk=pk)
+
+    if demande.prelevements.exists():
+        messages.error(request, "Impossible de supprimer une demande avec des prélèvements enregistrés.")
+        return redirect("laboratoire:demande_detail", pk=pk)
+
+    # Traçabilité avant suppression
+    with transaction.atomic():
+        enregistrer_action(
+            utilisateur=request.user,
+            action="DEMANDE_SUPPRIMEE",
+            objet="DemandeAnalyse",
+            objet_id=demande.pk,
+            details={
+                "patient_id": demande.patient_id,
+                "laboratoire_id": demande.laboratoire_id,
+                "priorite": demande.priorite,
+                "analyses": [a.type_analyse_id for a in demande.analyses.all()],
+            },
+        )
+        demande.delete()
+
+    messages.success(request, "La demande a été supprimée définitivement.")
+    return redirect("laboratoire:demande_list")
+
+
+@consultation_requise
 def type_list(request):
+    """Catalogue accessible en lecture pour tous, en modification pour admin/responsable."""
+    archives_affichees = (
+        can_manage_catalog(request.user)
+        and request.GET.get("archives") == "1"
+    )
     return render(request, "laboratoire/type_list.html", {
-        "types": TypeAnalyse.objects.all(),
+        "types": TypeAnalyse.objects.filter(actif=not archives_affichees),
+        "can_manage_catalog": can_manage_catalog(request.user),
+        "archives_affichees": archives_affichees,
     })
 
 
@@ -1173,7 +1455,18 @@ def type_create(request):
                 details={"apres": _type_analyse_details(item)},
             )
         messages.success(request, "Le type d’analyse a été ajouté au catalogue.")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "redirect_url": reverse("laboratoire:type_list"),
+            })
         return redirect("laboratoire:type_list")
+    if request.GET.get("modal") == "1":
+        return render(request, "laboratoire/catalog_form_modal.html", {
+            "form": form,
+            "form_action": f"{reverse('laboratoire:type_create')}?modal=1",
+            "submit_label": "Ajouter l’analyse",
+        })
     return render(request, "laboratoire/form.html", {"form": form, "titre": "Ajouter une analyse"})
 
 
@@ -1194,16 +1487,53 @@ def type_update(request, pk):
                 },
             )
         messages.success(request, "Le type d’analyse a été mis à jour.")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "redirect_url": reverse("laboratoire:type_list"),
+            })
         return redirect("laboratoire:type_list")
+    if request.GET.get("modal") == "1":
+        return render(request, "laboratoire/catalog_form_modal.html", {
+            "form": form,
+            "form_action": f"{reverse('laboratoire:type_update', args=[pk])}?modal=1",
+            "submit_label": "Enregistrer les modifications",
+        })
     return render(request, "laboratoire/form.html", {
         "form": form, "titre": f"Modifier {item.nom}",
     })
 
 
 @catalogue_requis
+@require_POST
+def type_toggle_active(request, pk):
+    item = get_object_or_404(TypeAnalyse, pk=pk)
+    before = _type_analyse_details(item)
+    item.actif = not item.actif
+    with transaction.atomic():
+        item.save(update_fields=["actif"])
+        enregistrer_action(
+            utilisateur=request.user,
+            action="TYPE_ANALYSE_REACTIVE" if item.actif else "TYPE_ANALYSE_ARCHIVE",
+            objet="TypeAnalyse",
+            objet_id=item.pk,
+            details={"avant": before, "apres": _type_analyse_details(item)},
+        )
+    messages.success(
+        request,
+        "L’analyse a été réactivée." if item.actif else "L’analyse a été archivée et désactivée.",
+    )
+    return redirect("laboratoire:type_list")
+
+
+@catalogue_requis
 def bilan_list(request):
+    archives_affichees = request.GET.get("archives") == "1"
     return render(request, "laboratoire/bilan_list.html", {
-        "bilans": BilanPredefini.objects.prefetch_related("analyses"),
+        "bilans": BilanPredefini.objects.filter(
+            actif=not archives_affichees,
+        ).prefetch_related("analyses"),
+        "archives_affichees": archives_affichees,
     })
 
 
@@ -1218,12 +1548,24 @@ def bilan_create(request):
                 objet="BilanPredefini", objet_id=bilan.pk,
                 details={
                     "nom": bilan.nom,
+                    "description": bilan.description,
                     "analyses": list(bilan.analyses.values_list("pk", flat=True)),
                     "actif": bilan.actif,
                 },
             )
         messages.success(request, "Le bilan prédéfini a été créé.")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "redirect_url": reverse("laboratoire:bilan_list"),
+            })
         return redirect("laboratoire:bilan_list")
+    if request.GET.get("modal") == "1":
+        return render(request, "laboratoire/catalog_form_modal.html", {
+            "form": form,
+            "form_action": f"{reverse('laboratoire:bilan_create')}?modal=1",
+            "submit_label": "Créer le bilan",
+        })
     return render(request, "laboratoire/form.html", {
         "form": form, "titre": "Créer un bilan prédéfini",
     })
@@ -1236,6 +1578,7 @@ def bilan_update(request, pk):
     if request.method == "POST" and form.is_valid():
         avant = {
             "nom": bilan.nom,
+            "description": bilan.description,
             "analyses": list(bilan.analyses.values_list("pk", flat=True)),
             "actif": bilan.actif,
         }
@@ -1248,16 +1591,63 @@ def bilan_update(request, pk):
                     "avant": avant,
                     "apres": {
                         "nom": bilan.nom,
+                        "description": bilan.description,
                         "analyses": list(bilan.analyses.values_list("pk", flat=True)),
                         "actif": bilan.actif,
                     },
                 },
             )
         messages.success(request, "Le bilan prédéfini a été mis à jour.")
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "redirect_url": reverse("laboratoire:bilan_list"),
+            })
         return redirect("laboratoire:bilan_list")
+    if request.GET.get("modal") == "1":
+        return render(request, "laboratoire/catalog_form_modal.html", {
+            "form": form,
+            "form_action": f"{reverse('laboratoire:bilan_update', args=[pk])}?modal=1",
+            "submit_label": "Enregistrer les modifications",
+        })
     return render(request, "laboratoire/form.html", {
         "form": form, "titre": f"Modifier {bilan.nom}",
     })
+
+
+@catalogue_requis
+@require_POST
+def bilan_toggle_active(request, pk):
+    bilan = get_object_or_404(BilanPredefini, pk=pk)
+    avant = {
+        "nom": bilan.nom,
+        "description": bilan.description,
+        "analyses": list(bilan.analyses.values_list("pk", flat=True)),
+        "actif": bilan.actif,
+    }
+    bilan.actif = not bilan.actif
+    with transaction.atomic():
+        bilan.save(update_fields=["actif"])
+        enregistrer_action(
+            utilisateur=request.user,
+            action="BILAN_REACTIVE" if bilan.actif else "BILAN_ARCHIVE",
+            objet="BilanPredefini",
+            objet_id=bilan.pk,
+            details={
+                "avant": avant,
+                "apres": {
+                    "nom": bilan.nom,
+                    "description": bilan.description,
+                    "analyses": list(bilan.analyses.values_list("pk", flat=True)),
+                    "actif": bilan.actif,
+                },
+            },
+        )
+    messages.success(
+        request,
+        "Le bilan a été réactivé." if bilan.actif else "Le bilan a été archivé et désactivé.",
+    )
+    return redirect("laboratoire:bilan_list")
 
 
 @catalogue_requis
@@ -1306,65 +1696,321 @@ def parametres_laboratoire(request):
 
 
 @laboratoire_requis
-def prelevement_create(request, demande_id):
-    demande = get_object_or_404(_demande_visible(request.user), pk=demande_id)
-    if demande.statut == DemandeAnalyse.Statut.ANNULEE:
-        messages.error(request, "La demande est annulée.")
-        return redirect("laboratoire:demande_detail", pk=demande.pk)
-    form = PrelevementForm(request.POST or None)
+def prelevement_list(request):
+    exiger(request.user, "lire_demande")
+    scoped = prelevements_visibles(request.user).select_related(
+        "demande__patient", "demande__medecin",
+    ).prefetch_related("analyses__resultats")
+    prelevements = scoped
+    filter_form = PrelevementListFilterForm(request.GET)
+    filters = filter_form.cleaned_data if filter_form.is_valid() else {}
+    q = filters.get("q", "")
+    statut = filters.get("statut", "")
+    onglet = filters.get("onglet", "a_traiter")
+    statuts_par_onglet = {
+        "a_traiter": [
+            Prelevement.Statut.A_EFFECTUER,
+            Prelevement.Statut.PRELEVE,
+        ],
+        "resultats": [Prelevement.Statut.RECU],
+        "clotures": [
+            Prelevement.Statut.TERMINE,
+            Prelevement.Statut.REJETE,
+            Prelevement.Statut.ANNULE,
+        ],
+    }
+    if onglet not in statuts_par_onglet:
+        onglet = "a_traiter"
+    statuts_onglet = statuts_par_onglet[onglet]
+    if statut not in statuts_onglet:
+        statut = ""
+
+    if q:
+        prelevements = prelevements.filter(
+            Q(code_prelevement__icontains=q)
+            | Q(demande__patient__first_name__icontains=q)
+            | Q(demande__patient__last_name__icontains=q)
+            | Q(demande__patient__username__icontains=q)
+        ).distinct()
+    if statut:
+        prelevements = prelevements.filter(statut=statut)
+    else:
+        prelevements = prelevements.filter(statut__in=statuts_onglet)
+
+    date_debut = filters.get("date_debut")
+    date_fin = filters.get("date_fin")
+    if date_debut:
+        prelevements = prelevements.filter(date_creation__date__gte=date_debut)
+    if date_fin:
+        prelevements = prelevements.filter(date_creation__date__lte=date_fin)
+
+    prelevements = prelevements.annotate(
+        priorite_tri=Case(
+            When(demande__priorite=DemandeAnalyse.Priorite.URGENTE, then=Value(0)),
+            When(demande__priorite=DemandeAnalyse.Priorite.HAUTE, then=Value(1)),
+            default=Value(2),
+            output_field=IntegerField(),
+        ),
+    ).order_by("priorite_tri", "-date_creation")
+    refuser_id = request.GET.get("refuser", "")
+    refuser_prelevement = None
+    if refuser_id.isdigit() and peut(request.user, "changer_statut"):
+        refuser_prelevement = scoped.filter(
+            pk=refuser_id,
+            statut__in=[
+                Prelevement.Statut.PRELEVE,
+                Prelevement.Statut.RECU,
+            ],
+        ).first()
+    onglets = [
+        ("a_traiter", "À traiter"),
+        ("resultats", "Résultats à saisir"),
+        ("clotures", "Clôturés"),
+    ]
+    return render(request, "laboratoire/prelevement_list.html", {
+        "prelevements": prelevements,
+        "filter_form": filter_form,
+        "q": q,
+        "statut": statut,
+        "onglet": onglet,
+        "onglets": onglets,
+        "onglet_label": dict(onglets)[onglet],
+        "statut_choices": [
+            choice for choice in Prelevement.Statut.choices
+            if choice[0] in statuts_onglet
+        ],
+        "motifs_rejet": ParametresLaboratoire.get_solo().motifs_rejet,
+        "can_work": peut(request.user, "changer_statut"),
+        "refuser_prelevement": refuser_prelevement,
+        "date_debut": request.GET.get("date_debut", ""),
+        "date_fin": request.GET.get("date_fin", ""),
+    })
+
+
+@laboratoire_requis
+@require_POST
+def prelevement_etape(request, pk):
+    prelevement = get_object_or_404(
+        prelevements_visibles(request.user).select_related("demande"),
+        pk=pk,
+    )
+    exiger(request.user, "changer_statut", demande=prelevement.demande)
+    etape = request.POST.get("etape")
+    if etape == "RECU":
+        nouveau_statut = Prelevement.Statut.RECU
+    elif etape == "PRELEVE" and prelevement.statut == Prelevement.Statut.A_EFFECTUER:
+        nouveau_statut = Prelevement.Statut.PRELEVE
+    elif etape == "RESULTATS" and prelevement.statut == Prelevement.Statut.RECU:
+        return redirect("laboratoire:prelevement_resultats", pk=prelevement.pk)
+    else:
+        messages.error(request, "Cette étape n’est pas disponible pour ce prélèvement.")
+        return _redirect_prelevement_list(
+            _onglet_prelevement(prelevement.statut),
+            prelevement.statut,
+        )
+    try:
+        changer_statut(prelevement, nouveau_statut, request.user)
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+        return _redirect_prelevement_list(
+            _onglet_prelevement(prelevement.statut),
+            prelevement.statut,
+        )
+    else:
+        messages.success(
+            request,
+            "La réception du prélèvement est confirmée. "
+            "Vous pouvez imprimer l’étiquette et saisir les résultats.",
+        )
+    return _redirect_prelevement_list(
+        _onglet_prelevement(nouveau_statut),
+        nouveau_statut,
+    )
+
+
+@laboratoire_requis
+@require_POST
+def prelevement_rejeter(request, pk):
+    prelevement = get_object_or_404(
+        prelevements_visibles(request.user).select_related("demande"),
+        pk=pk,
+    )
+    exiger(request.user, "changer_statut", demande=prelevement.demande)
+    form = RejetPrelevementForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Choisissez un motif de refus valide.")
+        return _redirect_prelevement_list(
+            _onglet_prelevement(prelevement.statut),
+            prelevement.statut,
+        )
+    try:
+        changer_statut(
+            prelevement,
+            Prelevement.Statut.REJETE,
+            request.user,
+            motif=form.cleaned_data["motif"],
+            remarque=form.cleaned_data["remarque"],
+        )
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+        return _redirect_prelevement_list(
+            _onglet_prelevement(prelevement.statut),
+            prelevement.statut,
+        )
+    else:
+        messages.success(request, "Le prélèvement a été refusé et tracé.")
+    return _redirect_prelevement_list("clotures", Prelevement.Statut.REJETE)
+
+
+@laboratoire_requis
+@require_POST
+def prelevement_refaire(request, pk):
+    prelevement = get_object_or_404(
+        prelevements_visibles(request.user).select_related("demande"),
+        pk=pk,
+    )
+    exiger(request.user, "changer_statut", demande=prelevement.demande)
+    try:
+        refaire_prelevement(prelevement, request.user)
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+        return _redirect_prelevement_list("clotures", Prelevement.Statut.REJETE)
+    else:
+        messages.success(request, "Un nouveau prélèvement a été créé.")
+    return _redirect_prelevement_list("a_traiter", Prelevement.Statut.A_EFFECTUER)
+
+
+@laboratoire_requis
+def prelevement_resultats(request, pk):
+    prelevement = get_object_or_404(
+        prelevements_visibles(request.user).select_related("demande"),
+        pk=pk,
+    )
+    exiger(request.user, "resultat", demande=prelevement.demande)
+    if prelevement.statut != Prelevement.Statut.RECU:
+        messages.error(request, "Le tube doit être reçu avant la saisie des résultats.")
+        return _redirect_prelevement_list(
+            _onglet_prelevement(prelevement.statut),
+            prelevement.statut,
+        )
+    analyses = list(
+        prelevement.analyses.select_related("type_analyse").exclude(
+            statut=AnalyseDemandee.Statut.ANNULEE,
+        ).order_by("type_analyse__nom")
+    )
+    a_saisir = [
+        analyse for analyse in analyses
+        if not analyse.resultats.filter(statut=Resultat.Statut.VALIDE).exists()
+    ]
+    if not analyses:
+        messages.error(
+            request,
+            "Aucune analyse active n’est associée à ce prélèvement. "
+            "La saisie est impossible ; contactez le responsable du laboratoire.",
+        )
+        return _redirect_prelevement_list("resultats", Prelevement.Statut.RECU)
+    if not a_saisir:
+        messages.info(request, "Tous les résultats de ce prélèvement sont déjà validés.")
+        return _redirect_prelevement_list("clotures", Prelevement.Statut.TERMINE)
+    action = request.POST.get("action") if request.method == "POST" else ""
+    publier = action == "valider"
+    form = PrelevementResultatsForm(
+        request.POST or None,
+        analyses=a_saisir,
+        publier=publier,
+    )
+    resultat_rows = [
+        {
+            "analyse": analyse,
+            "fields": [
+                form[f"valeur_{analyse.pk}"],
+                form[f"unite_{analyse.pk}"],
+                form[f"valeur_reference_{analyse.pk}"],
+                form[f"observation_{analyse.pk}"],
+            ],
+            "brouillon": analyse.resultats.filter(
+                statut=Resultat.Statut.EN_SAISIE,
+            ).first(),
+        }
+        for analyse in a_saisir
+    ]
     if request.method == "POST" and form.is_valid():
-        prelevement = form.save(commit=False)
-        prelevement.demande = demande
+        values = {
+            analyse: {
+                "valeur": form.cleaned_data.get(f"valeur_{analyse.pk}", ""),
+                "unite": form.cleaned_data.get(f"unite_{analyse.pk}", ""),
+                "valeur_reference": form.cleaned_data.get(
+                    f"valeur_reference_{analyse.pk}", "",
+                ),
+                "observation": form.cleaned_data.get(
+                    f"observation_{analyse.pk}", "",
+                ),
+            }
+            for analyse in a_saisir
+        }
         try:
-            enregistrer_prelevement(
-                prelevement=prelevement, utilisateur=request.user,
-                donnees={
-                    field: form.cleaned_data[field]
-                    for field in form.fields
-                },
-            )
+            if publier:
+                envoyer_resultats(
+                    resultats=values,
+                    utilisateur=request.user,
+                    prelevement=prelevement,
+                )
+            else:
+                enregistrer_resultats_brouillon(
+                    resultats=values,
+                    utilisateur=request.user,
+                    prelevement=prelevement,
+                )
         except ValidationError as error:
             form.add_error(None, error)
         else:
-            if demande.statut == DemandeAnalyse.Statut.EN_ATTENTE:
-                demande.statut = DemandeAnalyse.Statut.EN_COURS
-                demande.save(update_fields=["statut"])
-                enregistrer_action(
-                    utilisateur=request.user, action="DEMANDE_EN_COURS",
-                    objet="DemandeAnalyse", objet_id=demande.pk,
-                    details={"statut": demande.statut},
+            if publier:
+                messages.success(request, "Les résultats ont été validés et publiés.")
+                return _redirect_prelevement_list(
+                    "clotures", Prelevement.Statut.TERMINE,
                 )
-            messages.success(request, "Le prélèvement a été enregistré.")
-            return redirect("laboratoire:demande_detail", pk=demande.pk)
-    return render(request, "laboratoire/form.html", {
-        "form": form, "titre": f"Prélèvement — demande #{demande.pk}",
+            messages.success(
+                request,
+                "Le brouillon a été enregistré. Les résultats ne sont pas encore publiés.",
+            )
+            return redirect("laboratoire:prelevement_resultats", pk=prelevement.pk)
+    return render(request, "laboratoire/prelevement_resultats.html", {
+        "form": form,
+        "prelevement": prelevement,
+        "resultat_rows": resultat_rows,
     })
+
+
+@laboratoire_requis
+@require_POST
+def prelevement_create(request, demande_id):
+    demande = get_object_or_404(_demande_visible(request.user), pk=demande_id)
+    exiger(request.user, "changer_statut", demande=demande)
+    try:
+        creer_prelevements(demande, request.user)
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+    else:
+        messages.success(request, "Les prélèvements nécessaires ont été créés.")
+    return redirect("laboratoire:prelevement_list")
 
 
 @laboratoire_requis
 def prelevement_update(request, pk):
     prelevement = get_object_or_404(
-        Prelevement.objects.select_related("demande").filter(
-            Q(demande__laboratoire__in=laboratory_team_user_ids(request.user))
-            | Q(demande__laboratoire__isnull=True)
-        ),
+        prelevements_visibles(request.user).select_related("demande"),
         pk=pk,
     )
-    form = PrelevementForm(request.POST or None, instance=prelevement)
-    if request.method == "POST" and form.is_valid():
-        try:
-            enregistrer_prelevement(
-                prelevement=prelevement, utilisateur=request.user,
-                donnees={field: form.cleaned_data[field] for field in form.fields},
-            )
-        except ValidationError as error:
-            form.add_error(None, error)
-        else:
-            messages.success(request, "Le prélèvement a été mis à jour.")
-            return redirect("laboratoire:demande_detail", pk=prelevement.demande_id)
-    return render(request, "laboratoire/form.html", {
-        "form": form, "titre": f"Modifier le prélèvement {prelevement.code_prelevement}",
-    })
+    exiger(request.user, "changer_statut", demande=prelevement.demande)
+    messages.info(
+        request,
+        "La modification directe des prélèvements est désactivée. "
+        "Utilisez les actions correspondant à leur étape.",
+    )
+    return _redirect_prelevement_list(
+        _onglet_prelevement(prelevement.statut),
+        prelevement.statut,
+    )
 
 
 @laboratoire_requis
@@ -1372,12 +2018,22 @@ def prelevement_etiquette(request, pk):
     prelevement = get_object_or_404(
         Prelevement.objects.select_related(
             "demande__patient", "demande__medecin",
-        ).filter(
-            Q(demande__laboratoire__in=laboratory_team_user_ids(request.user))
-            | Q(demande__laboratoire__isnull=True)
-        ),
+        ).filter(pk__in=prelevements_visibles(request.user).values("pk")),
         pk=pk,
     )
+    exiger(request.user, "lire_demande", demande=prelevement.demande)
+    if prelevement.statut not in {
+        Prelevement.Statut.RECU,
+        Prelevement.Statut.TERMINE,
+    }:
+        messages.info(
+            request,
+            "L’étiquette sera disponible après la confirmation de réception du prélèvement.",
+        )
+        return _redirect_prelevement_list(
+            _onglet_prelevement(prelevement.statut),
+            prelevement.statut,
+        )
     bars, barcode_width = _code39_barres(prelevement.code_prelevement)
     return render(request, "laboratoire/etiquette_prelevement.html", {
         "prelevement": prelevement,
@@ -1389,58 +2045,55 @@ def prelevement_etiquette(request, pk):
 @laboratoire_requis
 def resultat_create(request, analyse_id):
     analyse = get_object_or_404(
-        AnalyseDemandee.objects.select_related("demande", "type_analyse").filter(
-            Q(demande__laboratoire__in=laboratory_team_user_ids(request.user))
-            | Q(demande__laboratoire__isnull=True)
-        ),
+        AnalyseDemandee.objects.select_related(
+            "demande", "type_analyse", "prelevement",
+        ).filter(demande__in=demandes_visibles(request.user)),
         pk=analyse_id,
     )
+    exiger(request.user, "resultat", demande=analyse.demande)
     if analyse.statut == AnalyseDemandee.Statut.ANNULEE:
         messages.error(request, "Cette analyse a été annulée et ne peut plus recevoir de résultat.")
         return redirect("laboratoire:demande_detail", pk=analyse.demande_id)
-    prelevement_id = request.GET.get("prelevement")
-    prelevement = None
-    if prelevement_id:
-        prelevement = get_object_or_404(
-            Prelevement, pk=prelevement_id, demande=analyse.demande,
-        )
-    form = ResultatForm(request.POST or None)
+    prelevement = analyse.prelevement
+    if not prelevement or prelevement.statut != Prelevement.Statut.RECU:
+        messages.error(request, "Le prélèvement doit être reçu avant la saisie du résultat.")
+        return redirect("laboratoire:demande_detail", pk=analyse.demande_id)
+    analyse_type = analyse.type_analyse
+    initial_data = {}
+    if analyse_type.unite:
+        initial_data["unite"] = analyse_type.unite
+    result = Resultat.objects.filter(analyse_demandee=analyse).first()
+    if result and result.statut == Resultat.Statut.VALIDE:
+        messages.info(request, "Ce résultat existe déjà ; utilisez la correction tracée.")
+        return redirect("laboratoire:resultat_update", pk=result.pk)
+    instance = result or Resultat(
+        analyse_demandee=analyse,
+        prelevement=prelevement,
+        saisi_par=request.user,
+    )
+    form = ResultatForm(request.POST or None, instance=instance, initial=initial_data)
     if request.method == "POST" and form.is_valid():
-        if Resultat.objects.filter(
-            analyse_demandee=analyse, prelevement=prelevement,
-        ).exists():
-            form.add_error(None, "Un résultat existe déjà pour cette analyse et ce prélèvement.")
+        donnees = {
+            key: form.cleaned_data[key]
+            for key in ("valeur", "unite", "valeur_reference", "interpretation", "observation")
+        }
+        try:
+            enregistrer_resultats_brouillon(
+                resultats={analyse: donnees},
+                utilisateur=request.user,
+                prelevement=prelevement,
+            )
+        except ValidationError as error:
+            form.add_error(None, error)
         else:
-            analyse_type = analyse.type_analyse
-            donnees = {field: form.cleaned_data[field] for field in form.fields}
-            if not donnees["unite"]:
-                donnees["unite"] = analyse_type.unite
-            if not donnees["valeur_reference"] and (
-                analyse_type.valeur_reference_min is not None
-                or analyse_type.valeur_reference_max is not None
-            ):
-                minimum = (
-                    str(analyse_type.valeur_reference_min)
-                    if analyse_type.valeur_reference_min is not None else "—"
-                )
-                maximum = (
-                    str(analyse_type.valeur_reference_max)
-                    if analyse_type.valeur_reference_max is not None else "—"
-                )
-                donnees["valeur_reference"] = (
-                    f"{minimum} – {maximum} {analyse_type.unite}"
-                ).strip()
-            try:
-                resultat = enregistrer_resultat(
-                    analyse_demandee=analyse, prelevement=prelevement,
-                    utilisateur=request.user,
-                    donnees=donnees,
-                )
-            except ValidationError as error:
-                form.add_error(None, error)
-            else:
-                messages.success(request, "Le résultat a été saisi et envoyé pour validation.")
-                return redirect("laboratoire:demande_detail", pk=analyse.demande_id)
+            messages.success(
+                request,
+                "Le brouillon a été enregistré. Il reste à valider avant publication.",
+            )
+            return redirect(
+                "laboratoire:prelevement_resultats",
+                pk=prelevement.pk,
+            )
     return render(request, "laboratoire/form.html", {
         "form": form, "titre": f"Résultat — {analyse.type_analyse.nom}",
     })
@@ -1449,37 +2102,49 @@ def resultat_create(request, analyse_id):
 @laboratoire_requis
 def resultat_update(request, pk):
     resultat = get_object_or_404(
-        Resultat.objects.select_related("analyse_demandee__demande", "prelevement").filter(
-            Q(analyse_demandee__demande__laboratoire__in=laboratory_team_user_ids(request.user))
-            | Q(analyse_demandee__demande__laboratoire__isnull=True)
+        resultats_visibles(request.user).select_related(
+            "analyse_demandee__demande",
+            "analyse_demandee__type_analyse",
+            "analyse_demandee__prelevement",
+            "prelevement",
         ),
         pk=pk,
     )
-    if resultat.statut in (
-        Resultat.Statut.VALIDE,
-        Resultat.Statut.CORRIGE,
-    ) and not is_lab_responsable(request.user):
-        messages.error(
-            request,
-            "Un résultat déjà validé ne peut être corrigé que par le biologiste responsable.",
-        )
-        return redirect("laboratoire:demande_detail", pk=resultat.analyse_demandee.demande_id)
-    if resultat.statut == Resultat.Statut.VALIDE and not request.POST:
-        messages.info(request, "Une correction de résultat validé sera soumise à une nouvelle validation.")
+    exiger(
+        request.user,
+        "resultat",
+        demande=resultat.analyse_demandee.demande,
+    )
     form = ResultatForm(request.POST or None, instance=resultat)
     if request.method == "POST" and form.is_valid():
+        donnees = {
+            key: form.cleaned_data[key]
+            for key in ("valeur", "unite", "valeur_reference", "interpretation", "observation")
+        }
         try:
-            enregistrer_resultat(
-                analyse_demandee=resultat.analyse_demandee,
-                prelevement=resultat.prelevement,
-                utilisateur=request.user,
-                donnees={field: form.cleaned_data[field] for field in form.fields},
-                resultat=resultat,
-            )
+            if resultat.statut == Resultat.Statut.EN_SAISIE:
+                enregistrer_resultats_brouillon(
+                    resultats={resultat.analyse_demandee: donnees},
+                    utilisateur=request.user,
+                    prelevement=resultat.prelevement,
+                )
+            else:
+                corriger_resultat(
+                    resultat=resultat,
+                    utilisateur=request.user,
+                    donnees=donnees,
+                    motif=form.cleaned_data["motif_correction"],
+                )
         except ValidationError as error:
             form.add_error(None, error)
         else:
-            messages.success(request, "La modification est tracée et soumise à validation.")
+            if resultat.statut == Resultat.Statut.EN_SAISIE:
+                messages.success(request, "Le brouillon du résultat a été mis à jour.")
+                return redirect(
+                    "laboratoire:prelevement_resultats",
+                    pk=resultat.prelevement_id,
+                )
+            messages.success(request, "La correction est enregistrée, versionnée et tracée.")
             return redirect("laboratoire:demande_detail", pk=resultat.analyse_demandee.demande_id)
     return render(request, "laboratoire/form.html", {
         "form": form, "titre": f"Modifier le résultat #{resultat.pk}",
@@ -1488,108 +2153,48 @@ def resultat_update(request, pk):
 
 @laboratoire_requis
 def validation_queue(request):
-    if not can_validate_results(request.user):
-        messages.error(
-            request,
-            "La file de validation est réservée au groupe Biologiste responsable.",
-        )
-        return redirect("laboratoire:demande_list")
-    resultats = Resultat.objects.filter(
-        statut__in=[
-            Resultat.Statut.EN_ATTENTE_VALIDATION,
-            Resultat.Statut.CORRIGE,
-        ],
-    ).filter(
-        Q(analyse_demandee__demande__laboratoire__in=laboratory_team_user_ids(request.user))
-        | Q(analyse_demandee__demande__laboratoire__isnull=True)
-    ).select_related(
-        "analyse_demandee__demande__patient",
-        "analyse_demandee__demande__medecin",
-        "analyse_demandee__type_analyse",
-        "saisi_par",
-        "valide_par",
-    ).order_by(
-        Case(
-            When(
-                analyse_demandee__demande__priorite=DemandeAnalyse.Priorite.URGENTE,
-                then=Value(0),
-            ),
-            When(
-                analyse_demandee__demande__priorite=DemandeAnalyse.Priorite.HAUTE,
-                then=Value(1),
-            ),
-            default=Value(2),
-            output_field=IntegerField(),
-        ),
-        "date_saisie",
-    )
-    return render(request, "laboratoire/validation_queue.html", {
-        "resultats": resultats,
-        "nombre_critiques": sum(
-            resultat.potentiellement_critique for resultat in resultats
-        ),
-    })
+    exiger(request.user, "lire_demande")
+    messages.info(request, "La validation des résultats est effectuée directement par le laboratoire.")
+    return redirect("laboratoire:prelevement_list")
 
 
 @laboratoire_requis
 @require_POST
 def resultat_reject(request, pk):
-    resultat = get_object_or_404(
-        Resultat.objects.select_related(
-            "analyse_demandee__demande",
-        ).filter(
-            Q(analyse_demandee__demande__laboratoire__in=laboratory_team_user_ids(request.user))
-            | Q(analyse_demandee__demande__laboratoire__isnull=True)
-        ),
-        pk=pk,
-    )
-    form = RejetResultatForm(request.POST)
-    if not can_validate_results(request.user):
-        messages.error(
-            request,
-            "Seul un biologiste responsable peut rejeter un résultat.",
-        )
-    elif form.is_valid():
-        try:
-            rejeter_resultat(
-                resultat=resultat,
-                utilisateur=request.user,
-                commentaire=form.cleaned_data["commentaire"],
-            )
-        except ValidationError as error:
-            messages.error(request, error.messages[0])
-        else:
-            messages.success(request, "Le résultat a été retourné à l’opérateur avec commentaire.")
-    else:
-        messages.error(request, "Un commentaire valide est obligatoire pour rejeter le résultat.")
-    return redirect("laboratoire:validation_queue")
+    exiger(request.user, "resultat")
+    messages.info(request, "Un résultat ne se rejette pas : utilisez la correction tracée si nécessaire.")
+    return redirect("laboratoire:prelevement_list")
 
 
 @laboratoire_requis
 @require_POST
 def resultat_validate(request, pk):
     resultat = get_object_or_404(
-        Resultat.objects.select_related("analyse_demandee__demande").filter(
-            Q(analyse_demandee__demande__laboratoire__in=laboratory_team_user_ids(request.user))
-            | Q(analyse_demandee__demande__laboratoire__isnull=True)
-        ), pk=pk,
+        resultats_visibles(request.user).select_related(
+            "analyse_demandee__demande",
+        ),
+        pk=pk,
     )
+    exiger(request.user, "resultat", demande=resultat.analyse_demandee.demande)
+    if resultat.statut != Resultat.Statut.EN_SAISIE:
+        messages.info(request, "Ce résultat est déjà validé.")
+        return redirect("laboratoire:demande_detail", pk=resultat.analyse_demandee.demande_id)
     try:
         valider_resultat(resultat=resultat, utilisateur=request.user)
     except ValidationError as error:
         messages.error(request, error.messages[0])
     else:
-        messages.success(request, "Le résultat a été validé.")
+        messages.success(request, "Le résultat a été validé et publié.")
     return redirect("laboratoire:demande_detail", pk=resultat.analyse_demandee.demande_id)
 
 
 @consultation_requise
 def historique(request):
-    if not (request.user.is_laboratory or request.user.is_admin_user):
-        messages.error(request, "L’historique est réservé au laboratoire et à l’administration.")
-        return redirect("laboratoire:demande_list")
+    exiger(request.user, "historique")
     actions = HistoriqueAction.objects.select_related("utilisateur")
-    q = request.GET.get("q", "").strip()
+    filter_form = HistoriqueFilterForm(request.GET)
+    filters = filter_form.cleaned_data if filter_form.is_valid() else {}
+    q = filters.get("q", "")
     if q:
         actions = actions.filter(
             Q(objet_concerne__icontains=q) | Q(type_action__icontains=q)
@@ -1602,6 +2207,7 @@ def historique(request):
         _prepare_history_action(action)
     return render(request, "laboratoire/historique.html", {
         "actions": actions,
+        "filter_form": filter_form,
         "action_count": len(actions),
         "q": q,
     })

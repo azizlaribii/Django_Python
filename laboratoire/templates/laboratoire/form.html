@@ -10,19 +10,23 @@
       <div class="lab-hero__copy">
         <span class="lab-hero__eyebrow">🔬 Espace laboratoire</span>
         <h1>{{ titre }}</h1>
-        <p>Les champs marqués comme obligatoires doivent être renseignés avant l’enregistrement.</p>
+        {% if prelevement_form %}
+          <p>Le code est généré automatiquement. Les dates sont enregistrées lors de la confirmation des étapes du prélèvement.</p>
+        {% else %}
+          <p>Les champs marqués comme obligatoires doivent être renseignés avant l’enregistrement.</p>
+        {% endif %}
       </div>
     </header>
     <section class="lab-panel">
       <div class="lab-panel__head"><h2>Informations</h2></div>
       <div class="lab-panel__body">
-        <form method="post" class="lab-form" enctype="multipart/form-data">
+        <form method="post" class="lab-form" enctype="multipart/form-data" {% if prelevement_form %}data-prelevement-form{% endif %}>
           {% csrf_token %}
           {% if form.non_field_errors %}
             <div class="lab-form__nonfield lab-form__field--wide" role="alert">{{ form.non_field_errors }}</div>
           {% endif %}
           {% for field in form %}
-            <div class="lab-form__field {% if field.name == 'analyses' or field.name == 'bilans' or field.name == 'commentaire' or field.name == 'description' or field.name == 'observation' or field.name == 'motif_rejet' or field.name == 'motifs_rejet' or field.name == 'entete_compte_rendu' or field.name == 'signature_compte_rendu' or field.name == 'remarque' %}lab-form__field--wide{% endif %}">
+            <div class="lab-form__field {% if field.name == 'analyses' or field.name == 'bilans' or field.name == 'commentaire' or field.name == 'description' or field.name == 'observation' or field.name == 'motif_rejet' or field.name == 'motifs_rejet' or field.name == 'entete_compte_rendu' or field.name == 'signature_compte_rendu' or field.name == 'remarque' %}lab-form__field--wide{% endif %}" {% if prelevement_form and field.name == "precision_type" %}data-prelevement-precision {% if form.type_prelevement.value != "AUTRE" %}hidden{% endif %}{% endif %}>
               {{ field.label_tag }}
               {% if field.field.required %}<span aria-hidden="true" style="color:#b42318;">*</span>{% endif %}
               {% if field.name == "analyses" or field.name == "bilans" %}
@@ -48,4 +52,19 @@
     </section>
   </div>
 </div>
+{% if prelevement_form %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var form = document.querySelector("[data-prelevement-form]");
+    var typeField = form && form.querySelector('[name="type_prelevement"]');
+    var precisionField = form && form.querySelector("[data-prelevement-precision]");
+    if (!typeField || !precisionField) return;
+    var updatePrecisionVisibility = function () {
+      precisionField.hidden = typeField.value !== "AUTRE";
+    };
+    typeField.addEventListener("change", updatePrecisionVisibility);
+    updatePrecisionVisibility();
+  });
+</script>
+{% endif %}
 {% endblock %}

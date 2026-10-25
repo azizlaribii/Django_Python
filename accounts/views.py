@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -297,6 +298,15 @@ def doctor_dashboard(request):
         medecin_prescripteur=request.user
     ).select_related('dossier__patient', 'laboratoire').order_by('-date_prescription')[:5]
 
+    from laboratoire.models import DemandeAnalyse, Resultat
+
+    demandes_resume = DemandeAnalyse.objects.filter(
+        medecin=request.user,
+        analyses__resultats__statut=Resultat.Statut.VALIDE,
+    ).select_related(
+        'patient',
+    ).distinct().order_by('-date_demande')[:5]
+
     stats = {
         'patients_count': associations.count(),
         'consultations_today': ExamenMedical.objects.filter(
@@ -320,6 +330,12 @@ def doctor_dashboard(request):
         'associations': associations,
         'examens_recents': examens_recents,
         'resultats_recents': resultats_recents,
+        'demandes_resume': demandes_resume,
+        'ia_resume_configuree': bool(
+            getattr(settings, 'GOOGLE_API_KEY', '').strip()
+            or getattr(settings, 'GEMINI_API_KEY', '').strip()
+            or getattr(settings, 'ANTHROPIC_API_KEY', '').strip()
+        ),
         'search_q': search_q,
         'tous_patients': tous_patients,
     }
@@ -745,52 +761,57 @@ def get_observation_detail(request, observation_id):
 # ─────────────────────────────────────────────────────────────
 @login_required
 def lab_dashboard(request):
-    """Tableau de bord dédié aux laboratoires d'analyse."""
-    if not (request.user.is_laboratory or request.user.is_admin_user):
+    """Affiche les indicateurs et tâches récentes réservés au laboratoire."""
+    if not request.user.is_laboratory:
+        if request.user.is_admin_user:
+            return redirect('laboratoire:demande_list')
         messages.warning(request, "Accès réservé aux laboratoires.")
         return redirect('dashboard')
 
-    profile, _ = LaboratoryProfile.objects.get_or_create(user=request.user)
-    from laboratoire.permissions import laboratory_team_user_ids
+    from laboratoire.models import Prelevement
+    from laboratoire.permissions import prelevements_visibles
 
-    team_user_ids = laboratory_team_user_ids(request.user)
-
-    pending_analyses = ResultatLaboratoire.objects.filter(
-        laboratoire__in=team_user_ids
-    ).select_related('dossier__patient', 'medecin_prescripteur').order_by('-date_prescription')
-
-    total_analyses = ResultatLaboratoire.objects.filter(laboratoire__in=team_user_ids).count()
-    in_progress = ResultatLaboratoire.objects.filter(laboratoire__in=team_user_ids, statut='EN_COURS').count()
-    completed = ResultatLaboratoire.objects.filter(laboratoire__in=team_user_ids, statut__in=['DISPONIBLE', 'TRANSMIS']).count()
-    active_doctors = ResultatLaboratoire.objects.filter(
-        laboratoire__in=team_user_ids,
-        medecin_prescripteur__isnull=False
-    ).values('medecin_prescripteur').distinct().count()
-
-    stats = {
-        'analyses_prescrites': total_analyses,
-        'analyses_today': total_analyses,
-        'in_progress': in_progress,
-        'completed': completed,
-        'active_doctors': active_doctors,
-    }
-
-    context = {
-        'profile': profile,
-        'stats': stats,
-        'pending_analyses': pending_analyses,
-    }
-    return render(request, 'accounts/dashboard_lab.html', context)
+    prelevements = prelevements_visibles(request.user)
+    actifs = prelevements.filter(
+        statut__in=[
+            Prelevement.Statut.A_EFFECTUER,
+            Prelevement.Statut.PRELEVE,
+            Prelevement.Statut.RECU,
+        ],
+    )
+    return render(request, 'laboratoire/dashboard.html', {
+        'stats_prelevements': {
+            'total': prelevements.count(),
+            'a_effectuer': prelevements.filter(
+                statut=Prelevement.Statut.A_EFFECTUER,
+            ).count(),
+            'a_receptionner': prelevements.filter(
+                statut=Prelevement.Statut.PRELEVE,
+            ).count(),
+            'resultats_a_saisir': prelevements.filter(
+                statut=Prelevement.Statut.RECU,
+            ).count(),
+            'termines': prelevements.filter(
+                statut=Prelevement.Statut.TERMINE,
+            ).count(),
+            'refuses': prelevements.filter(
+                statut=Prelevement.Statut.REJETE,
+            ).count(),
+        },
+        'prelevements_recents': actifs.select_related(
+            'demande__patient',
+        ).order_by('-date_creation')[:8],
+    })
 
 
 @login_required
 @require_POST
 def lab_update_resultat(request, resultat_id):
-    """Permet au laboratoire de mettre à jour un résultat d'analyse."""
+    """Permet au laboratoire de mettre à jour un résultat d'analyse legacy."""
     if not request.user.is_laboratory:
         return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
 
-    from laboratoire.permissions import can_validate_results, laboratory_team_user_ids
+    from laboratoire.permissions import laboratory_team_user_ids
 
     resultat = get_object_or_404(
         ResultatLaboratoire,
@@ -800,15 +821,10 @@ def lab_update_resultat(request, resultat_id):
     statut = request.POST.get('statut', resultat.statut)
     if statut not in dict(ResultatLaboratoire.STATUT_CHOICES):
         return JsonResponse({'success': False, 'error': 'Statut invalide'}, status=400)
-    published_statuses = ['DISPONIBLE', 'TRANSMIS']
-    if (
-        (statut in published_statuses or resultat.statut in published_statuses)
-        and not can_validate_results(request.user)
-    ):
-        return JsonResponse(
-            {'success': False, 'error': 'Validation réservée aux professionnels du laboratoire'},
-            status=403,
-        )
+
+    # Pour les résultats legacy, pas besoin de permission valider_resultat
+    # (comportement différent du nouveau système laboratoire)
+
     valeurs = request.POST.get('valeurs', resultat.valeurs)
     interpretation = request.POST.get('interpretation', resultat.interpretation)
 

@@ -1,73 +1,119 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Demandes d’analyses — SantéConnect{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">
+{% endblock %}
 {% block content %}
 <div class="lab-shell">
   <header class="lab-hero">
     <div class="lab-hero__copy">
-      <span class="lab-hero__eyebrow">🔬 Espace laboratoire</span>
+      <span class="lab-hero__eyebrow">Suivi des demandes d’analyses</span>
+      {% if user.is_laboratory %}
+      <h1>Demandes d’analyses</h1>
+      <p>Consultez les demandes et ouvrez le suivi des prélèvements.</p>
+      {% else %}
       <h1>Demandes d’analyses</h1>
       <p>Suivez les prescriptions, les prélèvements et les résultats depuis un seul espace.</p>
+      {% endif %}
     </div>
     <div class="lab-hero__actions">
       {% if can_create %}
-        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:demande_create' %}">＋ Nouvelle prescription</a>
+      <button type="button" class="lab-btn lab-btn--white" id="open-prescription-modal"
+        data-open-request-modal data-request-title="Nouvelle demande d’analyse">＋ Nouvelle demande d’analyse</button>
       {% endif %}
-      {% if can_manage_catalog %}
-        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:supervision' %}">Supervision</a>
-        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:rapports' %}">Rapports</a>
-        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:type_list' %}">Catalogue</a>
-      {% endif %}
-      {% if can_validate %}
-        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:validation_queue' %}">Validation biologiste</a>
-      {% endif %}
-      {% if user.is_laboratory or user.is_admin_user %}
-        <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:historique' %}">Historique</a>
+      {% if user.is_laboratory %}
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:prelevement_list' %}">Ouvrir la file des prélèvements</a>
       {% endif %}
     </div>
   </header>
+  {% if user.is_doctor %}
+  <p class="lab-ai-note" role="note">
+    {% if ia_resume_configuree %}
+    Comparez les résultats publiés et leur historique ; l’IA peut rédiger un résumé descriptif à vérifier et approuver. Seules les données d’analyse pseudonymisées sont envoyées au fournisseur configuré.
+    {% else %}
+    Les comparaisons avec l’historique restent accessibles. Configurez un fournisseur IA pour générer un résumé descriptif ; aucun résumé local automatique n’est produit.
+    {% endif %}
+  </p>
+  {% endif %}
 
   <section class="lab-stats" aria-label="Résumé des demandes">
     <article class="lab-stat"><span class="lab-stat__icon">▤</span><span><strong class="lab-stat__number">{{ stats.total }}</strong><span class="lab-stat__label">Demandes visibles</span></span></article>
-    <article class="lab-stat"><span class="lab-stat__icon">◷</span><span><strong class="lab-stat__number">{{ stats.en_attente }}</strong><span class="lab-stat__label">En attente</span></span></article>
+    <article class="lab-stat"><span class="lab-stat__icon">◷</span><span><strong class="lab-stat__number">{{ stats.en_attente }}</strong><span class="lab-stat__label">À faire</span></span></article>
     <article class="lab-stat"><span class="lab-stat__icon">⌛</span><span><strong class="lab-stat__number">{{ stats.en_cours }}</strong><span class="lab-stat__label">En cours</span></span></article>
     <article class="lab-stat"><span class="lab-stat__icon">✓</span><span><strong class="lab-stat__number">{{ stats.terminees }}</strong><span class="lab-stat__label">Terminées</span></span></article>
     <article class="lab-stat"><span class="lab-stat__icon">⚠</span><span><strong class="lab-stat__number">{{ stats.urgentes_en_retard }}</strong><span class="lab-stat__label">Urgentes en retard ({{ delai_alerte_urgente }} min)</span></span></article>
   </section>
 
+  {% if user.is_laboratory and stats_prelevements %}
+  <section class="lab-workflow-dashboard" aria-labelledby="lab-workflow-dashboard-title">
+    <div class="lab-workflow-dashboard__heading">
+      <div>
+        <span class="lab-hero__eyebrow">Parcours des prélèvements</span>
+        <h2 id="lab-workflow-dashboard-title">À quelle étape intervenir ?</h2>
+      </div>
+      <a class="lab-btn lab-btn--soft" href="{% url 'laboratoire:prelevement_list' %}">Voir tous les prélèvements</a>
+    </div>
+    <div class="lab-workflow-dashboard__grid">
+      <a class="lab-workflow-card" href="{% url 'laboratoire:prelevement_list' %}?onglet=a_traiter&amp;statut=A_EFFECTUER">
+        <span class="lab-workflow-card__step">Étape 1</span>
+        <strong class="lab-workflow-card__count">{{ stats_prelevements.a_preparer }}</strong>
+        <span class="lab-workflow-card__title">Réceptions à confirmer</span>
+        <span class="lab-workflow-card__description">Vérifier le patient et l’échantillon avant de confirmer sa réception.</span>
+      </a>
+      <a class="lab-workflow-card" href="{% url 'laboratoire:prelevement_list' %}?onglet=a_traiter&amp;statut=PRELEVE">
+        <span class="lab-workflow-card__step">Étape 2</span>
+        <strong class="lab-workflow-card__count">{{ stats_prelevements.a_receptionner }}</strong>
+        <span class="lab-workflow-card__title">À réceptionner</span>
+        <span class="lab-workflow-card__description">Confirmer la réception ou refuser avec un motif.</span>
+      </a>
+      <a class="lab-workflow-card" href="{% url 'laboratoire:prelevement_list' %}?onglet=resultats&amp;statut=RECU">
+        <span class="lab-workflow-card__step">Étape 3</span>
+        <strong class="lab-workflow-card__count">{{ stats_prelevements.resultats_a_saisir }}</strong>
+        <span class="lab-workflow-card__title">Résultats à saisir</span>
+        <span class="lab-workflow-card__description">Saisir ou reprendre les résultats avant leur validation.</span>
+      </a>
+      <a class="lab-workflow-card" href="{% url 'laboratoire:prelevement_list' %}?onglet=clotures&amp;statut=TERMINE">
+        <span class="lab-workflow-card__step">Étape 4</span>
+        <strong class="lab-workflow-card__count">{{ stats_prelevements.termines }}</strong>
+        <span class="lab-workflow-card__title">Prélèvements terminés</span>
+        <span class="lab-workflow-card__description">Consulter les éléments déjà traités et publiés.</span>
+      </a>
+      <a class="lab-workflow-card lab-workflow-card--warning" href="{% url 'laboratoire:prelevement_list' %}?onglet=clotures&amp;statut=REJETE">
+        <span class="lab-workflow-card__step">Suivi</span>
+        <strong class="lab-workflow-card__count">{{ stats_prelevements.refuses }}</strong>
+        <span class="lab-workflow-card__title">Prélèvements refusés</span>
+        <span class="lab-workflow-card__description">Consulter les motifs et suivre les prélèvements à refaire.</span>
+      </a>
+    </div>
+    <p class="lab-workflow-dashboard__note">
+      Les résultats restent en brouillon jusqu’à leur validation par un utilisateur autorisé.
+    </p>
+  </section>
+  {% endif %}
+
   <form method="get" class="lab-filter" role="search">
     <div>
-      <label for="lab-q">Patient ou commentaire</label>
-      <input id="lab-q" type="search" name="q" value="{{ q }}" placeholder="Nom, prénom, commentaire">
+      {{ filter_form.q.label_tag }}{{ filter_form.q }}
+      {% if filter_form.q.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.q.errors }}</div>{% endif %}
     </div>
     <div>
-      <label for="lab-from">Depuis le</label>
-      <input id="lab-from" type="date" name="date_debut" value="{{ date_debut }}">
+      {{ filter_form.date_debut.label_tag }}{{ filter_form.date_debut }}
+      {% if filter_form.date_debut.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.date_debut.errors }}</div>{% endif %}
     </div>
     <div>
-      <label for="lab-to">Jusqu’au</label>
-      <input id="lab-to" type="date" name="date_fin" value="{{ date_fin }}">
+      {{ filter_form.date_fin.label_tag }}{{ filter_form.date_fin }}
+      {% if filter_form.date_fin.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.date_fin.errors }}</div>{% endif %}
     </div>
     <div>
-      <label for="lab-status">Statut</label>
-      <select id="lab-status" name="statut">
-        <option value="">Tous les statuts</option>
-        {% for value, label in statut_choices %}
-          <option value="{{ value }}" {% if statut == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
+      {{ filter_form.statut.label_tag }}{{ filter_form.statut }}
+      {% if filter_form.statut.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.statut.errors }}</div>{% endif %}
     </div>
     {% if user.is_laboratory %}
-      <div>
-        <label for="lab-priority">Urgence</label>
-        <select id="lab-priority" name="priorite">
-          <option value="">Toutes les priorités</option>
-          {% for value, label in priorite_choices %}
-            <option value="{{ value }}" {% if priorite == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
+    <div>
+      {{ filter_form.priorite.label_tag }}{{ filter_form.priorite }}
+      {% if filter_form.priorite.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.priorite.errors }}</div>{% endif %}
+    </div>
     {% endif %}
     <button class="lab-btn lab-btn--primary" type="submit">Filtrer</button>
   </form>
@@ -78,46 +124,147 @@
       <span class="lab-badge lab-badge--neutral">{{ stats.total }} demande{{ stats.total|pluralize:"s" }}</span>
     </div>
     <div class="lab-table-wrap">
-      <table class="lab-table">
+      <table class="lab-table lab-request-table{% if can_work %} lab-request-table--workflow{% endif %}">
         <thead>
-          <tr><th>Patient</th><th>Médecin</th><th>Analyses</th><th>Prescrite le</th><th>Priorité</th><th>Statut</th><th></th></tr>
+          <tr>
+            <th>Patient</th>
+            <th>Médecin</th>
+            <th>Analyses</th>
+            <th>Prescrite le</th>
+            <th>Priorité</th>
+            <th>Statut de la demande</th>
+            {% if can_work %}<th>Prélèvement / résultats</th>{% endif %}
+            <th></th>
+          </tr>
         </thead>
         <tbody>
           {% for demande in demandes %}
-            <tr>
-              <td><span class="lab-table__primary">{{ demande.patient.get_full_name|default:demande.patient.username }}</span><span class="lab-table__secondary">{{ demande.patient.username }}</span></td>
-              <td>{{ demande.medecin.get_full_name|default:demande.medecin.username }}</td>
-              <td>{{ demande.analyses.count }}</td>
-              <td>{{ demande.date_demande|date:"d/m/Y" }}<span class="lab-table__secondary">{{ demande.date_demande|date:"H:i" }}</span></td>
-              <td><span class="lab-priority {% if demande.priorite == 'URGENTE' %}lab-priority--urgent{% elif demande.priorite == 'HAUTE' %}lab-priority--high{% else %}lab-priority--normal{% endif %}">{{ demande.get_priorite_display }}</span>
-                {% if demande.urgent_en_retard %}<span class="lab-badge lab-badge--rejected" title="Délai configuré : {{ delai_alerte_urgente }} minutes">En retard</span>{% endif %}
-              </td>
-              <td>
-                <span class="lab-badge {% if demande.statut == 'EN_ATTENTE' %}lab-badge--pending{% elif demande.statut == 'EN_COURS' %}lab-badge--progress{% elif demande.statut == 'TERMINEE' %}lab-badge--done{% else %}lab-badge--cancelled{% endif %}">{{ demande.get_statut_display }}</span>
-              </td>
-              <td><a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:demande_detail' demande.pk %}">Ouvrir →</a></td>
-            </tr>
+          <tr>
+            <td><span class="lab-table__primary">{{ demande.patient.get_full_name|default:demande.patient.username }}</span><span class="lab-table__secondary">{{ demande.patient.username }}</span></td>
+            <td>{{ demande.medecin.get_full_name|default:demande.medecin.username }}</td>
+            <td class="lab-analyses-cell">
+              <span class="lab-analyses-badge" tabindex="0">{{ demande.nombre_analyses }}</span>
+              {% if demande.nombre_analyses > 0 %}
+              <div class="lab-analyses-tooltip" role="tooltip">
+                <ul>
+                  {% for a in demande.analyses.all %}
+                  <li>{{ a.type_analyse.nom }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+              {% endif %}
+            </td>
+            <td>{{ demande.date_demande|date:"d/m/Y" }}<span class="lab-table__secondary">{{ demande.date_demande|date:"H:i" }}</span></td>
+            <td><span class="lab-priority-cell"><span
+                class="lab-priority {% if demande.priorite == 'URGENTE' %}lab-priority--urgent{% elif demande.priorite == 'HAUTE' %}lab-priority--high{% else %}lab-priority--normal{% endif %}">{{ demande.get_priorite_display }}</span>
+              {% if demande.urgent_en_retard %}<span class="lab-badge lab-badge--rejected"
+                title="Délai configuré : {{ delai_alerte_urgente }} minutes">En retard</span>{% endif %}</span>
+            </td>
+            <td>
+              <span
+                class="lab-badge {% if demande.statut == 'EN_ATTENTE' %}lab-badge--pending{% elif demande.statut == 'EN_COURS' %}lab-badge--progress{% elif demande.statut == 'TERMINEE' %}lab-badge--done{% else %}lab-badge--cancelled{% endif %}">{{ demande.get_statut_display }}</span>
+              <span class="lab-table__secondary">Mis à jour automatiquement selon les prélèvements et résultats.</span>
+            </td>
+            {% if can_work %}
+            <td class="lab-workflow-cell">
+              {% for prelevement in demande.prelevements.all %}
+              <section class="lab-workflow-item">
+                <div class="lab-workflow-item__heading">
+                  <span class="lab-code">{{ prelevement.code_prelevement }}</span>
+                  <span class="lab-badge {% if prelevement.statut == 'TERMINE' %}lab-badge--done{% elif prelevement.statut == 'REJETE' or prelevement.statut == 'ANNULE' %}lab-badge--rejected{% elif prelevement.statut == 'A_EFFECTUER' %}lab-badge--pending{% else %}lab-badge--progress{% endif %}">{% if prelevement.statut == "RECU" %}Prélèvement reçu{% else %}{{ prelevement.get_statut_display }}{% endif %}</span>
+                </div>
+                <div class="lab-workflow-item__actions">
+                  {% if prelevement.statut == "A_EFFECTUER" %}
+                  <form method="post" action="{% url 'laboratoire:prelevement_etape' prelevement.pk %}">
+                    {% csrf_token %}<input type="hidden" name="etape" value="RECU">
+                    <button class="lab-btn lab-btn--primary lab-btn--small" type="submit">Confirmer la réception</button>
+                  </form>
+                  {% elif prelevement.statut == "PRELEVE" %}
+                  <form method="post" action="{% url 'laboratoire:prelevement_etape' prelevement.pk %}">
+                    {% csrf_token %}<input type="hidden" name="etape" value="RECU">
+                    <button class="lab-btn lab-btn--primary lab-btn--small" type="submit">Confirmer la réception</button>
+                  </form>
+                  <a class="lab-btn lab-btn--danger lab-btn--small" href="{% url 'laboratoire:prelevement_list' %}?onglet=a_traiter&amp;refuser={{ prelevement.pk }}">Refuser</a>
+                  {% elif prelevement.statut == "RECU" %}
+                  <a class="lab-btn lab-btn--primary lab-btn--small" href="{% url 'laboratoire:prelevement_resultats' prelevement.pk %}">Saisir / reprendre les résultats</a>
+                  <a class="lab-btn lab-btn--danger lab-btn--small" href="{% url 'laboratoire:prelevement_list' %}?onglet=resultats&amp;refuser={{ prelevement.pk }}">Refuser</a>
+                  {% elif prelevement.statut == "REJETE" %}
+                  <form method="post" action="{% url 'laboratoire:prelevement_refaire' prelevement.pk %}">
+                    {% csrf_token %}<button class="lab-btn lab-btn--soft lab-btn--small" type="submit">Créer un nouveau prélèvement</button>
+                  </form>
+                  {% endif %}
+                </div>
+                {% for analyse in prelevement.analyses.all %}
+                  {% for resultat in analyse.resultats.all %}
+                  <div class="lab-workflow-item__result">
+                    <span>{{ analyse.type_analyse.nom }}</span>
+                    {% if resultat.statut == "VALIDE" %}
+                    <strong>{{ resultat.valeur }} {{ resultat.unite }}</strong>
+                    <span class="lab-badge lab-badge--done">Publié</span>
+                    {% else %}
+                    <span class="lab-badge lab-badge--pending">Brouillon</span>
+                    <a href="{% url 'laboratoire:resultat_update' resultat.pk %}">Reprendre</a>
+                    {% endif %}
+                  </div>
+                  {% endfor %}
+                {% endfor %}
+              </section>
+              {% empty %}
+              <span class="lab-table__secondary">Aucun prélèvement associé.</span>
+              {% endfor %}
+            </td>
+            {% endif %}
+            <td class="lab-doctor-summary-actions">
+              <a class="lab-btn lab-btn--soft lab-btn--small"
+                href="{% url 'laboratoire:demande_detail' demande.pk %}">Ouvrir →</a>
+              {% if user.is_doctor and demande.pk in demandes_avec_resultats_publies %}
+              <a class="lab-btn lab-btn--primary lab-btn--small"
+                href="{% url 'laboratoire:compte_rendu' demande.pk %}">Comparer les résultats</a>
+              {% endif %}
+            </td>
+          </tr>
           {% empty %}
-            <tr><td colspan="7">
+          <tr>
+            <td colspan="{% if can_work %}8{% else %}7{% endif %}">
               <div class="lab-empty">
                 <span class="lab-empty__icon">🧪</span>
                 <h3>Aucune demande à afficher</h3>
                 {% if user.is_doctor %}
-                  <p>Créez une prescription pour un patient qui vous est associé afin de démarrer le parcours.</p>
-                  <a class="lab-btn lab-btn--primary" href="{% url 'laboratoire:demande_create' %}">＋ Créer une prescription</a>
+                <p>Créez une prescription pour un patient qui vous est associé afin de démarrer le parcours.</p>
+                <button type="button" class="lab-btn lab-btn--primary" id="open-prescription-modal-empty"
+                  data-open-request-modal data-request-title="Nouvelle demande d’analyse">＋ Créer une prescription</button>
                 {% elif user.is_laboratory %}
-                  <p>Cette file affiche les demandes attribuées à <strong>{{ user.username }}</strong> ainsi que celles qui ne sont pas encore attribuées.</p>
-                  <p>Si une prescription existe mais reste invisible, vérifiez le laboratoire destinataire choisi par le médecin et retirez les filtres actifs.</p>
-                  <p class="lab-empty__hint">Pour (ré)attribuer les demandes de démonstration au compte labo, exécutez <code>python manage.py seed_laboratory_demo</code>.</p>
+                <p>Cette file affiche les demandes reçues par le laboratoire.</p>
+                <p class="lab-empty__hint">Pour (ré)attribuer les demandes de démonstration au compte labo, exécutez
+                  <code>python manage.py seed_laboratory_demo</code>.
+                </p>
                 {% else %}
-                  <p>Aucune demande ne correspond à vos filtres.</p>
+                <p>Aucune demande ne correspond à vos filtres.</p>
                 {% endif %}
               </div>
-            </td></tr>
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </section>
 </div>
+{% if can_create %}
+<dialog class="lab-prescription-dialog" id="prescription-dialog" data-request-dialog
+  data-endpoint="{% url 'laboratoire:demande_create' %}?modal=1"
+  aria-labelledby="prescription-dialog-title">
+  <div class="lab-prescription-dialog__head">
+    <h2 id="prescription-dialog-title" data-request-title>Nouvelle demande d’analyse</h2>
+    <button type="button" class="lab-btn lab-btn--soft lab-btn--small" data-close-request-dialog aria-label="Fermer">✕</button>
+  </div>
+  <div id="prescription-form-container" data-request-form-container aria-live="polite"></div>
+</dialog>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if can_create %}
+<script src="{% static 'laboratoire/demande_modal.js' %}" defer></script>
+{% endif %}
 {% endblock %}

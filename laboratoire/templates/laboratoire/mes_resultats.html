@@ -78,19 +78,15 @@
     <div class="lab-panel__head"><h2>Évolution d’une analyse dans le temps</h2></div>
     <form method="get" class="patient-filter">
       <div>
-        <label for="filter-analyse">Type d’analyse à comparer</label>
-        <select id="filter-analyse" name="analyse">
-          <option value="">Choisir une analyse</option>
-          {% for type in types_analyse %}
-            <option value="{{ type.pk }}" {% if selected_analyse == type.pk|stringformat:"s" %}selected{% endif %}>{{ type.nom }}</option>
-          {% endfor %}
-        </select>
+        {{ filter_form.analyse.label_tag }}{{ filter_form.analyse }}
+        {% if filter_form.analyse.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.analyse.errors }}</div>{% endif %}
       </div>
-      <div><label for="filter-from">Du</label><input id="filter-from" type="date" name="date_debut" value="{{ date_debut }}"></div>
-      <div><label for="filter-to">Au</label><input id="filter-to" type="date" name="date_fin" value="{{ date_fin }}"></div>
-      <div><label for="filter-legacy-type">Autre type d’analyse</label><input id="filter-legacy-type" type="search" name="type_legacy" value="{{ type_legacy }}" placeholder="Ex. NFS"></div>
+      <div>{{ filter_form.date_debut.label_tag }}{{ filter_form.date_debut }}{% if filter_form.date_debut.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.date_debut.errors }}</div>{% endif %}</div>
+      <div>{{ filter_form.date_fin.label_tag }}{{ filter_form.date_fin }}{% if filter_form.date_fin.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.date_fin.errors }}</div>{% endif %}</div>
+      <div>{{ filter_form.type_legacy.label_tag }}{{ filter_form.type_legacy }}{% if filter_form.type_legacy.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.type_legacy.errors }}</div>{% endif %}</div>
       <button class="lab-btn lab-btn--primary" type="submit">Filtrer</button>
       {% if selected_analyse or date_debut or date_fin or type_legacy %}<a class="lab-btn lab-btn--soft" href="{% url 'laboratoire:mes_resultats' %}">Réinitialiser</a>{% endif %}
+      {% if filter_form.non_field_errors %}<div class="lab-form__errors" role="alert">{{ filter_form.non_field_errors }}</div>{% endif %}
     </form>
     {% if chart_points %}
       <div class="lab-panel__body">

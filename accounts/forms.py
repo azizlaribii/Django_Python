@@ -86,8 +86,8 @@ class RegisterForm(forms.ModelForm):
     )
     responsable = forms.CharField(
         required=False,
-        label="Nom du Biologiste responsable",
-        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'ex: Dr. Martin Dupont'})
+        label="Responsable du laboratoire",
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Nom du responsable'})
     )
 
     # Patient specific extra fields

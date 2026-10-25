@@ -12,13 +12,18 @@
     </div>
     <div class="lab-hero__actions">
       <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:type_list' %}">Catalogue</a>
-      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:parametres' %}">Paramètres</a>
-      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:bilan_create' %}">＋ Créer un bilan</a>
+      {% if archives_affichees %}
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:bilan_list' %}">Voir les bilans actifs</a>
+      {% else %}
+      <a class="lab-btn lab-btn--white" href="{% url 'laboratoire:bilan_list' %}?archives=1">Voir les bilans archivés</a>
+      {% endif %}
+      <button class="lab-btn lab-btn--white" type="button" data-open-catalog-dialog
+        data-catalog-url="{% url 'laboratoire:bilan_create' %}?modal=1" data-catalog-title="Créer un bilan prédéfini">＋ Créer un bilan</button>
     </div>
   </header>
   <section class="lab-panel">
     <div class="lab-panel__head">
-      <h2>Bilans configurés</h2>
+      <h2>{% if archives_affichees %}Bilans archivés{% else %}Bilans configurés{% endif %}</h2>
       <span class="lab-badge lab-badge--neutral">{{ bilans|length }} bilan{{ bilans|length|pluralize:"s" }}</span>
     </div>
     <div class="lab-table-wrap">
@@ -30,14 +35,37 @@
               <td><span class="lab-table__primary">{{ bilan.nom }}</span>{% if bilan.description %}<span class="lab-table__secondary">{{ bilan.description|truncatechars:100 }}</span>{% endif %}</td>
               <td>{% for analyse in bilan.analyses.all %}<span class="lab-code">{{ analyse.code }}</span> {{ analyse.nom }}{% if not forloop.last %}<br>{% endif %}{% empty %}Aucune analyse{% endfor %}</td>
               <td>{% if bilan.actif %}<span class="lab-badge lab-badge--done">Actif</span>{% else %}<span class="lab-badge lab-badge--neutral">Désactivé</span>{% endif %}</td>
-              <td><a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:bilan_update' bilan.pk %}">Modifier</a></td>
+              <td>
+                <div class="lab-catalog-actions">
+                  <button class="lab-btn lab-btn--soft lab-btn--small" type="button" data-open-catalog-dialog
+                    data-catalog-url="{% url 'laboratoire:bilan_update' bilan.pk %}?modal=1" data-catalog-title="Modifier {{ bilan.nom }}">Modifier</button>
+                  <form method="post" action="{% url 'laboratoire:bilan_toggle_active' bilan.pk %}"{% if bilan.actif %} data-confirm-archive="Archiver « {{ bilan.nom }} » ? Il disparaîtra de la liste active, mais sera conservé avec les historiques associés."{% endif %}>
+                    {% csrf_token %}
+                    <button class="lab-btn {% if bilan.actif %}lab-btn--danger{% else %}lab-btn--success{% endif %} lab-btn--small" type="submit">
+                      {% if bilan.actif %}Archiver{% else %}Réactiver{% endif %}
+                    </button>
+                  </form>
+                </div>
+              </td>
             </tr>
           {% empty %}
-            <tr><td colspan="4"><div class="lab-empty"><span class="lab-empty__icon">🧪</span><h3>Aucun bilan prédéfini</h3><p>Créez un bilan et sélectionnez les analyses qui le composent.</p><a class="lab-btn lab-btn--primary" href="{% url 'laboratoire:bilan_create' %}">＋ Créer un bilan</a></div></td></tr>
+            <tr><td colspan="4"><div class="lab-empty"><span class="lab-empty__icon">🧪</span><h3>{% if archives_affichees %}Aucun bilan archivé{% else %}Aucun bilan prédéfini{% endif %}</h3><p>{% if archives_affichees %}Les bilans archivés apparaîtront ici et pourront être réactivés.{% else %}Créez un bilan et sélectionnez les analyses qui le composent.{% endif %}</p><button class="lab-btn lab-btn--primary" type="button" data-open-catalog-dialog
+              data-catalog-url="{% url 'laboratoire:bilan_create' %}?modal=1" data-catalog-title="Créer un bilan prédéfini">＋ Créer un bilan</button></div></td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </section>
 </div>
+<dialog class="lab-prescription-dialog lab-catalog-dialog" data-catalog-dialog aria-labelledby="catalog-dialog-title">
+  <div class="lab-prescription-dialog__head">
+    <h2 id="catalog-dialog-title" data-catalog-title>Gestion des bilans</h2>
+    <button type="button" class="lab-btn lab-btn--soft lab-btn--small" data-close-catalog-dialog aria-label="Fermer">✕</button>
+  </div>
+  <div data-catalog-form-container aria-live="polite"></div>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'laboratoire/catalogue_modal.js' %}" defer></script>
 {% endblock %}
