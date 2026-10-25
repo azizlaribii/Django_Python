@@ -10,4 +10,6 @@ urlpatterns = [
     path('factures/', views.facture_list, name='facture_list'),
     path('factures/<int:pk>/', views.facture_detail, name='facture_detail'),
     path('factures/nouvelle/', views.facture_create, name='facture_create'),
+        path('factures/<int:pk>/modifier/', views.facture_update, name='facture_update'),
+    path('factures/<int:pk>/annuler/', views.facture_cancel, name='facture_cancel'),
 ]

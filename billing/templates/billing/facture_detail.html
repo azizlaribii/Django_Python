@@ -3,15 +3,19 @@
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'billing/billing.css' %}">
-<div class="container billing-page">
-    <div class="page-header">
-        <div>
-            <h1>Facture {{ facture.numero }}</h1>
-            <p>Émise le {{ facture.date_emission|date:"d/m/Y" }} —
-               <span class="badge badge-{{ facture.statut|lower }}">{{ facture.get_statut_display }}</span></p>
-        </div>
-        <a href="{% url 'facture_list' %}" class="btn btn-light">← Retour</a>
-    </div>
+
+
+<div class="actions">
+    <a href="{% url 'facture_list' %}" class="btn btn-light">← Retour</a>
+    {% if peut_gerer and facture.statut == 'EN_ATTENTE' %}
+    <a href="{% url 'facture_update' facture.pk %}" class="btn btn-light">Modifier</a>
+    <form method="post" action="{% url 'facture_cancel' facture.pk %}" style="display:inline"
+          onsubmit="return confirm('Annuler cette facture ?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-light">Annuler la facture</button>
+    </form>
+    {% endif %}
+</div>
 
     <div class="card"><div class="card-body">
         <p><strong>Patient :</strong> {{ facture.patient.get_full_name|default:facture.patient.username }}</p>

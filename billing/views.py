@@ -2,9 +2,9 @@ from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db import transaction
 from .forms import TarifForm, FactureForm, LigneFormSet
-from .models import Tarif
+from .models import Tarif, Facture
 from .permissions import admin_required, staff_required, billing_access_required, factures_visibles
-
+from django.views.decorators.http import require_POST
 # ───────────── TARIFS (admin seulement) ─────────────
 
 @admin_required
@@ -83,3 +83,37 @@ def facture_create(request):
 
     return render(request, 'billing/facture_form.html',
                   {'form': form, 'formset': formset, 'tarifs_json': _tarifs_json()})
+
+
+
+@staff_required
+def facture_update(request, pk):
+    facture = get_object_or_404(factures_visibles(request.user), pk=pk)
+    if facture.statut != Facture.Statut.EN_ATTENTE:
+        messages.error(request, "Cette facture n'est plus modifiable.")
+        return redirect('facture_detail', pk=pk)
+
+    form = FactureForm(request.POST or None, instance=facture, user=request.user)
+    formset = LigneFormSet(request.POST or None, instance=facture, prefix='lignes')
+    if request.method == 'POST' and form.is_valid() and formset.is_valid():
+        with transaction.atomic():
+            form.save()
+            formset.save()
+        messages.success(request, "Facture modifiée.")
+        return redirect('facture_detail', pk=pk)
+    return render(request, 'billing/facture_form.html',
+                  {'form': form, 'formset': formset, 'facture': facture,
+                   'tarifs_json': _tarifs_json()})
+
+
+@staff_required
+@require_POST
+def facture_cancel(request, pk):
+    facture = get_object_or_404(factures_visibles(request.user), pk=pk)
+    if facture.statut != Facture.Statut.EN_ATTENTE:
+        messages.error(request, "Impossible d'annuler : la facture a des paiements.")
+    else:
+        facture.statut = Facture.Statut.ANNULEE
+        facture.save(update_fields=['statut'])
+        messages.success(request, f"Facture {facture.numero} annulée.")
+    return redirect('facture_detail', pk=pk)
