@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ titre }} — Laboratoire{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
+{% block content %}
+<div class="lab-shell lab-request-shell">
+  <header class="lab-request-banner">
+    <h1>{{ titre }}</h1>
+    <p>Les champs marqués d’une étoile sont obligatoires.</p>
+  </header>
+
+  <section class="lab-request-panel">
+    <div class="lab-request-panel__head">
+      <h2>Informations</h2>
+      <p>Médecin prescripteur : Dr {{ request.user.get_full_name|default:request.user.username }}</p>
+    </div>
+    <div class="lab-request-panel__body">
+      <form method="post" class="lab-request-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="lab-request-errors lab-request-field--wide" role="alert">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        <div class="lab-request-field">
+          {{ form.patient.label_tag }}
+          {% if form.patient.field.required %}<span class="lab-request-required" aria-hidden="true">*</span>{% endif %}
+          {{ form.patient }}
+          {% if form.patient.errors %}<div class="lab-request-errors" role="alert">{{ form.patient.errors }}</div>{% endif %}
+        </div>
+
+        <div class="lab-request-field">
+          {{ form.priorite.label_tag }}
+          {% if form.priorite.field.required %}<span class="lab-request-required" aria-hidden="true">*</span>{% endif %}
+          {{ form.priorite }}
+          {% if form.priorite.errors %}<div class="lab-request-errors" role="alert">{{ form.priorite.errors }}</div>{% endif %}
+        </div>
+
+        <div class="lab-request-field lab-request-field--wide">
+          {{ form.commentaire.label_tag }}
+          {% if form.commentaire.field.required %}<span class="lab-request-required" aria-hidden="true">*</span>{% endif %}
+          {{ form.commentaire }}
+          {% if form.commentaire.help_text %}<span class="lab-request-help">{{ form.commentaire.help_text }}</span>{% endif %}
+          {% if form.commentaire.errors %}<div class="lab-request-errors" role="alert">{{ form.commentaire.errors }}</div>{% endif %}
+        </div>
+
+        <fieldset class="lab-request-field lab-request-field--wide lab-request-choice-group">
+          <legend>{{ form.bilans.label }}</legend>
+          <div class="lab-request-options">{{ form.bilans }}</div>
+          <span class="lab-request-help">Ses analyses sont ajoutées automatiquement.</span>
+          {% if form.bilans.errors %}<div class="lab-request-errors" role="alert">{{ form.bilans.errors }}</div>{% endif %}
+        </fieldset>
+
+        <fieldset class="lab-request-field lab-request-field--wide lab-request-choice-group">
+          <legend>{{ form.analyses.label }}</legend>
+          <div class="lab-request-options">{{ form.analyses }}</div>
+          {% if form.analyses.errors %}<div class="lab-request-errors" role="alert">{{ form.analyses.errors }}</div>{% endif %}
+        </fieldset>
+
+        <div class="lab-request-footer lab-request-field--wide">
+          <a class="lab-request-button lab-request-button--secondary" href="{% url 'laboratoire:demande_list' %}">Annuler</a>
+          <button class="lab-request-button lab-request-button--primary" type="submit">Envoyer la demande au laboratoire</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

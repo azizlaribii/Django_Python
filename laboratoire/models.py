@@ -15,7 +15,13 @@ from django.utils import timezone
 
 def motifs_rejet_par_defaut():
 
-    return ["Échantillon hémolysé", "Quantité insuffisante", "Mauvais tube"]
+    return [
+        "Échantillon hémolysé",
+        "Quantité insuffisante",
+        "Mauvais tube",
+        "Étiquette illisible",
+        "Autre",
+    ]
 
 
 def generer_code_prelevement():
@@ -24,6 +30,11 @@ def generer_code_prelevement():
 
 class TypeAnalyse(models.Model):
 
+    class TypeEchantillon(models.TextChoices):
+        SANG = "SANG", "Sang"
+        URINE = "URINE", "Urine"
+        AUTRE = "AUTRE", "Autre"
+
     code = models.CharField("Code", max_length=30, unique=True)
 
     nom = models.CharField("Nom", max_length=150)
@@ -31,6 +42,13 @@ class TypeAnalyse(models.Model):
     description = models.TextField("Description", blank=True)
 
     unite = models.CharField("Unité", max_length=30, blank=True)
+
+    type_echantillon = models.CharField(
+        "Type d’échantillon",
+        max_length=10,
+        choices=TypeEchantillon.choices,
+        default=TypeEchantillon.SANG,
+    )
 
     valeur_reference_min = models.DecimalField(
 
@@ -251,7 +269,7 @@ class DemandeAnalyse(models.Model):
 
     class Statut(models.TextChoices):
 
-        EN_ATTENTE = "EN_ATTENTE", "En attente"
+        EN_ATTENTE = "EN_ATTENTE", "À faire"
 
         EN_COURS = "EN_COURS", "En cours"
 
@@ -344,6 +362,12 @@ class DemandeAnalyse(models.Model):
 
             errors["laboratoire"] = "Le destinataire doit être un compte laboratoire."
 
+        if self.priorite == self.Priorite.URGENTE and not self.commentaire.strip():
+            errors["commentaire"] = "Motif médical obligatoire pour une demande urgente."
+
+        if self.statut == self.Statut.ANNULEE and not self.motif_annulation.strip():
+            errors["motif_annulation"] = "Le motif est obligatoire pour annuler une demande."
+
         if errors:
 
             raise ValidationError(errors)
@@ -353,12 +377,36 @@ class DemandeAnalyse(models.Model):
 
         return f"Demande #{self.pk} — {self.patient}"
 
+    def update_statut_from_analyses(self):
+        if self.statut == self.Statut.ANNULEE:
+            return False
+        statuts = list(
+            self.analyses.exclude(statut=AnalyseDemandee.Statut.ANNULEE)
+            .values_list("statut", flat=True)
+        )
+        if not statuts:
+            return False
+        if all(status == AnalyseDemandee.Statut.TERMINEE for status in statuts):
+            new_status = self.Statut.TERMINEE
+        elif any(
+            status in (AnalyseDemandee.Statut.EN_COURS, AnalyseDemandee.Statut.TERMINEE)
+            for status in statuts
+        ):
+            new_status = self.Statut.EN_COURS
+        else:
+            new_status = self.Statut.EN_ATTENTE
+        if self.statut == new_status:
+            return False
+        self.statut = new_status
+        self.save(update_fields=["statut"])
+        return True
+
 
 class AnalyseDemandee(models.Model):
 
     class Statut(models.TextChoices):
 
-        EN_ATTENTE = "EN_ATTENTE", "En attente"
+        EN_ATTENTE = "EN_ATTENTE", "À faire"
 
         EN_COURS = "EN_COURS", "En cours"
 
@@ -377,6 +425,15 @@ class AnalyseDemandee(models.Model):
 
         TypeAnalyse, on_delete=models.PROTECT, related_name="demandes",
 
+    )
+
+    prelevement = models.ForeignKey(
+        "Prelevement",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="analyses",
+        verbose_name="Prélèvement",
     )
 
     statut = models.CharField(
@@ -409,6 +466,28 @@ class AnalyseDemandee(models.Model):
 
         return f"{self.type_analyse} — demande #{self.demande_id}"
 
+    def update_statut_from_resultats(self):
+        if self.statut == self.Statut.ANNULEE:
+            return False
+        if self.prelevement_id:
+            new_status = {
+                Prelevement.Statut.A_EFFECTUER: self.Statut.EN_ATTENTE,
+                Prelevement.Statut.PRELEVE: self.Statut.EN_COURS,
+                Prelevement.Statut.RECU: self.Statut.EN_COURS,
+                Prelevement.Statut.TERMINE: self.Statut.TERMINEE,
+                Prelevement.Statut.REJETE: self.Statut.EN_ATTENTE,
+                Prelevement.Statut.ANNULE: self.Statut.ANNULEE,
+            }[self.prelevement.statut]
+        else:
+            resultat = self.resultats.filter(statut=Resultat.Statut.VALIDE).exists()
+            new_status = self.Statut.TERMINEE if resultat else self.Statut.EN_ATTENTE
+        if self.statut == new_status:
+            return False
+        self.statut = new_status
+        self.save(update_fields=["statut"])
+        self.demande.update_statut_from_analyses()
+        return True
+
 
 class Prelevement(models.Model):
 
@@ -423,15 +502,17 @@ class Prelevement(models.Model):
 
     class Statut(models.TextChoices):
 
-        A_EFFECTUER = "A_EFFECTUER", "À prélever"
+        A_EFFECTUER = "A_EFFECTUER", "À faire"
 
-        PRELEVE = "PRELEVE", "Prélevé"
+        PRELEVE = "PRELEVE", "Prise de sang faite"
 
-        RECU = "RECU", "Reçu au laboratoire"
+        RECU = "RECU", "Tube reçu"
 
-        REJETE = "REJETE", "Rejeté"
+        REJETE = "REJETE", "Refusé"
 
         ANNULE = "ANNULE", "Annulé"
+
+        TERMINE = "TERMINE", "Terminé"
 
 
     demande = models.ForeignKey(
@@ -449,9 +530,40 @@ class Prelevement(models.Model):
 
     type_prelevement = models.CharField("Type", max_length=10, choices=Type.choices)
 
+    precision_type = models.CharField("Précision du type", max_length=120, blank=True)
+
     date_prelevement = models.DateTimeField("Date du prélèvement", null=True, blank=True)
 
     date_reception = models.DateTimeField("Date de réception", null=True, blank=True)
+
+    date_creation = models.DateTimeField("Date de création", auto_now_add=True)
+
+    preleve_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prelevements_effectues",
+        verbose_name="Prélevé par",
+    )
+
+    recu_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prelevements_recus",
+        verbose_name="Reçu par",
+    )
+
+    prelevement_precedent = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reprises",
+        verbose_name="Prélèvement précédent",
+    )
 
     statut = models.CharField(
 
@@ -466,7 +578,7 @@ class Prelevement(models.Model):
 
     class Meta:
 
-        ordering = ["-date_prelevement", "-pk"]
+        ordering = ["-date_creation"]
 
         verbose_name = "Prélèvement"
 
@@ -477,13 +589,36 @@ class Prelevement(models.Model):
 
         super().clean()
 
-        if self.statut == self.Statut.REJETE and not self.motif_rejet.strip():
-
-            raise ValidationError({"motif_rejet": "Le motif est obligatoire pour rejeter un prélèvement."})
+        errors = {}
+        now = timezone.now()
+        if self.statut == self.Statut.A_EFFECTUER and (
+            self.date_prelevement or self.date_reception
+        ):
+            errors["statut"] = "Un prélèvement à faire ne peut pas avoir de date de prélèvement ou de réception."
+        if self.date_prelevement and self.date_prelevement > now:
+            errors["date_prelevement"] = "La date du prélèvement ne peut pas être dans le futur."
+        if self.date_reception and self.date_reception > now:
+            errors["date_reception"] = "La date de réception ne peut pas être dans le futur."
+        if (
+            self.date_prelevement and self.date_reception
+            and self.date_reception < self.date_prelevement
+        ):
+            errors["date_reception"] = "La réception ne peut pas précéder le prélèvement."
+        if self.statut == self.Statut.REJETE:
+            motifs = ParametresLaboratoire.get_solo().motifs_rejet
+            if not self.motif_rejet.strip():
+                errors["motif_rejet"] = "Le motif est obligatoire pour refuser un prélèvement."
+            elif self.motif_rejet not in motifs:
+                errors["motif_rejet"] = "Choisissez un motif de refus proposé."
+            elif self.motif_rejet == "Autre" and not self.remarque.strip():
+                errors["remarque"] = "Ajoutez une précision lorsque le motif choisi est « Autre »."
 
         if self.demande_id and self.demande.statut == DemandeAnalyse.Statut.ANNULEE:
 
-            raise ValidationError({"demande": "La demande associée est annulée."})
+            errors["demande"] = "La demande associée est annulée."
+
+        if errors:
+            raise ValidationError(errors)
 
 
     def __str__(self):
@@ -496,9 +631,6 @@ class Resultat(models.Model):
     class Statut(models.TextChoices):
 
         EN_SAISIE = "EN_SAISIE", "En saisie"
-        EN_ATTENTE_VALIDATION = "EN_ATTENTE_VALIDATION", "En attente de validation"
-        CORRIGE = "CORRIGE", "Correction à valider"
-        REJETE = "REJETE", "Rejeté — à corriger"
         VALIDE = "VALIDE", "Validé"
 
 
@@ -528,7 +660,9 @@ class Resultat(models.Model):
 
     observation = models.TextField("Observation", blank=True)
 
-    commentaire_rejet = models.TextField("Commentaire de rejet", blank=True)
+    version = models.PositiveIntegerField("Version", default=1)
+
+    motif_correction = models.TextField("Motif de correction", blank=True)
 
     statut = models.CharField(
 
@@ -563,19 +697,13 @@ class Resultat(models.Model):
 
         ordering = ["-date_saisie"]
 
-        permissions = [
-
-            ("valider_resultat", "Peut valider les résultats d’analyses"),
-
-        ]
-
         constraints = [
 
             models.UniqueConstraint(
 
-                fields=["analyse_demandee", "prelevement"],
+                fields=["analyse_demandee"],
 
-                name="unique_resultat_analyse_prelevement",
+                name="unique_resultat_par_analyse",
 
             ),
 
@@ -587,25 +715,22 @@ class Resultat(models.Model):
 
 
     @property
+    def _valeur_decimal(self):
+        try:
+            return Decimal(self.valeur.strip().replace(",", "."))
+        except (InvalidOperation, TypeError, ValueError, AttributeError):
+            return None
 
+    @property
     def potentiellement_anormal(self):
 
         """Repère une valeur numérique hors plage sans en déduire de diagnostic."""
 
         analyse = self.analyse_demandee.type_analyse
 
-        try:
-
-            numeric_value = Decimal(self.valeur.strip().replace(",", "."))
-
-        except (InvalidOperation, TypeError, ValueError):
-
-            return False
-
+        numeric_value = self._valeur_decimal
         if numeric_value is None:
-
             return False
-
         return (
 
             (analyse.valeur_reference_min is not None and numeric_value < analyse.valeur_reference_min)
@@ -621,12 +746,8 @@ class Resultat(models.Model):
 
         analyse = self.analyse_demandee.type_analyse
 
-        try:
-
-            numeric_value = Decimal(self.valeur.strip().replace(",", "."))
-
-        except (InvalidOperation, TypeError, ValueError):
-
+        numeric_value = self._valeur_decimal
+        if numeric_value is None:
             return False
 
         return (
@@ -637,9 +758,8 @@ class Resultat(models.Model):
     @property
     def interpretation_automatique(self):
         analyse = self.analyse_demandee.type_analyse
-        try:
-            numeric_value = Decimal(self.valeur.strip().replace(",", "."))
-        except (InvalidOperation, TypeError, ValueError):
+        numeric_value = self._valeur_decimal
+        if numeric_value is None:
             return "À interpréter"
         if self.potentiellement_critique:
             return "Critique"
@@ -694,3 +814,68 @@ class HistoriqueAction(models.Model):
     def __str__(self):
 
         return f"{self.type_action} — {self.objet_concerne} #{self.objet_id or '—'}"
+
+
+class CompteRendu(models.Model):
+    class Source(models.TextChoices):
+        REGLES = "regles", "Résumé automatique (règles)"
+        IA = "ia", "Généré par IA"
+
+    class Statut(models.TextChoices):
+        BROUILLON = "brouillon", "Brouillon"
+        APPROUVE = "approuve", "Approuvé"
+
+    demande = models.ForeignKey(
+        DemandeAnalyse,
+        on_delete=models.CASCADE,
+        related_name="comptes_rendus",
+        verbose_name="Demande d’analyses",
+    )
+    medecin = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="comptes_rendus_laboratoire",
+        verbose_name="Médecin prescripteur",
+    )
+    texte_genere = models.TextField("Texte généré")
+    texte_final = models.TextField("Texte final", blank=True)
+    note_medecin = models.TextField("Observations du médecin", blank=True)
+    analyse_evolution_ia = models.TextField("Analyse IA de l’évolution", blank=True)
+    modele_evolution_ia = models.CharField(
+        "Modèle IA de l’évolution",
+        max_length=100,
+        blank=True,
+    )
+    generee_evolution_ia_le = models.DateTimeField(
+        "Analyse IA générée le",
+        null=True,
+        blank=True,
+    )
+    source = models.CharField(
+        "Source du résumé",
+        max_length=10,
+        choices=Source.choices,
+        default=Source.REGLES,
+    )
+    statut = models.CharField(
+        "Statut",
+        max_length=12,
+        choices=Statut.choices,
+        default=Statut.BROUILLON,
+    )
+    cree_le = models.DateTimeField("Créé le", auto_now_add=True)
+    approuve_le = models.DateTimeField("Approuvé le", null=True, blank=True)
+
+    class Meta:
+        ordering = ["-cree_le", "-pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["demande"],
+                name="unique_compte_rendu_par_demande",
+            ),
+        ]
+        verbose_name = "Compte rendu descriptif"
+        verbose_name_plural = "Comptes rendus descriptifs"
+
+    def __str__(self):
+        return f"Compte rendu de la demande #{self.demande_id}"

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Prélèvements — Laboratoire{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
+{% block content %}
+<div class="lab-shell">
+  <h1 class="lab-list-title">Prélèvements du laboratoire</h1>
+
+  <nav class="lab-sample-tabs" aria-label="États des prélèvements">
+    {% for key, label in onglets %}
+      <a href="?onglet={{ key }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}{% if date_debut %}&amp;date_debut={{ date_debut }}{% endif %}{% if date_fin %}&amp;date_fin={{ date_fin }}{% endif %}"
+         class="{% if onglet == key %}is-active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  <form method="get" class="lab-filter" role="search">
+    <input type="hidden" name="onglet" value="{{ onglet }}">
+    <div>
+      {{ filter_form.q.label_tag }}{{ filter_form.q }}
+      {% if filter_form.q.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.q.errors }}</div>{% endif %}
+    </div>
+    <div>
+      {{ filter_form.statut.label_tag }}{{ filter_form.statut }}
+      {% if filter_form.statut.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.statut.errors }}</div>{% endif %}
+    </div>
+    <div>
+      {{ filter_form.date_debut.label_tag }}{{ filter_form.date_debut }}
+      {% if filter_form.date_debut.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.date_debut.errors }}</div>{% endif %}
+    </div>
+    <div>
+      {{ filter_form.date_fin.label_tag }}{{ filter_form.date_fin }}
+      {% if filter_form.date_fin.errors %}<div class="lab-form__errors" role="alert">{{ filter_form.date_fin.errors }}</div>{% endif %}
+    </div>
+    <button class="lab-btn lab-btn--primary" type="submit">Filtrer</button>
+  </form>
+
+  <section class="lab-panel">
+    <div class="lab-panel__head">
+      <h2>{{ onglet_label }}</h2>
+      <span class="lab-badge lab-badge--neutral">{{ prelevements|length }} prélèvement{{ prelevements|length|pluralize:"s" }}</span>
+    </div>
+    <div class="lab-table-wrap">
+      <table class="lab-table lab-sample-table">
+        <thead>
+          <tr><th>Code</th><th>Patient</th><th>Type</th><th>Créé le</th><th>Statut</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for prelevement in prelevements %}
+            <tr>
+              <td><span class="lab-code">{{ prelevement.code_prelevement }}</span></td>
+              <td>
+                <span class="lab-table__primary">{{ prelevement.demande.patient.get_full_name|default:prelevement.demande.patient.username }}</span>
+                <span class="lab-table__secondary">{{ prelevement.demande.get_priorite_display }}{% if prelevement.demande.priorite == "URGENTE" %} · Urgente{% endif %}</span>
+              </td>
+              <td>{{ prelevement.get_type_prelevement_display }}{% if prelevement.precision_type %}<span class="lab-table__secondary">{{ prelevement.precision_type }}</span>{% endif %}</td>
+              <td>{{ prelevement.date_creation|date:"d/m/Y H:i" }}</td>
+              <td>
+                <span class="lab-badge {% if prelevement.statut == 'TERMINE' %}lab-badge--done{% elif prelevement.statut == 'REJETE' %}lab-badge--rejected{% elif prelevement.statut == 'ANNULE' %}lab-badge--cancelled{% elif prelevement.statut == 'A_EFFECTUER' %}lab-badge--pending{% else %}lab-badge--progress{% endif %}">{% if prelevement.statut == "RECU" %}Prélèvement reçu{% else %}{{ prelevement.get_statut_display }}{% endif %}</span>
+                {% if prelevement.motif_rejet %}<span class="lab-table__secondary">{{ prelevement.motif_rejet }}{% if prelevement.remarque %} — {{ prelevement.remarque }}{% endif %}</span>{% endif %}
+              </td>
+              <td class="lab-sample-actions">
+                {% if can_work %}
+                {% if prelevement.statut == "A_EFFECTUER" %}
+                  <form method="post" action="{% url 'laboratoire:prelevement_etape' prelevement.pk %}">{% csrf_token %}<input type="hidden" name="etape" value="RECU"><button class="lab-btn lab-btn--primary lab-btn--small" type="submit">Confirmer la réception</button></form>
+                {% elif prelevement.statut == "PRELEVE" %}
+                  <form method="post" action="{% url 'laboratoire:prelevement_etape' prelevement.pk %}">{% csrf_token %}<input type="hidden" name="etape" value="RECU"><button class="lab-btn lab-btn--primary lab-btn--small" type="submit">Confirmer la réception</button></form>
+                  <button class="lab-btn lab-btn--danger lab-btn--small" type="button" data-open-reject data-reject-url="{% url 'laboratoire:prelevement_rejeter' prelevement.pk %}" data-reject-code="{{ prelevement.code_prelevement }}">Refuser</button>
+                {% elif prelevement.statut == "RECU" %}
+                  <form method="post" action="{% url 'laboratoire:prelevement_etape' prelevement.pk %}">{% csrf_token %}<input type="hidden" name="etape" value="RESULTATS"><button class="lab-btn lab-btn--primary lab-btn--small" type="submit">Saisir / reprendre les résultats</button></form>
+                  <button class="lab-btn lab-btn--danger lab-btn--small" type="button" data-open-reject data-reject-url="{% url 'laboratoire:prelevement_rejeter' prelevement.pk %}" data-reject-code="{{ prelevement.code_prelevement }}">Refuser</button>
+                {% elif prelevement.statut == "REJETE" %}
+                  <form method="post" action="{% url 'laboratoire:prelevement_refaire' prelevement.pk %}">{% csrf_token %}<button class="lab-btn lab-btn--soft lab-btn--small" type="submit">Refaire le prélèvement</button></form>
+                {% endif %}
+                {% endif %}
+                {% if prelevement.statut == "RECU" or prelevement.statut == "TERMINE" %}
+                <a class="lab-btn lab-btn--soft lab-btn--small" href="{% url 'laboratoire:prelevement_etiquette' prelevement.pk %}" target="_blank" rel="noopener">Étiquette</a>
+                {% else %}
+                <span class="lab-table__secondary lab-sample-label-hint">Étiquette après réception</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="{% if can_work and onglet == 'resultats' %}7{% else %}6{% endif %}"><div class="lab-empty"><span class="lab-empty__icon">🧫</span><h3>Aucun prélèvement à afficher</h3><p>Les prélèvements correspondant à cet onglet et à vos filtres apparaîtront ici.</p></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% if can_work %}
+<dialog class="lab-reject-dialog" id="reject-dialog" aria-labelledby="reject-dialog-title">
+  <form method="post" id="reject-form">
+    {% csrf_token %}
+    <header class="lab-reject-dialog__head">
+      <div>
+        <span class="lab-hero__eyebrow">Traçabilité du prélèvement</span>
+        <h2 id="reject-dialog-title">Refuser le prélèvement</h2>
+      </div>
+      <button class="lab-btn lab-btn--soft lab-btn--small" type="button" data-close-reject aria-label="Fermer">✕</button>
+    </header>
+    <p id="reject-code" class="lab-table__secondary"></p>
+    <div class="lab-form__field">
+      <label for="reject-reason">Motif du refus</label>
+      <select id="reject-reason" name="motif" required>
+        <option value="">Choisir un motif</option>
+        {% for motif in motifs_rejet %}<option value="{{ motif }}">{{ motif }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="lab-form__field">
+      <label for="reject-note">Précision</label>
+      <textarea id="reject-note" name="remarque" rows="3" maxlength="1000" placeholder="Obligatoire si le motif choisi est « Autre »"></textarea>
+    </div>
+    <div class="lab-actions">
+      <button class="lab-btn lab-btn--soft" type="button" data-close-reject>Annuler</button>
+      <button class="lab-btn lab-btn--danger" type="submit">Confirmer le refus</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if can_work %}
+<script>
+(() => {
+  const dialog = document.getElementById('reject-dialog');
+  const form = document.getElementById('reject-form');
+  const code = document.getElementById('reject-code');
+  const reason = document.getElementById('reject-reason');
+  const note = document.getElementById('reject-note');
+  const closeButtons = dialog.querySelectorAll('[data-close-reject]');
+  const openButtons = document.querySelectorAll('[data-open-reject]');
+
+  function openReject(button) {
+    form.action = button.dataset.rejectUrl;
+    code.textContent = `Prélèvement : ${button.dataset.rejectCode}`;
+    reason.value = '';
+    note.value = '';
+    note.required = false;
+    dialog.showModal();
+  }
+
+  reason.addEventListener('change', () => {
+    note.required = reason.value === 'Autre';
+  });
+  openButtons.forEach(button => button.addEventListener('click', () => openReject(button)));
+  closeButtons.forEach(button => button.addEventListener('click', () => dialog.close()));
+  dialog.addEventListener('click', event => {
+    if (event.target === dialog) dialog.close();
+  });
+
+  {% if refuser_prelevement %}
+  const selected = [...openButtons].find(
+    button => button.dataset.rejectCode === '{{ refuser_prelevement.code_prelevement|escapejs }}',
+  );
+  if (selected) openReject(selected);
+  {% endif %}
+})();
+</script>
+{% endif %}
+{% endblock %}

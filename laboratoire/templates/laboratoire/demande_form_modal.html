@@ -1,0 +1,47 @@
+<form method="post" action="{{ form_action }}" data-prescription-form class="lab-request-form">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+    <div class="lab-request-errors lab-request-field--wide" role="alert">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+  <div data-prescription-error class="lab-request-errors lab-request-field--wide" role="alert" hidden></div>
+
+  <div class="lab-request-field">
+    {{ form.patient.label_tag }}
+    {{ form.patient }}
+    {% if form.patient.help_text %}<span class="lab-request-help">{{ form.patient.help_text }}</span>{% endif %}
+    {% if form.patient.errors %}<div class="lab-request-errors" role="alert">{{ form.patient.errors }}</div>{% endif %}
+  </div>
+
+  <div class="lab-request-field">
+    {{ form.priorite.label_tag }}
+    {{ form.priorite }}
+    {% if form.priorite.errors %}<div class="lab-request-errors" role="alert">{{ form.priorite.errors }}</div>{% endif %}
+  </div>
+
+  <div class="lab-request-field lab-request-field--wide">
+    {{ form.commentaire.label_tag }}
+    {{ form.commentaire }}
+    {% if form.commentaire.help_text %}<span class="lab-request-help">{{ form.commentaire.help_text }}</span>{% endif %}
+    {% if form.commentaire.errors %}<div class="lab-request-errors" role="alert">{{ form.commentaire.errors }}</div>{% endif %}
+  </div>
+
+  <fieldset class="lab-request-field lab-request-field--wide lab-request-choice-group">
+    <legend>{{ form.bilans.label }}</legend>
+    <div class="lab-request-options">{{ form.bilans }}</div>
+    <span class="lab-request-help">Les analyses des bilans sont ajoutées automatiquement.</span>
+    {% if form.bilans.errors %}<div class="lab-request-errors" role="alert">{{ form.bilans.errors }}</div>{% endif %}
+  </fieldset>
+
+  <fieldset class="lab-request-field lab-request-field--wide lab-request-choice-group">
+    <legend>{{ form.analyses.label }}</legend>
+    <div class="lab-request-options">{{ form.analyses }}</div>
+    {% if form.analyses.errors %}<div class="lab-request-errors" role="alert">{{ form.analyses.errors }}</div>{% endif %}
+  </fieldset>
+
+  <div class="lab-request-footer lab-request-field--wide">
+    <button type="button" class="lab-request-button lab-request-button--secondary" data-close-request>Annuler</button>
+    <button type="submit" class="lab-request-button lab-request-button--primary">{{ submit_label|default:"Enregistrer" }}</button>
+  </div>
+</form>

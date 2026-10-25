@@ -46,7 +46,7 @@ def get_report_data(date_debut=None, date_fin=None):
     ).count()
     resultats_en_attente = Resultat.objects.filter(
         analyse_demandee__demande__in=demandes,
-        statut__in=(Resultat.Statut.EN_ATTENTE_VALIDATION, Resultat.Statut.CORRIGE),
+        statut=Resultat.Statut.EN_SAISIE,
     ).count()
 
     analyses_populaires = list(
@@ -137,10 +137,7 @@ def _export_sheets(report):
             for prelevement in demande.prelevements.all()
         )
         resultats_en_attente = sum(
-            resultat.statut in (
-                Resultat.Statut.EN_ATTENTE_VALIDATION,
-                Resultat.Statut.CORRIGE,
-            )
+            resultat.statut == Resultat.Statut.EN_SAISIE
             for analyse in analyses
             for resultat in analyse.resultats.all()
         )

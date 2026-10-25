@@ -86,6 +86,7 @@
       <p>{{ profile.specialite }}{% if profile.numero_ordre %} &bull; N° {{ profile.numero_ordre }}{% endif %}{% if profile.cabinet_name %} &bull; {{ profile.cabinet_name }}{% endif %}</p>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button type="button" class="btn-white-out" onclick="openPrescriptionModal()">＋ Nouvelle prescription</button>
       <a href="{% url 'laboratoire:demande_list' %}" class="btn-white-out">🧪 Mes demandes laboratoire</a>
       <a href="{% url 'laboratoire:doctor_notifications' %}" class="btn-white-out">🔔 Alertes laboratoire</a>
       <a href="{% url 'dossiers_patients_list' %}" class="btn-white-out">📁 Dossiers Patients</a>
@@ -207,6 +208,33 @@
         {% endif %}
       </div>
 
+      <div class="card doctor-smartresult">
+        <div class="card-title">SmartResult — résumés descriptifs</div>
+        <p class="doctor-smartresult__notice">
+          {% if ia_resume_configuree %}
+          Comparez les résultats publiés à leur historique ; l’IA prépare un résumé descriptif à vérifier et approuver. Seules les données d’analyse pseudonymisées sont envoyées au fournisseur configuré.
+          {% else %}
+          La comparaison des résultats reste disponible. Configurez un fournisseur IA pour générer le résumé ; aucun texte automatique local n’est utilisé.
+          {% endif %}
+        </p>
+        {% if demandes_resume %}
+          {% for demande in demandes_resume %}
+          <div class="recent-item">
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:.88rem;color:#0f172a;">{{ demande.patient.get_full_name|default:demande.patient.username }}</div>
+              <div style="font-size:.78rem;color:#64748b;">Demande #{{ demande.pk }} · {{ demande.date_demande|date:"d M Y" }}</div>
+            </div>
+            <a href="{% url 'laboratoire:compte_rendu' demande.pk %}" class="btn-green">Comparer les résultats</a>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="text-align:center;padding:18px;color:#64748b;font-size:.875rem;">
+            Aucun résultat publié disponible pour un résumé. Les demandes éligibles apparaîtront ici.
+          </div>
+        {% endif %}
+        <a href="{% url 'laboratoire:demande_list' %}" class="btn-blue">Voir mes demandes laboratoire</a>
+      </div>
+
     </div>
   </div>
 </div>
@@ -245,13 +273,73 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-new-prescription" onclick="closeModalOnOverlay(event, 'modal-new-prescription')">
+  <div class="modal-box" style="max-width:900px;">
+    <div class="modal-header">
+      <span class="modal-title">Nouvelle prescription d’analyses</span>
+      <button type="button" class="modal-close" onclick="closeModal('modal-new-prescription')" aria-label="Fermer">✕</button>
+    </div>
+    <div id="prescription-modal-content" aria-live="polite"></div>
+  </div>
+</div>
+
 {% block extra_js %}
 <script>
 const CSRF = '{{ csrf_token }}';
+const prescriptionModalUrl = '{% url "laboratoire:demande_create" %}?modal=1';
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function closeModalOnOverlay(e, id) { if(e.target.classList.contains('modal-overlay')) closeModal(id); }
+
+async function openPrescriptionModal() {
+  openModal('modal-new-prescription');
+  const content = document.getElementById('prescription-modal-content');
+  content.textContent = 'Chargement du formulaire…';
+  try {
+    const response = await fetch(prescriptionModalUrl, {
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    if (!response.ok) throw new Error('Le formulaire de prescription ne peut pas être chargé.');
+    content.innerHTML = await response.text();
+  } catch (error) {
+    content.textContent = error.message || 'Une erreur empêche le chargement du formulaire.';
+  }
+}
+
+document.getElementById('prescription-modal-content').addEventListener('submit', async event => {
+  if (!event.target.matches('form[data-prescription-form]')) return;
+  event.preventDefault();
+  const form = event.target;
+  const submitButton = form.querySelector('button[type="submit"]');
+  if (submitButton) submitButton.disabled = true;
+  try {
+    const response = await fetch(prescriptionModalUrl, {
+      method: 'POST',
+      body: new FormData(form),
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'La demande n’a pas pu être enregistrée.');
+      window.location.href = data.redirect_url;
+      return;
+    }
+    document.getElementById('prescription-modal-content').innerHTML = await response.text();
+  } catch (error) {
+    const errorBox = form.querySelector('[data-prescription-error]');
+    if (errorBox) {
+      errorBox.textContent = error.message || 'Une erreur empêche l’enregistrement.';
+      errorBox.hidden = false;
+    } else {
+      document.getElementById('prescription-modal-content').textContent =
+        error.message || 'Une erreur empêche l’enregistrement.';
+    }
+  } finally {
+    if (submitButton && submitButton.isConnected) submitButton.disabled = false;
+  }
+});
 
 async function submitAssocier() {
   const pid = document.getElementById('assoc-patient-id').value;

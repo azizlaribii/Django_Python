@@ -227,7 +227,7 @@ class LaboratoireAdmin(admin.ModelAdmin):
     def get_numero_agrement(self, obj):
         return getattr(obj.lab_profile, 'numero_agrement', '-') or '-'
 
-    @admin.display(description="Biologiste / Resp.")
+    @admin.display(description="Responsable du laboratoire")
     def get_responsable(self, obj):
         return getattr(obj.lab_profile, 'responsable', '-') or '-'
 
