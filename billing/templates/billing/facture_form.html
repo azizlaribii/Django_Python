@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block title %}{% if facture %}Modifier {{ facture.numero }}{% else %}Nouvelle facture{% endif %} - SantéConnect{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'billing/billing.css' %}">{% endblock %}
 
 {% block content %}
 <div class="container billing-page">
     <div class="page-header">
         <div>
-           <h1>{% if facture %}Modifier {{ facture.numero }}{% else %}Nouvelle facture{% endif %}</h1>
+            <h1>{% if facture %}Modifier {{ facture.numero }}{% else %}Nouvelle facture{% endif %}</h1>
             <p>Renseignez le patient puis les lignes de la facture.</p>
         </div>
     </div>
@@ -20,7 +21,9 @@
             <div class="form-group">
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
-                {% for error in field.errors %}<div class="field-error" role="alert">{{ error }}</div>{% endfor %}
+                {% for error in field.errors %}
+                <div class="field-error" role="alert">{{ error }}</div>
+                {% endfor %}
             </div>
             {% endfor %}
         </div></div>
@@ -36,18 +39,24 @@
             <table>
                 <caption class="sr-only">Lignes de la facture</caption>
                 <thead>
-                    <tr><th scope="col">Tarif</th><th scope="col">Description</th><th scope="col">Référence</th>
-                        <th scope="col">Qté</th><th scope="col">Prix unitaire</th><th scope="col">Supprimer</th></tr>
+                    <tr>
+                        <th scope="col">Tarif</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Référence</th>
+                        <th scope="col">Qté</th>
+                        <th scope="col">Prix unitaire</th>
+                        <th scope="col">Supprimer</th>
+                    </tr>
                 </thead>
                 <tbody id="lignes-body">
                     {% for lf in formset %}
                     <tr class="ligne">
                         {% for hidden in lf.hidden_fields %}{{ hidden }}{% endfor %}
                         <td>{{ lf.tarif }}</td>
-                        <td>{{ lf.description }}{{ lf.description.errors }}</td>
+                        <td>{{ lf.description }}{% for e in lf.description.errors %}<div class="field-error" role="alert">{{ e }}</div>{% endfor %}</td>
                         <td>{{ lf.reference }}</td>
-                        <td>{{ lf.quantite }}{{ lf.quantite.errors }}</td>
-                        <td>{{ lf.prix_unitaire }}{{ lf.prix_unitaire.errors }}</td>
+                        <td>{{ lf.quantite }}{% for e in lf.quantite.errors %}<div class="field-error" role="alert">{{ e }}</div>{% endfor %}</td>
+                        <td>{{ lf.prix_unitaire }}{% for e in lf.prix_unitaire.errors %}<div class="field-error" role="alert">{{ e }}</div>{% endfor %}</td>
                         <td><label>{{ lf.DELETE }}<span class="sr-only">Supprimer cette ligne</span></label></td>
                     </tr>
                     {% endfor %}

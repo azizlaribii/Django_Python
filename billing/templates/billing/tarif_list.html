@@ -1,29 +1,33 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block content %}
-<link rel="stylesheet" href="{% static 'billing/billing.css' %}">
+{% block title %}Tarifs - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'billing/billing.css' %}">{% endblock %}
 
-<div class="billing-page">
+{% block content %}
+<div class="container billing-page">
     <div class="page-header">
         <div>
-            <h1>💳 Tarifs</h1>
+            <h1><span aria-hidden="true">💳</span> Tarifs</h1>
             <p>{{ tarifs|length }} tarif{{ tarifs|length|pluralize }} enregistré{{ tarifs|length|pluralize }}</p>
         </div>
-        <a href="{% url 'tarif_create' %}" class="btn btn-primary">+ Nouveau tarif</a>
+        <div class="actions">
+            <a href="{% url 'tarif_create' %}" class="btn btn-primary">+ Nouveau tarif</a>
+        </div>
     </div>
 
     <div class="card">
         <div class="table-wrap">
             <table>
+                <caption class="sr-only">Liste des tarifs</caption>
                 <thead>
                     <tr>
-                        <th>Code</th>
-                        <th>Libellé</th>
-                        <th>Catégorie</th>
-                        <th class="text-right">Prix (TND)</th>
-                        <th>Statut</th>
-                        <th class="text-right">Actions</th>
+                        <th scope="col">Code</th>
+                        <th scope="col">Libellé</th>
+                        <th scope="col">Catégorie</th>
+                        <th scope="col" class="text-right">Prix (TND)</th>
+                        <th scope="col">Statut</th>
+                        <th scope="col" class="text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -31,23 +35,21 @@
                     <tr>
                         <td><strong>{{ t.code }}</strong></td>
                         <td>{{ t.libelle }}</td>
-                        <td>
-                            <span class="badge badge-{{ t.categorie|lower }}">
-                                {{ t.get_categorie_display }}
-                            </span>
-                        </td>
+                        <td><span class="badge badge-{{ t.categorie|lower }}">{{ t.get_categorie_display }}</span></td>
                         <td class="text-right">{{ t.prix|floatformat:3 }}</td>
                         <td>
                             {% if t.actif %}
-                                <span class="badge badge-actif">Actif</span>
+                            <span class="badge badge-actif">Actif</span>
                             {% else %}
-                                <span class="badge badge-inactif">Inactif</span>
+                            <span class="badge badge-inactif">Inactif</span>
                             {% endif %}
                         </td>
                         <td>
                             <div class="actions">
-                                <a href="{% url 'tarif_update' t.pk %}" class="btn btn-light btn-sm">✏️ Modifier</a>
-                                <a href="{% url 'tarif_delete' t.pk %}" class="btn btn-light btn-sm">🗑️</a>
+                                <a href="{% url 'tarif_update' t.pk %}" class="btn btn-light btn-sm"
+                                   aria-label="Modifier le tarif {{ t.libelle }}"><span aria-hidden="true">✏️</span> Modifier</a>
+                                <a href="{% url 'tarif_delete' t.pk %}" class="btn btn-light btn-sm"
+                                   aria-label="Supprimer le tarif {{ t.libelle }}"><span aria-hidden="true">🗑️</span></a>
                             </div>
                         </td>
                     </tr>

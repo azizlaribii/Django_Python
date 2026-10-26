@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
+
+{% block title %}Historique - SantéConnect{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'billing/billing.css' %}">{% endblock %}
 
 {% block content %}
@@ -9,13 +11,18 @@
             <h1>Historique - {{ patient.get_full_name|default:patient.username }}</h1>
             <p>{{ factures|length }} facture{{ factures|length|pluralize }}</p>
         </div>
-        <a href="{% url 'facture_list' %}" class="btn btn-light">← Retour aux factures</a>
+        <div class="actions">
+            <a href="{% url 'facture_list' %}" class="btn btn-light">← Retour aux factures</a>
+        </div>
     </div>
 
-    <div class="card" style="margin-bottom:20px;"><div class="card-body totals" style="max-width:100%;">
-        <div><span>Total facturé</span><span>{{ total_facture|floatformat:3 }} TND</span></div>
-        <div><span>Total encaissé</span><span>{{ total_encaisse|floatformat:3 }} TND</span></div>
-        <div class="grand"><span>Reste</span><span>{{ total_reste|floatformat:3 }} TND</span></div>
+    <div class="card" style="margin-bottom:20px;"><div class="card-body">
+        <h2 class="sr-only">Récapitulatif</h2>
+        <div class="totals">
+            <div><span>Total facturé</span><span>{{ total_facture|floatformat:3 }} TND</span></div>
+            <div><span>Total encaissé</span><span>{{ total_encaisse|floatformat:3 }} TND</span></div>
+            <div class="grand"><span>Reste</span><span>{{ total_reste|floatformat:3 }} TND</span></div>
+        </div>
     </div></div>
 
     <div class="card">
@@ -24,7 +31,8 @@
                 <caption class="sr-only">Historique des factures</caption>
                 <thead>
                     <tr>
-                        <th scope="col">Numéro</th><th scope="col">Date</th>
+                        <th scope="col">Numéro</th>
+                        <th scope="col">Date</th>
                         <th scope="col" class="text-right">Total TTC</th>
                         <th scope="col" class="text-right">Payé</th>
                         <th scope="col">Statut</th>
@@ -39,10 +47,12 @@
                         <td class="text-right">{{ f.total_ttc|floatformat:3 }}</td>
                         <td class="text-right">{{ f.total_paye|floatformat:3 }}</td>
                         <td><span class="badge badge-{{ f.statut|lower }}">{{ f.get_statut_display }}</span></td>
-                        <td><div class="actions">
-                            <a href="{% url 'facture_detail' f.pk %}" class="btn btn-light btn-sm"
-                               aria-label="Voir la facture {{ f.numero }}">Voir</a>
-                        </div></td>
+                        <td>
+                            <div class="actions">
+                                <a href="{% url 'facture_detail' f.pk %}" class="btn btn-light btn-sm"
+                                   aria-label="Voir la facture {{ f.numero }}">Voir</a>
+                            </div>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr><td colspan="6" class="empty">Aucune facture pour ce patient.</td></tr>

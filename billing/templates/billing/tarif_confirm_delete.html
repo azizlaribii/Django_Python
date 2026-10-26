@@ -1,14 +1,15 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block content %}
-<link rel="stylesheet" href="{% static 'billing/billing.css' %}">
+{% block title %}Supprimer un tarif - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'billing/billing.css' %}">{% endblock %}
 
-<div class="billing-page">
+{% block content %}
+<div class="container billing-page">
     <div class="card delete-box">
         <div class="card-body">
-            <div class="delete-icon">⚠️</div>
-            <h2>Supprimer ce tarif ?</h2>
+            <div class="delete-icon" aria-hidden="true">⚠️</div>
+            <h1>Supprimer ce tarif ?</h1>
             <p>Vous allez supprimer <strong>{{ tarif.libelle }}</strong>. Cette action est définitive.</p>
 
             <form method="post">

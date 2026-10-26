@@ -20,8 +20,9 @@
   </head>
 
   <body>
+    <a href="#contenu" class="sr-only">Aller au contenu</a>
     <!-- Navigation Bar -->
-    <nav class="navbar" id="main-navbar">
+    <nav class="navbar" id="main-navbar" aria-label="Navigation principale">
       <div class="container navbar-inner">
         <div class="navbar-brand-section">
           <a href="{% url 'home' %}" class="logo-brand" id="brand-logo-link">
@@ -153,7 +154,7 @@
     </div>
 
     <!-- Main Content Block -->
-    <main style="flex: 1; padding: 24px 0 60px">
+    <main id="contenu" style="flex: 1; padding: 24px 0 60px">
       {% block content %}{% endblock %}
     </main>
 

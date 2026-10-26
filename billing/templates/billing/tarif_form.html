@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block content %}
-<link rel="stylesheet" href="{% static 'billing/billing.css' %}">
+{% block title %}{% if tarif %}Modifier le tarif{% else %}Nouveau tarif{% endif %} - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'billing/billing.css' %}">{% endblock %}
 
-<div class="billing-page">
+{% block content %}
+<div class="container billing-page">
     <div class="page-header">
         <div>
             <h1>{% if tarif %}Modifier le tarif{% else %}Nouveau tarif{% endif %}</h1>
@@ -28,7 +29,7 @@
                         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {{ field }}
                         {% for error in field.errors %}
-                            <div class="field-error">{{ error }}</div>
+                        <div class="field-error" role="alert">{{ error }}</div>
                         {% endfor %}
                     </div>
                     {% endif %}
