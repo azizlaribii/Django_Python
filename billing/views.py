@@ -135,13 +135,18 @@ def paiement_create(request, pk):
 
     form = PaiementForm(request.POST or None, facture=facture)
     if request.method == 'POST' and form.is_valid():
-        with transaction.atomic():
-            paiement = form.save(commit=False)
-            paiement.facture = facture
-            paiement.enregistre_par = request.user
-            paiement.save()
-        messages.success(request, "Paiement enregistré.")
-        return redirect('facture_detail', pk=pk)
+         with transaction.atomic():
+            verrou = Facture.objects.select_for_update().get(pk=facture.pk)
+            montant = form.cleaned_data['montant']
+            if montant > verrou.reste_a_payer():
+                form.add_error('montant', "Le montant dépasse le reste à payer.")
+            else:
+                paiement = form.save(commit=False)
+                paiement.facture = verrou
+                paiement.enregistre_par = request.user
+                paiement.save()
+                messages.success(request, "Paiement enregistré.")
+                return redirect('facture_detail', pk=pk)
     return render(request, 'billing/paiement_form.html', {'form': form, 'facture': facture})
 
 

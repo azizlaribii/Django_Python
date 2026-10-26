@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}Accès refusé - SantéConnect{% endblock %}
+
+{% block content %}
+<div class="container">
+    <section class="glass-card" style="padding:40px; max-width:640px; margin:40px auto; text-align:center;" aria-labelledby="err-titre">
+        <p style="font-size:3rem; font-weight:800; color:#b91c1c; margin:0;" aria-hidden="true">403</p>
+        <h1 id="err-titre" style="font-size:1.6rem; margin:8px 0 12px;">Accès refusé</h1>
+        <p style="color:var(--text-muted); margin-bottom:24px;">
+            Votre rôle ne vous permet pas d'accéder à cette page.
+        </p>
+        <a href="{% url 'dashboard' %}" class="btn btn-primary">Retour au tableau de bord</a>
+    </section>
+</div>
+{% endblock %}

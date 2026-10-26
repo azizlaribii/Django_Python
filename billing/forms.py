@@ -30,6 +30,17 @@ class FactureForm(forms.ModelForm):
         # Un docteur ne choisit pas le médecin : c'est lui.
         if user is not None and user.is_doctor:
             del self.fields['medecin']
+    def clean_remise(self):
+        v = self.cleaned_data['remise']
+        if v < 0:
+            raise forms.ValidationError("La remise ne peut pas être négative.")
+        return v
+
+    def clean_tva(self):
+        v = self.cleaned_data['tva']
+        if not 0 <= v <= 100:
+            raise forms.ValidationError("La TVA doit être comprise entre 0 et 100.")
+        return v        
 
 
 class LigneFactureForm(forms.ModelForm):
@@ -47,6 +58,18 @@ class LigneFactureForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['tarif'].queryset = Tarif.objects.filter(actif=True)
+
+    def clean_quantite(self):
+        v = self.cleaned_data['quantite']
+        if v < 1:
+            raise forms.ValidationError("La quantité doit être d'au moins 1.")
+        return v
+
+    def clean_prix_unitaire(self):
+        v = self.cleaned_data['prix_unitaire']
+        if v < 0:
+            raise forms.ValidationError("Le prix ne peut pas être négatif.")
+        return v    
 
 
 LigneFormSet = inlineformset_factory(
