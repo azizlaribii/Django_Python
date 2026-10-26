@@ -13,4 +13,6 @@ urlpatterns = [
     path('factures/<int:pk>/modifier/', views.facture_update, name='facture_update'),
     path('factures/<int:pk>/annuler/', views.facture_cancel, name='facture_cancel'),
     path('factures/<int:pk>/paiement/', views.paiement_create, name='paiement_create'),
+    path('patients/<int:patient_id>/historique/', views.patient_historique, name='patient_historique'),
+    path('mon-historique/', views.patient_historique, name='mon_historique'),
 ]

@@ -5,6 +5,10 @@ from .forms import TarifForm, FactureForm, LigneFormSet , PaiementForm
 from .models import Tarif, Facture
 from .permissions import admin_required, staff_required, billing_access_required, factures_visibles
 from django.views.decorators.http import require_POST
+from decimal import Decimal
+from django.http import Http404
+from django.contrib.auth import get_user_model
+
 # ───────────── TARIFS (admin seulement) ─────────────
 
 @admin_required
@@ -140,3 +144,23 @@ def paiement_create(request, pk):
         return redirect('facture_detail', pk=pk)
     return render(request, 'billing/paiement_form.html', {'form': form, 'facture': facture})
 
+
+@billing_access_required
+def patient_historique(request, patient_id=None):
+    if request.user.is_patient:
+        if patient_id not in (None, request.user.pk):
+            raise Http404
+        patient = request.user
+    else:
+        patient = get_object_or_404(get_user_model(), pk=patient_id, role='PATIENT')
+
+    factures = (factures_visibles(request.user)
+                .filter(patient=patient).prefetch_related('lignes', 'paiements'))
+    actives = [f for f in factures if f.statut != Facture.Statut.ANNULEE]
+    total_facture = sum((f.total_ttc for f in actives), Decimal('0'))
+    total_encaisse = sum((f.total_paye() for f in actives), Decimal('0'))
+    return render(request, 'billing/patient_historique.html', {
+        'patient': patient, 'factures': factures,
+        'total_facture': total_facture, 'total_encaisse': total_encaisse,
+        'total_reste': total_facture - total_encaisse,
+    })

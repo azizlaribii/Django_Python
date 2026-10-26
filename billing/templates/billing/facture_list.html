@@ -12,6 +12,7 @@
         {% if user.is_admin_user or user.is_doctor %}
 <a href="{% url 'facture_create' %}" class="btn btn-primary">+ Nouvelle facture</a>
         {% endif %}
+        {% if user.is_patient %}<a href="{% url 'mon_historique' %}" class="btn btn-light">Mon historique</a>{% endif %}
     </div>
 
     <div class="card">
@@ -29,7 +30,7 @@
                     <tr>
                         <td><strong>{{ f.numero }}</strong></td>
                         <td>{{ f.date_emission|date:"d/m/Y" }}</td>
-                        <td>{{ f.patient.get_full_name|default:f.patient.username }}</td>
+                        <td>{% if user.is_admin_user or user.is_doctor %}<a href="{% url 'patient_historique' f.patient.pk %}">{{ f.patient.get_full_name|default:f.patient.username }}</a>{% else %}{{ f.patient.get_full_name|default:f.patient.username }}{% endif %}</td>
                         <td class="text-right">{{ f.total_ttc|floatformat:3 }}</td>
                         <td><span class="badge badge-{{ f.statut|lower }}">{{ f.get_statut_display }}</span></td>
                         <td><div class="actions">
