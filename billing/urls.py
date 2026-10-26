@@ -15,4 +15,5 @@ urlpatterns = [
     path('factures/<int:pk>/paiement/', views.paiement_create, name='paiement_create'),
     path('patients/<int:patient_id>/historique/', views.patient_historique, name='patient_historique'),
     path('mon-historique/', views.patient_historique, name='mon_historique'),
+    path('factures/<int:pk>/pdf/', views.facture_pdf, name='facture_pdf'),
 ]

@@ -6,9 +6,9 @@ from .models import Tarif, Facture
 from .permissions import admin_required, staff_required, billing_access_required, factures_visibles
 from django.views.decorators.http import require_POST
 from decimal import Decimal
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.contrib.auth import get_user_model
-
+from .pdf import build_facture_pdf
 # ───────────── TARIFS (admin seulement) ─────────────
 
 @admin_required
@@ -169,3 +169,11 @@ def patient_historique(request, patient_id=None):
         'total_facture': total_facture, 'total_encaisse': total_encaisse,
         'total_reste': total_facture - total_encaisse,
     })
+
+@billing_access_required
+def facture_pdf(request, pk):
+    facture = get_object_or_404(factures_visibles(request.user), pk=pk)
+    mode = 'inline' if request.GET.get('apercu') else 'attachment'
+    response = HttpResponse(build_facture_pdf(facture).getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'{mode}; filename="{facture.numero}.pdf"'
+    return response

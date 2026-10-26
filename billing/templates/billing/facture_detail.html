@@ -20,6 +20,8 @@
                 <button type="submit" class="btn btn-light">Annuler la facture</button>
             </form>
             {% endif %}
+            <a href="{% url 'facture_pdf' facture.pk %}?apercu=1" target="_blank" rel="noopener" class="btn btn-light">Aperçu PDF</a>
+            <a href="{% url 'facture_pdf' facture.pk %}" class="btn btn-primary">Télécharger PDF</a>
         </div>
     </div>
 
