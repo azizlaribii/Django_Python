@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db import transaction
-from .forms import TarifForm, FactureForm, LigneFormSet
+from .forms import TarifForm, FactureForm, LigneFormSet , PaiementForm
 from .models import Tarif, Facture
 from .permissions import admin_required, staff_required, billing_access_required, factures_visibles
 from django.views.decorators.http import require_POST
@@ -117,3 +117,26 @@ def facture_cancel(request, pk):
         facture.save(update_fields=['statut'])
         messages.success(request, f"Facture {facture.numero} annulée.")
     return redirect('facture_detail', pk=pk)
+
+
+
+
+
+@staff_required
+def paiement_create(request, pk):
+    facture = get_object_or_404(factures_visibles(request.user), pk=pk)
+    if facture.statut in (Facture.Statut.ANNULEE, Facture.Statut.PAYEE):
+        messages.error(request, "Aucun paiement possible sur cette facture.")
+        return redirect('facture_detail', pk=pk)
+
+    form = PaiementForm(request.POST or None, facture=facture)
+    if request.method == 'POST' and form.is_valid():
+        with transaction.atomic():
+            paiement = form.save(commit=False)
+            paiement.facture = facture
+            paiement.enregistre_par = request.user
+            paiement.save()
+        messages.success(request, "Paiement enregistré.")
+        return redirect('facture_detail', pk=pk)
+    return render(request, 'billing/paiement_form.html', {'form': form, 'facture': facture})
+

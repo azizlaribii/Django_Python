@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'billing/billing.css' %}">{% endblock %}
+{% block content %}
+<div class="container billing-page">
+    <div class="page-header"><div>
+        <h1>Paiement - {{ facture.numero }}</h1>
+        <p>Reste à payer : <strong>{{ facture.reste_a_payer|floatformat:3 }} TND</strong></p>
+    </div></div>
+    <form method="post" class="card"><div class="card-body">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% for e in field.errors %}<div class="field-error" role="alert">{{ e }}</div>{% endfor %}
+        </div>
+        {% endfor %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+            <a href="{% url 'facture_detail' facture.pk %}" class="btn btn-light">Annuler</a>
+        </div>
+    </div></form>
+</div>
+{% endblock %}

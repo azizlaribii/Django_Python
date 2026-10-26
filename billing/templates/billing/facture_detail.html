@@ -3,19 +3,25 @@
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'billing/billing.css' %}">
-
-
-<div class="actions">
-    <a href="{% url 'facture_list' %}" class="btn btn-light">← Retour</a>
-    {% if peut_gerer and facture.statut == 'EN_ATTENTE' %}
-    <a href="{% url 'facture_update' facture.pk %}" class="btn btn-light">Modifier</a>
-    <form method="post" action="{% url 'facture_cancel' facture.pk %}" style="display:inline"
-          onsubmit="return confirm('Annuler cette facture ?');">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-light">Annuler la facture</button>
-    </form>
-    {% endif %}
-</div>
+<div class="container billing-page">
+    <div class="page-header">
+        <div>
+            <h1>Facture {{ facture.numero }}</h1>
+            <p>Émise le {{ facture.date_emission|date:"d/m/Y" }} —
+               <span class="badge badge-{{ facture.statut|lower }}">{{ facture.get_statut_display }}</span></p>
+        </div>
+        <div class="actions">
+            <a href="{% url 'facture_list' %}" class="btn btn-light">← Retour</a>
+            {% if peut_gerer and facture.statut == 'EN_ATTENTE' %}
+            <a href="{% url 'facture_update' facture.pk %}" class="btn btn-light">Modifier</a>
+            <form method="post" action="{% url 'facture_cancel' facture.pk %}" style="display:inline"
+                  onsubmit="return confirm('Annuler cette facture ?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-light">Annuler la facture</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
 
     <div class="card"><div class="card-body">
         <p><strong>Patient :</strong> {{ facture.patient.get_full_name|default:facture.patient.username }}</p>
@@ -23,9 +29,11 @@
         <p><strong>Médecin :</strong> {{ facture.medecin.get_full_name|default:facture.medecin.username }}</p>
         {% endif %}
 
+        <div class="table-wrap">
         <table>
-            <thead><tr><th>Description</th><th>Qté</th>
-                <th class="text-right">Prix unitaire</th><th class="text-right">Total</th></tr></thead>
+            <caption class="sr-only">Lignes de la facture</caption>
+            <thead><tr><th scope="col">Description</th><th scope="col">Qté</th>
+                <th scope="col" class="text-right">Prix unitaire</th><th scope="col" class="text-right">Total</th></tr></thead>
             <tbody>
                 {% for l in facture.lignes.all %}
                 <tr><td>{{ l.description }}</td><td>{{ l.quantite }}</td>
@@ -36,6 +44,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
 
         <div class="totals">
             <div><span>Sous-total</span><span>{{ facture.sous_total|floatformat:3 }}</span></div>
@@ -43,6 +52,29 @@
             <div><span>TVA ({{ facture.tva }} %)</span><span>{{ facture.montant_tva|floatformat:3 }}</span></div>
             <div class="grand"><span>Total TTC</span><span>{{ facture.total_ttc|floatformat:3 }} TND</span></div>
         </div>
+
+        <div class="totals">
+            <div><span>Déjà payé</span><span>{{ facture.total_paye|floatformat:3 }}</span></div>
+            <div class="grand"><span>Reste à payer</span><span>{{ facture.reste_a_payer|floatformat:3 }} TND</span></div>
+        </div>
+
+        <h2>Paiements</h2>
+        <div class="table-wrap">
+        <table>
+            <caption class="sr-only">Paiements enregistrés</caption>
+            <thead><tr><th scope="col">Date</th><th scope="col">Mode</th><th scope="col" class="text-right">Montant</th></tr></thead>
+            <tbody>
+            {% for p in facture.paiements.all %}
+            <tr><td>{{ p.date_paiement|date:"d/m/Y H:i" }}</td><td>{{ p.get_mode_display }}</td>
+                <td class="text-right">{{ p.montant|floatformat:3 }}</td></tr>
+            {% empty %}<tr><td colspan="3" class="empty">Aucun paiement.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+        </div>
+
+        {% if peut_gerer and facture.statut != 'ANNULEE' and facture.statut != 'PAYEE' %}
+        <p style="margin-top:16px;"><a href="{% url 'paiement_create' facture.pk %}" class="btn btn-primary">+ Enregistrer un paiement</a></p>
+        {% endif %}
     </div></div>
 </div>
 {% endblock %}

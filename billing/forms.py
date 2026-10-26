@@ -1,8 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
-
-from .models import Tarif, Facture, LigneFacture
-
+from .models import Tarif, Facture, LigneFacture, Paiement
 
 class TarifForm(forms.ModelForm):
     class Meta:
@@ -55,3 +53,25 @@ LigneFormSet = inlineformset_factory(
     Facture, LigneFacture, form=LigneFactureForm,
     extra=1, can_delete=True, min_num=1, validate_min=True,
 )
+
+
+
+class PaiementForm(forms.ModelForm):
+    class Meta:
+        model = Paiement
+        fields = ['montant', 'mode']
+        widgets = {
+            'montant': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.001', 'min': '0.001'}),
+            'mode': forms.Select(attrs={'class': 'form-input'}),
+        }
+
+    def __init__(self, *args, facture=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.facture = facture
+
+    def clean_montant(self):
+        montant = self.cleaned_data['montant']
+        reste = self.facture.reste_a_payer()
+        if montant > reste:
+            raise forms.ValidationError(f"Le montant dépasse le reste à payer ({reste:.3f} TND).")
+        return montant

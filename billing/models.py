@@ -2,7 +2,7 @@ from decimal import Decimal
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
-
+from django.core.validators import MinValueValidator
 
 class Tarif(models.Model):
     class Categorie(models.TextChoices):
@@ -78,6 +78,24 @@ class Facture(models.Model):
     def __str__(self):
         return self.numero or f"Facture #{self.pk}"
 
+    def total_paye(self):
+        return sum((p.montant for p in self.paiements.all()), Decimal('0'))
+
+    def reste_a_payer(self):
+        return self.total_ttc - self.total_paye()
+
+    def mettre_a_jour_statut(self):
+        if self.statut == self.Statut.ANNULEE:
+            return
+        paye = self.total_paye()
+        if self.total_ttc > 0 and paye >= self.total_ttc:
+            self.statut = self.Statut.PAYEE
+        elif paye > 0:
+            self.statut = self.Statut.PARTIELLE
+        else:
+            self.statut = self.Statut.EN_ATTENTE
+        self.save(update_fields=['statut'])
+
 
 class LigneFacture(models.Model):
     facture = models.ForeignKey(Facture, on_delete=models.CASCADE, related_name='lignes')
@@ -93,3 +111,32 @@ class LigneFacture(models.Model):
 
     def __str__(self):
         return f"{self.description} x{self.quantite}"
+
+
+
+class Paiement(models.Model):
+    class Mode(models.TextChoices):
+        ESPECES = 'ESPECES', 'Espèces'
+        CARTE = 'CARTE', 'Carte bancaire'
+        CHEQUE = 'CHEQUE', 'Chèque'
+        VIREMENT = 'VIREMENT', 'Virement'
+
+    facture = models.ForeignKey(Facture, on_delete=models.PROTECT, related_name='paiements')
+    montant = models.DecimalField("Montant", max_digits=12, decimal_places=3,
+                                  validators=[MinValueValidator(Decimal('0.001'))])
+    mode = models.CharField("Mode", max_length=10, choices=Mode.choices, default=Mode.ESPECES)
+    date_paiement = models.DateTimeField("Date", default=timezone.now)
+    enregistre_par = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                       on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        ordering = ['-date_paiement']
+
+    def __str__(self):
+        return f"{self.montant} TND - {self.facture.numero}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.facture.mettre_a_jour_statut()
+
+
