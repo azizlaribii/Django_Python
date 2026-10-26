@@ -142,19 +142,58 @@ GEMINI_FALLBACK_MODEL = os.environ.get(
 ).strip() or 'gemini-3.5-flash-lite'
 IA_MODELE = os.environ.get('IA_MODELE', 'claude-sonnet-4-5').strip() or 'claude-sonnet-4-5'
 
+# ─────────────────────────────────────────────────────────────
+# EXIGENCES NON-FONCTIONNELLES (BNF) : SÉCURITÉ OWASP & PROD
+# ─────────────────────────────────────────────────────────────
+X_FRAME_OPTIONS = 'DENY'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+if not DEBUG:
+    # Paramètres activés automatiquement en production (DEBUG=False)
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = os.environ.get('DJANGO_SECURE_SSL_REDIRECT', 'True').lower() in ('1', 'true', 'yes')
+    SECURE_HSTS_SECONDS = 31536000  # 1 an
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+# ─────────────────────────────────────────────────────────────
+# EXIGENCES NON-FONCTIONNELLES (BNF) : LOGGING & AUDIT
+# ─────────────────────────────────────────────────────────────
 LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} [{name}:{lineno}] {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
         },
     },
-    "loggers": {
-        "laboratoire.services_resume": {
-            "handlers": ["console"],
-            "level": "INFO",
-            "propagate": False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO'),
+            'propagate': True,
+        },
+        'accounts': {
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'laboratoire.services_resume': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
         },
     },
 }
