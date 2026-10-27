@@ -1,0 +1,6 @@
+Django==6.1.2
+scikit-learn>=1.5
+numpy>=1.26
+pandas>=2.2
+joblib>=1.4
+coverage>=7.0

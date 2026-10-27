@@ -1,0 +1,5 @@
+Questions évaluées : 25
+Questions hors sujet : 3
+Réponses correctes : 25/25
+Taux de bonnes réponses : 100.00%
+Temps moyen : 0.03 ms

@@ -6,3 +6,11 @@ __pycache__/
 !.env.example
 .coverage
 htmlcov/
+*.sqlite3
+findstr
+now
+powershell
+test_result.txt
+templates/base_*backup*.html
+templates/base_before_fix2.html
+

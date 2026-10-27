@@ -660,6 +660,10 @@ class Resultat(models.Model):
 
     observation = models.TextField("Observation", blank=True)
 
+    commentaire_interne = models.TextField("Commentaire interne", blank=True)
+
+    commentaire_patient = models.TextField("Commentaire destiné au patient", blank=True)
+
     version = models.PositiveIntegerField("Version", default=1)
 
     motif_correction = models.TextField("Motif de correction", blank=True)

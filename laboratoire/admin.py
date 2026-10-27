@@ -79,7 +79,8 @@ class ResultatAdmin(admin.ModelAdmin):
     list_filter = ("statut",)
     readonly_fields = (
         "analyse_demandee", "prelevement", "valeur", "unite", "valeur_reference",
-        "interpretation", "observation", "statut", "saisi_par", "valide_par",
+        "interpretation", "observation", "commentaire_interne",
+        "commentaire_patient", "statut", "saisi_par", "valide_par",
         "date_saisie", "date_modification", "date_validation",
     )
 

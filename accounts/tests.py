@@ -8,7 +8,7 @@ class NavigationTests(TestCase):
     def test_authenticated_navigation_displays_the_users_full_name(self):
         user = User.objects.create_user(
             username="leila-ben-salah",
-            password="test-password",
+            password="unit-test-password",
             first_name="Leila",
             last_name="Ben Salah",
             role=User.Role.DOCTEUR,
@@ -24,7 +24,7 @@ class NavigationTests(TestCase):
     def test_admin_laboratory_menu_keeps_only_analysis_management_and_history(self):
         admin = User.objects.create_user(
             username="laboratory-admin",
-            password="test-password-123",
+            password="unit-test-password",
             role=User.Role.ADMIN,
         )
         self.client.force_login(admin)

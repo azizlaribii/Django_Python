@@ -377,6 +377,15 @@ def _message_erreur_http(status_code):
     return "requête fournisseur refusée"
 
 
+def _est_erreur_delai(error):
+    if isinstance(error, TimeoutError):
+        return True
+    return isinstance(error, URLError) and isinstance(
+        error.reason,
+        TimeoutError,
+    )
+
+
 def _poster_json(request):
     try:
         with urlopen(request, timeout=15) as response:
@@ -388,9 +397,10 @@ def _poster_json(request):
             status_code=error.code,
         ) from error
     except (TimeoutError, URLError, OSError) as error:
-        code = "timeout" if isinstance(error, TimeoutError) else "network_error"
+        code = "timeout" if _est_erreur_delai(error) else "network_error"
         message = (
-            "délai d’attente dépassé"
+            "Le fournisseur IA n’a pas répondu dans le délai imparti. "
+            "Aucun résumé n’a été enregistré ; réessayez dans quelques instants."
             if code == "timeout"
             else "erreur de connexion réseau"
         )
@@ -522,15 +532,22 @@ def generer_resume(lignes):
                 texte = _appeler_gemini(lignes, model=model)
             except ResumeAPIError as primary_error:
                 if (
-                    primary_error.status_code != 503
+                    (
+                        primary_error.status_code != 503
+                        and primary_error.code != "timeout"
+                    )
                     or not fallback_model
                     or fallback_model == model
                 ):
                     raise
                 logger.warning(
-                    "Modèle Gemini indisponible: modèle=%s http_status=503 "
-                    "repli=%s",
+                    "Modèle Gemini indisponible: modèle=%s cause=%s repli=%s",
                     model,
+                    (
+                        f"http_status={primary_error.status_code}"
+                        if primary_error.status_code
+                        else primary_error.code
+                    ),
                     fallback_model,
                 )
                 model = fallback_model

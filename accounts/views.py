@@ -1588,3 +1588,34 @@ def get_protocole_details(request, protocole_id):
     if not proto:
         return JsonResponse({'success': False, 'error': 'Protocole non trouvé.'}, status=404)
     return JsonResponse({'success': True, 'protocole': proto})
+<<<<<<< Updated upstream
+=======
+
+# ─────────────────────────────────────────────────────────────
+# API — IA & ML MÉDICAL
+# ─────────────────────────────────────────────────────────────
+@login_required
+def api_dossier_analyse_ia(request, patient_id):
+    """API endpoint retournant l'analyse IA complète du dossier médical en JSON."""
+    if not (request.user.is_doctor or request.user.is_admin_user or request.user.id == patient_id):
+        return JsonResponse({'error': 'Non autorisé'}, status=403)
+    patient = get_object_or_404(User, id=patient_id, role=User.Role.PATIENT)
+    dossier = get_or_create_dossier(patient)
+    from .medical_ai import analyser_dossier_ia
+    data = analyser_dossier_ia(patient, dossier)
+    return JsonResponse({'success': True, 'data': data})
+
+
+@login_required
+def api_dossier_risques_ml(request, patient_id):
+    """API endpoint retournant la détection des risques ML et profils similaires en JSON."""
+    if not (request.user.is_doctor or request.user.is_admin_user or request.user.id == patient_id):
+        return JsonResponse({'error': 'Non autorisé'}, status=403)
+    patient = get_object_or_404(User, id=patient_id, role=User.Role.PATIENT)
+    dossier = get_or_create_dossier(patient)
+    from .medical_ai import analyser_dossier_ia
+    from .medical_ml import evaluer_risques_machine_learning
+    ia_data = analyser_dossier_ia(patient, dossier)
+    ml_data = evaluer_risques_machine_learning(patient, dossier, ia_data)
+    return JsonResponse({'success': True, 'data': ml_data})
+>>>>>>> Stashed changes
