@@ -1,7 +1,5 @@
-{% extends 'base.html' %}
-{% load static %}
+{% extends 'stock/base_stock.html' %}
 {% block title %}{{ produit.nom }} - Stocks médicaux{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -9,7 +7,7 @@
 
     <div class="stock-grid-2">
         <div class="stock-card">
-            <h3>{{ produit.nom }} {% include 'stock/_pills.html' %}</h3>
+            <h2>{{ produit.nom }} {% include 'stock/_pills.html' %}</h2>
             <dl class="def-list">
                 <dt>Référence</dt><dd>{{ produit.reference }}</dd>
                 <dt>Catégorie</dt><dd>{{ produit.categorie.nom|default:"—" }}</dd>
@@ -25,11 +23,12 @@
             </dl>
         </div>
         <div class="stock-card">
-            <h3>Quantité disponible</h3>
+            <h2>Quantité disponible</h2>
             <div class="qty-big" style="color:{% if produit.en_rupture %}#dc2626{% elif produit.stock_faible %}#b45309{% else %}#0f172a{% endif %};">
                 {{ produit.quantite }} <span style="font-size:1.1rem; font-weight:600; color:var(--text-muted);">{{ produit.get_unite_display|lower }}(s)</span>
             </div>
-            <p class="muted" style="margin:8px 0 20px;">Seuil d’alerte : {{ produit.seuil_alerte }}</p>
+            <meter class="stock-meter" min="0" max="{{ produit.niveau_max }}" low="{{ produit.seuil_alerte }}" optimum="{{ produit.niveau_max }}" value="{{ produit.quantite }}" aria-label="Niveau de stock de {{ produit.nom }}" aria-valuetext="{{ produit.quantite }} en stock, seuil d’alerte {{ produit.seuil_alerte }}">{{ produit.quantite }} / {{ produit.niveau_max }}</meter>
+            <p class="muted" style="margin:8px 0 20px;">Seuil d’alerte : {{ produit.seuil_alerte }} — {% if produit.en_rupture %}stock épuisé{% elif produit.stock_faible %}stock sous le seuil{% else %}stock suffisant{% endif %}</p>
             {% if can_manage %}
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 <a href="{% url 'stock:mouvement_create' produit.pk 'entree' %}" class="btn btn-success btn-sm">+ Entrée de stock</a>
@@ -42,16 +41,16 @@
     </div>
 
     <div class="stock-card" style="margin-bottom:40px;">
-        <h3>Historique des mouvements <a href="{% url 'stock:mouvement_list' %}?q={{ produit.reference }}" class="btn btn-secondary btn-sm">Tout voir</a></h3>
+        <h2>Historique des mouvements <a href="{% url 'stock:mouvement_list' %}?q={{ produit.reference }}" class="btn btn-secondary btn-sm">Tout voir</a></h2>
         {% if mouvements %}
         <div class="table-responsive">
-            <table class="data-table">
-                <thead><tr><th>Date</th><th>Mouvement</th><th>Motif</th><th>Lot</th><th>Stock après</th><th>Par</th><th>Commentaire</th></tr></thead>
+            <table class="data-table"><caption class="sr-only">Derniers mouvements de {{ produit.nom }}</caption>
+                <thead><tr><th scope="col">Date</th><th scope="col">Mouvement</th><th scope="col">Motif</th><th scope="col">Lot</th><th scope="col">Stock après</th><th scope="col">Par</th><th scope="col">Commentaire</th></tr></thead>
                 <tbody>
                 {% for m in mouvements %}
                     <tr>
                         <td>{{ m.date|date:"d/m/Y H:i" }}</td>
-                        <td><span class="status-pill {% if m.type == 'ENTREE' %}verified{% else %}info{% endif %}">{% if m.type == 'ENTREE' %}+{% else %}−{% endif %}{{ m.quantite }}</span></td>
+                        <td><span class="status-pill {% if m.type == 'ENTREE' %}verified{% else %}info{% endif %}"><span aria-hidden="true">{% if m.type == 'ENTREE' %}+{% else %}−{% endif %}{{ m.quantite }}</span><span class="sr-only">{{ m.get_type_display }} de {{ m.quantite }}</span></span></td>
                         <td>{{ m.get_motif_display }}</td>
                         <td>{{ m.numero_lot|default:"—" }}</td>
                         <td>{{ m.stock_apres }}</td>

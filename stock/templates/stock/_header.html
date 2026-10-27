@@ -1,20 +1,25 @@
+<a href="#contenu-stock" class="skip-link">Aller au contenu du module stock</a>
 <div class="glass-card" style="padding: 24px; margin-bottom: 20px; border-left: 6px solid var(--primary);">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
         <div>
-            <h1 style="font-size:1.75rem;">📦 Gestion des stocks médicaux</h1>
+            <h1 style="font-size:1.75rem;"><span aria-hidden="true">📦</span> Gestion des stocks médicaux</h1>
             <p style="color:var(--text-muted); font-size:0.95rem; margin-top:4px;">
                 Produits, consommables, entrées / sorties, alertes et péremptions.
                 {% if not can_manage %}<span class="status-pill inactive" style="margin-left:6px;">Lecture seule</span>{% endif %}
             </p>
         </div>
-        {% if can_manage %}
-            <a href="{% url 'stock:produit_create' %}" class="btn btn-primary btn-sm" id="btn-new-product">+ Nouveau produit</a>
-        {% endif %}
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+            {% include 'stock/_a11y_bar.html' %}
+            {% if can_manage %}
+                <a href="{% url 'stock:produit_create' %}" class="btn btn-primary btn-sm" id="btn-new-product">+ Nouveau produit</a>
+            {% endif %}
+        </div>
     </div>
 </div>
-<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:24px;">
-    <a href="{% url 'stock:dashboard' %}" class="btn btn-sm {% if active == 'dashboard' %}btn-primary{% else %}btn-secondary{% endif %}">📊 Tableau de bord</a>
-    <a href="{% url 'stock:produit_list' %}" class="btn btn-sm {% if active == 'produits' %}btn-primary{% else %}btn-secondary{% endif %}">🧪 Produits</a>
-    <a href="{% url 'stock:mouvement_list' %}" class="btn btn-sm {% if active == 'mouvements' %}btn-primary{% else %}btn-secondary{% endif %}">🔁 Mouvements</a>
-    <a href="{% url 'stock:categorie_list' %}" class="btn btn-sm {% if active == 'categories' %}btn-primary{% else %}btn-secondary{% endif %}">🏷️ Catégories</a>
-</div>
+<nav aria-label="Sections du module stock" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:24px;">
+    <a href="{% url 'stock:dashboard' %}" class="btn btn-sm {% if active == 'dashboard' %}btn-primary{% else %}btn-secondary{% endif %}" {% if active == 'dashboard' %}aria-current="page"{% endif %}><span aria-hidden="true">📊</span> Tableau de bord</a>
+    <a href="{% url 'stock:produit_list' %}" class="btn btn-sm {% if active == 'produits' %}btn-primary{% else %}btn-secondary{% endif %}" {% if active == 'produits' %}aria-current="page"{% endif %}><span aria-hidden="true">🧪</span> Produits</a>
+    <a href="{% url 'stock:mouvement_list' %}" class="btn btn-sm {% if active == 'mouvements' %}btn-primary{% else %}btn-secondary{% endif %}" {% if active == 'mouvements' %}aria-current="page"{% endif %}><span aria-hidden="true">🔁</span> Mouvements</a>
+    <a href="{% url 'stock:categorie_list' %}" class="btn btn-sm {% if active == 'categories' %}btn-primary{% else %}btn-secondary{% endif %}" {% if active == 'categories' %}aria-current="page"{% endif %}><span aria-hidden="true">🏷️</span> Catégories</a>
+</nav>
+<div id="contenu-stock" tabindex="-1"></div>

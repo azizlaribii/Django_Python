@@ -1,1 +1,1 @@
-<div class="stock-pills">{% for code, label, css in produit.statuts %}<span class="status-pill {{ css }}">{{ label }}</span>{% endfor %}</div>
+<div class="stock-pills">{% for code, label, css in produit.statuts %}<span class="status-pill {{ css }}"><span aria-hidden="true">{% if code == 'rupture' %}⛔{% elif code == 'faible' %}⚠{% elif code == 'expire' %}✖{% elif code == 'bientot' %}⏳{% else %}✓{% endif %}</span> {{ label }}</span>{% endfor %}</div>

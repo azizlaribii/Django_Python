@@ -1,9 +1,9 @@
-{% extends 'base.html' %}
-{% load static %}
+{% extends 'stock/base_stock.html' %}
 {% block title %}Supprimer {{ produit.nom }}{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
 
 {% block content %}
+{% include 'stock/_a11y_toolbar.html' %}
+<div id="contenu-stock" tabindex="-1"></div>
 <div class="container" style="max-width: 620px;">
     <div class="glass-card" style="margin-bottom:40px;">
         <h1 style="font-size:1.5rem; margin-bottom:12px;">Supprimer « {{ produit.nom }} » ?</h1>
