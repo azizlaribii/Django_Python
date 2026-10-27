@@ -15,3 +15,4 @@ test_result.txt
 templates/base_*backup*.html
 templates/base_before_fix2.html
 
+staticfiles/

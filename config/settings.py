@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+import dj_database_url
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -23,15 +24,30 @@ load_dotenv(BASE_DIR / ".env")
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
+# Render définit automatiquement la variable RENDER : on passe alors en mode production.
+EN_PRODUCTION = 'RENDER' in os.environ
+
 # SECURITY WARNING: keep the secret key used in production secret!
-# En production, définir DJANGO_SECRET_KEY (la valeur ci-dessous ne sert qu'en développement).
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-6n0mpr8d)c3-9b*_aqblxyey=v_54z!$8b+h&pm9(ali1(iouo')
+# En production : variable SECRET_KEY (générée par Render). La valeur par défaut ne sert qu'en développement.
+SECRET_KEY = (
+    os.environ.get('SECRET_KEY')
+    or os.environ.get('DJANGO_SECRET_KEY')
+    or 'django-insecure-6n0mpr8d)c3-9b*_aqblxyey=v_54z!$8b+h&pm9(ali1(iouo'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# DJANGO_DEBUG=False en production (pages 404/500 personnalisées, pas de traces d'erreur).
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('1', 'true', 'yes')
+# DEBUG vaut False sur Render, True en local (modifiable avec DJANGO_DEBUG).
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False' if EN_PRODUCTION else 'True').lower() in ('1', 'true', 'yes')
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = os.environ.get(
+    'DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1' if EN_PRODUCTION else '*'
+).split(',')
+# Render fournit automatiquement cette variable (ex. : santeconnect.onrender.com)
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+# CSRF trusted origins (nécessaire depuis Django 4 pour les formulaires en HTTPS)
+CSRF_TRUSTED_ORIGINS = [f'https://{RENDER_EXTERNAL_HOSTNAME}'] if RENDER_EXTERNAL_HOSTNAME else []
 
 
 # Application definition
@@ -55,6 +71,7 @@ AUTH_USER_MODEL = 'accounts.User'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # fichiers statiques servis par Django en production
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -86,11 +103,14 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
+# Sur Render : PostgreSQL via la variable DATABASE_URL (Internal Database URL).
+# En local, sans DATABASE_URL : on garde SQLite (pas besoin d'installer PostgreSQL).
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
 
 
@@ -123,7 +143,21 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = '/static/'
+# Dossier où `collectstatic` copie les ressources statiques (spécifique au déploiement)
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Django 5.1+ : STATICFILES_STORAGE n'existe plus, on passe par STORAGES.
+# En production, WhiteNoise compresse les fichiers et leur donne un nom unique par version
+# (mise en cache longue durée). En développement, on garde le stockage standard.
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {
+        'BACKEND': (
+            'django.contrib.staticfiles.storage.StaticFilesStorage' if DEBUG
+            else 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+        ),
+    },
+}
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -150,6 +184,8 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 
 if not DEBUG:
     # Paramètres activés automatiquement en production (DEBUG=False)
+    # Render termine le HTTPS sur son proxy : sans cette ligne, SECURE_SSL_REDIRECT boucle à l'infini.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SECURE = True
     SECURE_SSL_REDIRECT = os.environ.get('DJANGO_SECURE_SSL_REDIRECT', 'True').lower() in ('1', 'true', 'yes')
