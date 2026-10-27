@@ -1,13 +1,19 @@
 {% extends 'base.html' %}
 {% load static %}
+
+{% block title %}Paiement {{ facture.numero }} - SantéConnect{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'billing/billing.css' %}">{% endblock %}
+
 {% block content %}
 <div class="container billing-page">
-    <div class="page-header"><div>
-        <h1>Paiement - {{ facture.numero }}</h1>
-        <p>Reste à payer : <strong>{{ facture.reste_a_payer|floatformat:3 }} TND</strong></p>
-    </div></div>
-    <form method="post" class="card"><div class="card-body">
+    <div class="page-header">
+        <div>
+            <h1>Paiement - {{ facture.numero }}</h1>
+            <p>Reste à payer : <strong>{{ facture.reste_a_payer|floatformat:3 }} TND</strong></p>
+        </div>
+    </div>
+
+    <form method="post" class="card form-narrow"><div class="card-body">
         {% csrf_token %}
         {% for field in form %}
         <div class="form-group">

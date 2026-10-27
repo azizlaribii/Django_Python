@@ -1,13 +1,11 @@
-{% extends 'base.html' %}
-{% load static %}
+{% extends 'stock/base_stock.html' %}
 {% block title %}Produits - Stocks médicaux{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
 
 {% block content %}
 <div class="container">
     {% include 'stock/_header.html' with active='produits' %}
 
-    <form method="get" class="filters-bar">
+    <form method="get" class="filters-bar" role="search" aria-label="Filtrer les produits">
         <div class="form-group"><label class="form-label" for="f-q">Recherche</label>
             <input type="text" id="f-q" name="q" value="{{ q }}" class="form-input" placeholder="Nom, référence, fournisseur..."></div>
         <div class="form-group"><label class="form-label" for="f-cat">Catégorie</label>
@@ -24,9 +22,9 @@
     </form>
 
     <div class="table-responsive">
-        <table class="data-table">
+        <table class="data-table"><caption class="sr-only">Liste des produits en stock</caption>
             <thead><tr>
-                <th>Produit</th><th>Catégorie</th><th>Quantité</th><th>Seuil</th><th>Péremption</th><th>Statut</th><th>Actions</th>
+                <th scope="col">Produit</th><th scope="col">Catégorie</th><th scope="col">Quantité</th><th scope="col">Seuil</th><th scope="col">Péremption</th><th scope="col">Statut</th><th scope="col">Actions</th>
             </tr></thead>
             <tbody>
             {% for p in page_obj %}
@@ -38,11 +36,11 @@
                     <td>{% if p.date_peremption %}{{ p.date_peremption|date:"d/m/Y" }}{% else %}<span class="muted">—</span>{% endif %}</td>
                     <td>{% include 'stock/_pills.html' with produit=p %}</td>
                     <td style="white-space:nowrap;">
-                        <a href="{% url 'stock:produit_detail' p.pk %}" class="btn btn-secondary btn-sm">Détail</a>
+                        <a href="{% url 'stock:produit_detail' p.pk %}" class="btn btn-secondary btn-sm" aria-label="Détail de {{ p.nom }}">Détail</a>
                         {% if can_manage %}
-                            <a href="{% url 'stock:mouvement_create' p.pk 'entree' %}" class="btn-table-activate">+ Entrée</a>
-                            <a href="{% url 'stock:mouvement_create' p.pk 'sortie' %}" class="btn-table-suspend">− Sortie</a>
-                            <a href="{% url 'stock:produit_update' p.pk %}" class="btn-table-edit">Modifier</a>
+                            <a href="{% url 'stock:mouvement_create' p.pk 'entree' %}" class="btn-table-activate" aria-label="Entrée de stock pour {{ p.nom }}">+ Entrée</a>
+                            <a href="{% url 'stock:mouvement_create' p.pk 'sortie' %}" class="btn-table-suspend" aria-label="Sortie de stock pour {{ p.nom }}">− Sortie</a>
+                            <a href="{% url 'stock:produit_update' p.pk %}" class="btn-table-edit" aria-label="Modifier {{ p.nom }}">Modifier</a>
                         {% endif %}
                     </td>
                 </tr>

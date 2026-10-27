@@ -10,6 +10,7 @@ urlpatterns = [
     path("rapports/", views.rapports, name="rapports"),
     path("rapports/export/<str:format>/", views.rapports_export, name="rapports_export"),
     path("resultats/mes-resultats/", views.mes_resultats, name="mes_resultats"),
+    path("resultats/chatbot/", views.chatbot_view, name="chatbot"),
     path(
         "patient/demandes/<int:pk>/compte-rendu.pdf",
         views.patient_report_pdf,

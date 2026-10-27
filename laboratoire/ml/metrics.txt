@@ -1,0 +1,23 @@
+Analyse : cholesterol
+Matrice de confusion (lignes=réel, colonnes=prédit) :
+[[74  1]
+ [ 0  8]]
+Precision : 0.8889
+Recall : 1.0000
+F1 : 0.9412
+
+Analyse : glycemie
+Matrice de confusion (lignes=réel, colonnes=prédit) :
+[[75  0]
+ [ 0  8]]
+Precision : 1.0000
+Recall : 1.0000
+F1 : 1.0000
+
+Analyse : hemoglobine
+Matrice de confusion (lignes=réel, colonnes=prédit) :
+[[75  0]
+ [ 0  8]]
+Precision : 1.0000
+Recall : 1.0000
+F1 : 1.0000

@@ -522,6 +522,16 @@ class ResultatsPatientFilterForm(forms.Form):
         label="Autre type d’analyse",
         widget=forms.SearchInput(attrs={"maxlength": 100}),
     )
+    recherche = forms.CharField(
+        required=False,
+        max_length=100,
+        label="Rechercher une analyse",
+        widget=forms.SearchInput(attrs={"maxlength": 100}),
+    )
+    hors_norme = forms.BooleanField(
+        required=False,
+        label="Hors norme seulement",
+    )
 
     def __init__(self, *args, types_analyse, **kwargs):
         super().__init__(*args, **kwargs)
@@ -715,11 +725,18 @@ class PrelevementResultatsForm(forms.Form):
                 ),
             )
             self.fields[f"observation_{analyse.pk}"] = forms.CharField(
-                label="Commentaire / observation",
+                label="Commentaire interne (laboratoire)",
                 required=False,
                 max_length=2000,
                 widget=forms.Textarea(attrs={"rows": 2}),
                 initial=resultat.observation if resultat else "",
+            )
+            self.fields[f"commentaire_patient_{analyse.pk}"] = forms.CharField(
+                label="Commentaire destiné au patient",
+                required=False,
+                max_length=2000,
+                widget=forms.Textarea(attrs={"rows": 2, "maxlength": 2000}),
+                initial=resultat.commentaire_patient if resultat else "",
             )
             self.fields[f"valeur_{analyse.pk}"].widget.attrs.update({
                 "inputmode": "decimal",
@@ -744,6 +761,21 @@ class PrelevementResultatsForm(forms.Form):
             value = cleaned_data.get(f"valeur_{analyse.pk}", "").strip()
             unit = cleaned_data.get(f"unite_{analyse.pk}", "").strip()
             configured_unit = analyse.type_analyse.unite.strip()
+            if self.publier and value:
+                try:
+                    numeric_value = Decimal(value.replace(",", "."))
+                except InvalidOperation:
+                    numeric_value = None
+                if numeric_value is None or not numeric_value.is_finite() or numeric_value <= 0:
+                    self.add_error(
+                        f"valeur_{analyse.pk}",
+                        "Saisissez un nombre strictement supérieur à zéro.",
+                    )
+                else:
+                    cleaned_data[f"valeur_{analyse.pk}"] = format(
+                        numeric_value,
+                        "f",
+                    )
             if value and not _valeur_resultat_valide(value):
                 self.add_error(
                     f"valeur_{analyse.pk}",
@@ -772,12 +804,26 @@ class ResultatForm(forms.ModelForm):
     observation = forms.CharField(
         required=False,
         max_length=2000,
+        label="Commentaire interne (laboratoire)",
         widget=forms.Textarea(attrs={"rows": 3, "maxlength": 2000}),
+    )
+    commentaire_patient = forms.CharField(
+        label="Commentaire destiné au patient",
+        required=False,
+        max_length=2000,
+        widget=forms.Textarea(attrs={
+            "rows": 3,
+            "maxlength": 2000,
+            "placeholder": "Message clair destiné au patient, sans diagnostic.",
+        }),
     )
 
     class Meta:
         model = Resultat
-        fields = ["valeur", "unite", "valeur_reference", "interpretation", "observation"]
+        fields = [
+            "valeur", "unite", "valeur_reference", "interpretation",
+            "observation", "commentaire_patient",
+        ]
         labels = {
             "valeur": "Valeur mesurée",
             "unite": "Unité de mesure",
@@ -838,6 +884,17 @@ class ResultatForm(forms.ModelForm):
         if not _valeur_resultat_valide(valeur):
             raise forms.ValidationError(
                 "Saisissez un nombre valide (ex. 1,25 ou <0,1) ou un résultat qualitatif sans chiffres."
+            )
+        numeric_text = valeur.lstrip("<>≤≥").strip().replace(",", ".")
+        try:
+            numeric_value = Decimal(numeric_text)
+        except InvalidOperation:
+            numeric_value = None
+        if numeric_value is not None and (
+            not numeric_value.is_finite() or numeric_value <= 0
+        ):
+            raise forms.ValidationError(
+                "La valeur du résultat doit être un nombre strictement supérieur à zéro."
             )
         return valeur
 

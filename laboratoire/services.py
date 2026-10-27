@@ -314,10 +314,24 @@ def _valider_donnees_resultat(analyse, donnees, *, exiger_valeur=True):
     valeur = str(donnees.get("valeur", "")).strip()
     if exiger_valeur and not valeur:
         _erreur("La valeur du résultat est obligatoire.")
+    numeric_text = valeur.lstrip("<>≤≥").strip().replace(",", ".")
+    if numeric_text:
+        try:
+            numeric_value = Decimal(numeric_text)
+        except InvalidOperation:
+            numeric_value = None
+        if numeric_value is not None and (
+            not numeric_value.is_finite() or numeric_value <= 0
+        ):
+            _erreur(
+                "La valeur du résultat doit être un nombre strictement supérieur à zéro."
+            )
     reference = donnees.get("valeur_reference", "")
     unite = donnees.get("unite") or analyse.type_analyse.unite
     interpretation = donnees.get("interpretation", "")
     observation = donnees.get("observation", "")
+    commentaire_interne = donnees.get("commentaire_interne", observation)
+    commentaire_patient = donnees.get("commentaire_patient", "")
     if not reference:
         minimum = analyse.type_analyse.valeur_reference_min
         maximum = analyse.type_analyse.valeur_reference_max
@@ -329,6 +343,8 @@ def _valider_donnees_resultat(analyse, donnees, *, exiger_valeur=True):
         "valeur_reference": reference,
         "interpretation": interpretation,
         "observation": observation,
+        "commentaire_interne": commentaire_interne,
+        "commentaire_patient": commentaire_patient,
     }
 
 
@@ -487,6 +503,8 @@ def corriger_resultat(*, resultat, utilisateur, donnees, motif):
         "valeur_reference": resultat.valeur_reference,
         "interpretation": resultat.interpretation,
         "observation": resultat.observation,
+        "commentaire_interne": resultat.commentaire_interne,
+        "commentaire_patient": resultat.commentaire_patient,
         "version": resultat.version,
     }
     for key, value in _valider_donnees_resultat(analyse, donnees).items():
@@ -508,6 +526,8 @@ def corriger_resultat(*, resultat, utilisateur, donnees, motif):
             "apres": {
                 "valeur": resultat.valeur,
                 "unite": resultat.unite,
+                "commentaire_interne": resultat.commentaire_interne,
+                "commentaire_patient": resultat.commentaire_patient,
                 "version": resultat.version,
             },
             "motif": motif,
@@ -577,6 +597,8 @@ def valider_resultat(*, resultat, utilisateur):
             "valeur_reference": resultat.valeur_reference,
             "interpretation": resultat.interpretation,
             "observation": resultat.observation,
+            "commentaire_interne": resultat.commentaire_interne,
+            "commentaire_patient": resultat.commentaire_patient,
         },
         prelevement=resultat.prelevement,
     )

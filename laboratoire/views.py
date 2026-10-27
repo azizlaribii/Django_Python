@@ -1,11 +1,13 @@
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+import unicodedata
 from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import (
@@ -83,9 +85,12 @@ from .services_resume import (
     ResumeAPIError,
     generer_resume,
     preparer_donnees,
+    statut_valeur,
 )
+from .ia.chatbot import answer_question
 from .reporting import export_csv, export_xlsx, get_report_data
-from .pdf import build_report_pdf
+from .pdf import build_patient_report_pdf, build_report_pdf
+from .ml.predict import check_value
 
 User = get_user_model()
 
@@ -1092,6 +1097,44 @@ def mes_resultats(request):
         "prelevement",
         "valide_par",
     ).order_by("-date_validation", "-pk")
+    all_results_for_trends = Resultat.objects.filter(
+        analyse_demandee__demande__patient=request.user,
+        statut=Resultat.Statut.VALIDE,
+    ).select_related(
+        "analyse_demandee__type_analyse",
+    ).order_by("date_validation", "pk")
+    previous_values = {}
+    trends_by_result_id = {}
+    for previous_result in all_results_for_trends:
+        analysis_id = previous_result.analyse_demandee.type_analyse_id
+        try:
+            previous_value = Decimal(previous_result.valeur.strip().replace(",", "."))
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+        if not previous_value.is_finite() or previous_value <= 0:
+            continue
+        previous_value_for_analysis = previous_values.get(analysis_id)
+        if previous_value_for_analysis is not None:
+            relative_change = abs(
+                previous_value - previous_value_for_analysis
+            ) / previous_value_for_analysis
+            if relative_change < Decimal("0.05"):
+                trends_by_result_id[previous_result.pk] = (
+                    "→",
+                    "stable depuis le dernier résultat",
+                )
+            elif previous_value > previous_value_for_analysis:
+                trends_by_result_id[previous_result.pk] = (
+                    "↑",
+                    "en hausse depuis le dernier résultat",
+                )
+            else:
+                trends_by_result_id[previous_result.pk] = (
+                    "↓",
+                    "en baisse depuis le dernier résultat",
+                )
+        previous_values[analysis_id] = previous_value
+
     if date_debut:
         resultats = resultats.filter(date_validation__date__gte=date_debut)
     if date_fin:
@@ -1102,7 +1145,38 @@ def mes_resultats(request):
     else:
         analyse_id = ""
 
-    resultats_chart = list(reversed(list(resultats))) if analyse_id else []
+    resultats = list(resultats)
+    for resultat in resultats:
+        resultat.tendance, resultat.tendance_label = trends_by_result_id.get(
+            resultat.pk,
+            ("", ""),
+        )
+        _annoter_resultat_patient(resultat)
+
+    search_query = filters.get("recherche", "").strip()
+    only_abnormal = filters.get("hors_norme", False)
+    filtered_results = [
+        resultat for resultat in resultats
+        if (
+            not search_query
+            or _normaliser_recherche(search_query)
+            in _normaliser_recherche(resultat.analyse_demandee.type_analyse.nom)
+        )
+        and (
+            not only_abnormal
+            or resultat.statut_patient in {"hors_norme", "critique"}
+        )
+    ]
+    results_by_request = {}
+    for resultat in filtered_results:
+        request_id = resultat.analyse_demandee.demande_id
+        results_by_request.setdefault(request_id, {
+            "demande": resultat.analyse_demandee.demande,
+            "resultats": [],
+        })["resultats"].append(resultat)
+    resultats_par_demande = list(results_by_request.values())
+
+    resultats_chart = list(reversed(resultats)) if analyse_id else []
     chart_points = []
     numeric_points = []
     for resultat in resultats_chart:
@@ -1110,7 +1184,8 @@ def mes_resultats(request):
             value = Decimal(resultat.valeur.strip().replace(",", "."))
         except (InvalidOperation, TypeError, ValueError):
             continue
-        numeric_points.append((resultat, value))
+        if value.is_finite() and value > 0:
+            numeric_points.append((resultat, value))
     if numeric_points:
         values = [float(value) for _, value in numeric_points]
         low, high = min(values), max(values)
@@ -1144,6 +1219,20 @@ def mes_resultats(request):
         resultats_legacy = resultats_legacy.filter(
             type_analyse__icontains=type_legacy,
         )
+    if only_abnormal:
+        resultats_legacy = resultats_legacy.none()
+    resultats_legacy = [
+        resultat for resultat in resultats_legacy
+        if (
+            not search_query
+            or _normaliser_recherche(search_query)
+            in _normaliser_recherche(resultat.type_analyse)
+        )
+    ]
+    for resultat_legacy in resultats_legacy:
+        resultat_legacy.interpretation_patient = _interpretation_patient(
+            resultat_legacy.interpretation,
+        )
 
     demandes = DemandeAnalyse.objects.filter(
         patient=request.user,
@@ -1160,9 +1249,13 @@ def mes_resultats(request):
     ).order_by("-date_validation")
     return render(request, "laboratoire/mes_resultats.html", {
         "resultats": resultats,
+        "resultats_par_demande": resultats_par_demande,
+        "recherche": search_query,
+        "hors_norme": only_abnormal,
         "filter_form": filter_form,
         "resultats_legacy": resultats_legacy,
-        "resultats_count": resultats.count() + resultats_legacy.count(),
+        "resultats_count": len(resultats) + len(resultats_legacy),
+        "history_resultats_count": len(filtered_results) + len(resultats_legacy),
         "demandes": demandes,
         "types_analyse": types_analyse,
         "selected_analyse": analyse_id,
@@ -1170,10 +1263,131 @@ def mes_resultats(request):
         "date_fin": request.GET.get("date_fin", ""),
         "type_legacy": request.GET.get("type_legacy", ""),
         "notifications": notifications,
+        "parametres_laboratoire": ParametresLaboratoire.objects.filter(pk=1).first(),
         "chart_points": chart_points,
         "chart_polyline": " ".join(
             f'{point["x"]},{point["y"]}' for point in chart_points
         ),
+    })
+
+
+def _annoter_resultat_patient(resultat):
+    status = statut_valeur(resultat)
+    numeric_value = resultat._valeur_decimal
+    resultat.interpretation_patient = _interpretation_patient(
+        resultat.interpretation,
+    )
+
+    if (
+        numeric_value is not None
+        and numeric_value.is_finite()
+        and numeric_value <= 0
+    ):
+        resultat.statut_patient = "critique"
+        resultat.statut_patient_label = "À revoir avec votre médecin"
+        resultat.statut_patient_icon = "!"
+    elif status == "normal":
+        resultat.statut_patient = "normal"
+        resultat.statut_patient_label = "Normal"
+        resultat.statut_patient_icon = "✓"
+    elif status in ("bas", "élevé"):
+        if resultat.potentiellement_critique:
+            resultat.statut_patient = "critique"
+            resultat.statut_patient_label = "À revoir avec votre médecin"
+            resultat.statut_patient_icon = "!"
+        else:
+            resultat.statut_patient = "hors_norme"
+            resultat.statut_patient_label = "Hors norme"
+            resultat.statut_patient_icon = "⚠"
+    else:
+        resultat.statut_patient = "indetermine"
+        resultat.statut_patient_label = "Référence non disponible"
+        resultat.statut_patient_icon = "ℹ"
+
+    analyse = resultat.analyse_demandee.type_analyse
+    minimum, maximum = analyse.valeur_reference_min, analyse.valeur_reference_max
+    if (
+        numeric_value is None
+        or not numeric_value.is_finite()
+        or numeric_value <= 0
+        or minimum is None
+        or maximum is None
+        or minimum <= 0
+        or maximum <= minimum
+        or status == "non déterminé"
+    ):
+        resultat.barre_reference = None
+        resultat.reference_patient = "Référence non renseignée"
+        return
+
+    unit = resultat.unite or analyse.unite
+    minimum_text = str(minimum)
+    maximum_text = str(maximum)
+    resultat.reference_patient = f"{minimum_text} à {maximum_text} {unit}".strip()
+    resultat.aria_reference = (
+        f"Valeur {resultat.valeur} {unit}; plage normale "
+        f"{minimum_text} à {maximum_text} {unit}"
+    )
+    margin = max((maximum - minimum) / 4, abs(minimum) / 10, Decimal("0.1"))
+    scale_min, scale_max = minimum - margin, maximum + margin
+    if scale_max <= scale_min:
+        resultat.barre_reference = None
+        return
+    reference_start = float((minimum - scale_min) / (scale_max - scale_min) * 100)
+    reference_end = float((maximum - scale_min) / (scale_max - scale_min) * 100)
+    position = float((numeric_value - scale_min) / (scale_max - scale_min) * 100)
+    resultat.barre_reference = {
+        "start": min(max(reference_start, 0), 100),
+        "width": min(max(reference_end - reference_start, 0), 100),
+        "position": min(max(position, 0), 100),
+    }
+
+
+def _normaliser_recherche(value):
+    normalized = unicodedata.normalize("NFKD", str(value or ""))
+    return "".join(
+        character.casefold()
+        for character in normalized
+        if not unicodedata.combining(character)
+    )
+
+
+def _interpretation_inappropriee_pour_patient(value):
+    normalized = _normaliser_recherche(value)
+    return any(
+        term in normalized
+        for term in (
+            "confirm",
+            "dyslipid",
+            "diagnostic",
+            "therapeut",
+            "traitement",
+            "medicament",
+        )
+    )
+
+
+def _interpretation_patient(value):
+    if _interpretation_inappropriee_pour_patient(value):
+        return "À discuter avec votre médecin"
+    return value
+
+
+@login_required
+@require_POST
+def chatbot_view(request):
+    if not request.user.is_patient:
+        return JsonResponse({"error": "Accès réservé aux patients."}, status=403)
+    question = request.POST.get("question", "").strip()
+    if not question:
+        return JsonResponse({"error": "Saisissez une question."}, status=400)
+    if len(question) > 300:
+        return JsonResponse({"error": "La question ne peut pas dépasser 300 caractères."}, status=400)
+    response = answer_question(question)
+    return JsonResponse({
+        "answer": response.answer,
+        "id": response.faq_id or None,
+        "intent": response.intent,
     })
 
 
@@ -1197,44 +1411,75 @@ def patient_report_pdf(request, pk):
         exiger(request.user, "lire_resultat", resultat=resultat)
 
     parametres = ParametresLaboratoire.objects.filter(pk=1).first()
-    lines = [
-        "COMPTE RENDU D'ANALYSES",
-        f"Patient : {demande.patient.get_full_name() or demande.patient.username}",
-        f"Medecin : {demande.medecin.get_full_name() or demande.medecin.username}",
-        f"Prescrite le : {demande.date_demande:%d/%m/%Y %H:%M}",
-        "",
-        "RESULTATS VALIDES",
-        "",
+    metadata = [
+        ("Demande", f"#{demande.pk}"),
+        ("Prescrite le", f"{demande.date_demande:%d/%m/%Y %H:%M}"),
+        (
+            "Médecin prescripteur",
+            demande.medecin.get_full_name() or demande.medecin.username,
+        ),
     ]
-    if parametres:
-        if parametres.nom:
-            lines.insert(1, parametres.nom)
-        if parametres.adresse:
-            lines.insert(2, parametres.adresse)
-        if parametres.telephone:
-            lines.insert(3, f"Telephone : {parametres.telephone}")
-        if parametres.entete_compte_rendu:
-            lines.insert(0, parametres.entete_compte_rendu)
+    if parametres and (parametres.adresse or parametres.telephone):
+        contact = " - ".join(
+            value for value in (parametres.adresse, parametres.telephone) if value
+        )
+        metadata.append(("Contact laboratoire", contact))
+    result_blocks = []
     for resultat in resultats:
         analyse = resultat.analyse_demandee.type_analyse
-        lines.extend([
-            f"Analyse : {analyse.nom} ({analyse.code})",
-            f"Resultat : {resultat.valeur} {resultat.unite or analyse.unite}",
-            f"Valeurs de reference : {resultat.valeur_reference or 'Non renseignees'}",
-            f"Valide le : {resultat.date_validation:%d/%m/%Y %H:%M}" if resultat.date_validation else "Valide",
-            f"Interpretation automatique : {resultat.interpretation_automatique}",
-            f"Validé par : {resultat.valide_par.get_full_name() or resultat.valide_par.username}" if resultat.valide_par else "Validé par le laboratoire",
-        ])
+        details = [
+            ("Code analyse", analyse.code),
+            (
+                "Valeurs de référence",
+                resultat.valeur_reference or "Non renseignées",
+            ),
+            (
+                "Date de validation",
+                f"{resultat.date_validation:%d/%m/%Y %H:%M}"
+                if resultat.date_validation
+                else "Validé",
+            ),
+            ("Interprétation du résultat", resultat.interpretation_automatique),
+            (
+                "Validé par",
+                resultat.valide_par.get_full_name() or resultat.valide_par.username
+                if resultat.valide_par
+                else "Validé par le laboratoire",
+            ),
+        ]
         if resultat.interpretation:
-            lines.append(f"Interpretation : {resultat.interpretation}")
-        if resultat.observation:
-            lines.append(f"Observation : {resultat.observation}")
-        lines.append("")
-    if parametres and parametres.signature_compte_rendu:
-        lines.extend(["", parametres.signature_compte_rendu])
+            details.append(
+                (
+                    "Commentaire d’interprétation",
+                    _interpretation_patient(resultat.interpretation),
+                )
+            )
+        if resultat.commentaire_patient:
+            details.append(
+                ("Message du laboratoire", resultat.commentaire_patient)
+            )
+        result_blocks.append({
+            "title": f"{analyse.nom} ({analyse.code})",
+            "value": resultat.valeur,
+            "unit": resultat.unite or analyse.unite,
+            "details": details,
+        })
 
     response = HttpResponse(
-        build_report_pdf(lines),
+        build_patient_report_pdf(
+            patient_name=(
+                demande.patient.get_full_name() or demande.patient.username
+            ),
+            metadata=metadata,
+            results=result_blocks,
+            laboratory_name=parametres.nom if parametres else "",
+            header_text=(
+                parametres.entete_compte_rendu if parametres else ""
+            ),
+            signature=(
+                parametres.signature_compte_rendu if parametres else ""
+            ),
+        ),
         content_type="application/pdf",
     )
     response["Content-Disposition"] = (
@@ -1254,34 +1499,59 @@ def patient_legacy_report_pdf(request, pk):
         statut__in=("DISPONIBLE", "TRANSMIS"),
     )
     parametres = ParametresLaboratoire.objects.filter(pk=1).first()
-    lines = [
-        "COMPTE RENDU D'ANALYSES",
-        f"Patient : {resultat.dossier.patient.get_full_name() or resultat.dossier.patient.username}",
-        f"Analyse : {resultat.type_analyse}",
-        f"Reference : {resultat.reference}",
-        f"Prescrite le : {resultat.date_prescription:%d/%m/%Y}",
+    metadata = [
+        ("Référence", resultat.reference),
+        ("Prescrite le", f"{resultat.date_prescription:%d/%m/%Y}"),
     ]
     if resultat.date_realisation:
-        lines.append(f"Realisee le : {resultat.date_realisation:%d/%m/%Y}")
+        metadata.append(
+            ("Réalisée le", f"{resultat.date_realisation:%d/%m/%Y}")
+        )
     if resultat.laboratoire:
-        lines.append(f"Laboratoire : {resultat.laboratoire.username}")
-    lines.extend(["", "RESULTATS", resultat.valeurs or "Valeurs non renseignees"])
+        metadata.append(
+            (
+                "Laboratoire",
+                resultat.laboratoire.get_full_name()
+                or resultat.laboratoire.username,
+            )
+        )
+    details = []
     if resultat.interpretation:
-        lines.extend(["", "INTERPRETATION", resultat.interpretation])
-    if parametres:
-        if parametres.nom:
-            lines.insert(1, parametres.nom)
-        if parametres.adresse:
-            lines.insert(2, parametres.adresse)
-        if parametres.telephone:
-            lines.insert(3, f"Telephone : {parametres.telephone}")
-        if parametres.entete_compte_rendu:
-            lines.insert(0, parametres.entete_compte_rendu)
-        if parametres.signature_compte_rendu:
-            lines.extend(["", parametres.signature_compte_rendu])
+        details.append(
+            (
+                "Interprétation",
+                _interpretation_patient(resultat.interpretation),
+            )
+        )
+    if parametres and (parametres.adresse or parametres.telephone):
+        metadata.append((
+            "Contact laboratoire",
+            " - ".join(
+                value for value in (parametres.adresse, parametres.telephone)
+                if value
+            ),
+        ))
 
     response = HttpResponse(
-        build_report_pdf(lines),
+        build_patient_report_pdf(
+            patient_name=(
+                resultat.dossier.patient.get_full_name()
+                or resultat.dossier.patient.username
+            ),
+            metadata=metadata,
+            results=[{
+                "title": resultat.type_analyse,
+                "value": resultat.valeurs or "Valeurs non renseignées",
+                "details": details,
+            }],
+            laboratory_name=parametres.nom if parametres else "",
+            header_text=(
+                parametres.entete_compte_rendu if parametres else ""
+            ),
+            signature=(
+                parametres.signature_compte_rendu if parametres else ""
+            ),
+        ),
         content_type="application/pdf",
     )
     response["Content-Disposition"] = (
@@ -1927,6 +2197,7 @@ def prelevement_resultats(request, pk):
                 form[f"unite_{analyse.pk}"],
                 form[f"valeur_reference_{analyse.pk}"],
                 form[f"observation_{analyse.pk}"],
+                form[f"commentaire_patient_{analyse.pk}"],
             ],
             "brouillon": analyse.resultats.filter(
                 statut=Resultat.Statut.EN_SAISIE,
@@ -1945,39 +2216,88 @@ def prelevement_resultats(request, pk):
                 "observation": form.cleaned_data.get(
                     f"observation_{analyse.pk}", "",
                 ),
+                "commentaire_interne": form.cleaned_data.get(
+                    f"observation_{analyse.pk}", "",
+                ),
+                "commentaire_patient": form.cleaned_data.get(
+                    f"commentaire_patient_{analyse.pk}", "",
+                ),
             }
             for analyse in a_saisir
         }
-        try:
-            if publier:
-                envoyer_resultats(
-                    resultats=values,
-                    utilisateur=request.user,
-                    prelevement=prelevement,
+        confirmation_ia = False
+        confirmation_token = ""
+        confirmation_expiree = False
+        autoriser_enregistrement = action != "corriger"
+        if publier:
+            anomalies = [
+                {
+                    "analyse_id": analyse.pk,
+                    "valeur": values[analyse]["valeur"],
+                }
+                for analyse in a_saisir
+                if check_value(
+                    analyse.type_analyse.nom,
+                    float(values[analyse]["valeur"].replace(",", ".")),
                 )
+            ]
+            token = request.POST.get("confirmation_ia", "")
+            confirme = False
+            if anomalies and token:
+                try:
+                    confirme = signing.loads(
+                        token,
+                        salt="laboratoire.confirmation_ia",
+                    ) == anomalies
+                except signing.BadSignature:
+                    confirmation_expiree = True
+            if anomalies and not confirme:
+                confirmation_ia = True
+                autoriser_enregistrement = False
+                confirmation_token = signing.dumps(
+                    anomalies,
+                    salt="laboratoire.confirmation_ia",
+                )
+        if autoriser_enregistrement:
+            try:
+                if publier:
+                    envoyer_resultats(
+                        resultats=values,
+                        utilisateur=request.user,
+                        prelevement=prelevement,
+                    )
+                else:
+                    enregistrer_resultats_brouillon(
+                        resultats=values,
+                        utilisateur=request.user,
+                        prelevement=prelevement,
+                    )
+            except ValidationError as error:
+                form.add_error(None, error)
             else:
-                enregistrer_resultats_brouillon(
-                    resultats=values,
-                    utilisateur=request.user,
-                    prelevement=prelevement,
+                if publier:
+                    messages.success(request, "Les résultats ont été validés et publiés.")
+                    return _redirect_prelevement_list(
+                        "clotures", Prelevement.Statut.TERMINE,
+                    )
+
+                messages.success(
+                    request,
+                    "Le brouillon a été enregistré. Les résultats ne sont pas encore publiés.",
                 )
-        except ValidationError as error:
-            form.add_error(None, error)
-        else:
-            if publier:
-                messages.success(request, "Les résultats ont été validés et publiés.")
-                return _redirect_prelevement_list(
-                    "clotures", Prelevement.Statut.TERMINE,
-                )
-            messages.success(
-                request,
-                "Le brouillon a été enregistré. Les résultats ne sont pas encore publiés.",
-            )
-            return redirect("laboratoire:prelevement_resultats", pk=prelevement.pk)
+                return redirect("laboratoire:prelevement_resultats", pk=prelevement.pk)
+    else:
+        confirmation_ia = False
+        confirmation_token = ""
+        confirmation_expiree = False
+
     return render(request, "laboratoire/prelevement_resultats.html", {
         "form": form,
         "prelevement": prelevement,
         "resultat_rows": resultat_rows,
+        "confirmation_ia": confirmation_ia,
+        "confirmation_token": confirmation_token,
+        "confirmation_expiree": confirmation_expiree,
     })
 
 
@@ -2075,7 +2395,10 @@ def resultat_create(request, analyse_id):
     if request.method == "POST" and form.is_valid():
         donnees = {
             key: form.cleaned_data[key]
-            for key in ("valeur", "unite", "valeur_reference", "interpretation", "observation")
+            for key in (
+                "valeur", "unite", "valeur_reference", "interpretation",
+                "observation", "commentaire_patient",
+            )
         }
         try:
             enregistrer_resultats_brouillon(
@@ -2119,7 +2442,10 @@ def resultat_update(request, pk):
     if request.method == "POST" and form.is_valid():
         donnees = {
             key: form.cleaned_data[key]
-            for key in ("valeur", "unite", "valeur_reference", "interpretation", "observation")
+            for key in (
+                "valeur", "unite", "valeur_reference", "interpretation",
+                "observation", "commentaire_patient",
+            )
         }
         try:
             if resultat.statut == Resultat.Statut.EN_SAISIE:

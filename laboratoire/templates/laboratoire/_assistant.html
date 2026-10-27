@@ -1,0 +1,31 @@
+{% load static %}
+<button class="as-launcher" type="button" aria-label="Ouvrir l’assistant" aria-controls="as-panel" aria-expanded="false">Une question ?</button>
+<dialog id="as-panel" class="as-panel" role="dialog" aria-labelledby="as-title" aria-modal="true">
+  <header class="as-header">
+    <h2 id="as-title">Assistant d'information</h2>
+    <button class="as-close" type="button" aria-label="Fermer l’assistant">✕</button>
+  </header>
+  <div class="as-messages" role="log" aria-live="polite" aria-relevant="additions text">
+    <div class="as-message as-message--assistant" dir="auto">
+      <p>Bonjour ! Je peux répondre à des questions générales sur vos analyses.</p>
+      <time></time>
+    </div>
+  </div>
+  <div class="as-suggestions" aria-label="Suggestions de questions">
+    <button type="button">Dois-je être à jeun ?</button>
+    <button type="button">Délai des résultats ?</button>
+    <button type="button">Que veut dire LDL ?</button>
+    <button type="button">Comment télécharger mon PDF ?</button>
+  </div>
+  <form class="as-form" method="post" action="{% url 'laboratoire:chatbot' %}" data-contact-url="{% url 'laboratoire:mes_resultats' %}#contact">
+    {% csrf_token %}
+    <label for="as-question">Votre question</label>
+    <div class="as-form__row">
+      <input id="as-question" name="question" type="text" maxlength="300" autocomplete="off" required>
+      <button type="submit" disabled>Envoyer</button>
+    </div>
+    <span class="as-counter" aria-live="polite">0 / 300</span>
+  </form>
+  <p class="as-disclaimer">Information générale, ne remplace pas l'avis du médecin.</p>
+</dialog>
+<script src="{% static 'laboratoire/patient_chatbot.js' %}?v=20261026_1" defer></script>

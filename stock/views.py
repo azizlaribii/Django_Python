@@ -43,18 +43,31 @@ def _paginer(request, queryset, par_page=15):
 def dashboard(request):
     alertes = get_alertes()
     blocs = [
-        {"cle": "rupture", "titre": "Produits en rupture", "icone": "⛔", "mode": "stock"},
-        {"cle": "faible", "titre": "Stock faible", "icone": "⚠️", "mode": "stock"},
-        {"cle": "expire", "titre": "Produits périmés", "icone": "☠️", "mode": "date"},
-        {"cle": "bientot", "titre": "Péremption proche", "icone": "⏳", "mode": "date"},
+        {"cle": "rupture", "titre": "Produits en rupture", "icone": "⛔", "mode": "stock",
+         "s": "produit en rupture", "p": "produits en rupture"},
+        {"cle": "faible", "titre": "Stock faible", "icone": "⚠️", "mode": "stock",
+         "s": "produit à stock faible", "p": "produits à stock faible"},
+        {"cle": "expire", "titre": "Produits périmés", "icone": "☠️", "mode": "date",
+         "s": "produit périmé", "p": "produits périmés"},
+        {"cle": "bientot", "titre": "Péremption proche", "icone": "⏳", "mode": "date",
+         "s": "produit proche de la péremption", "p": "produits proches de la péremption"},
     ]
     for bloc in blocs:
         qs = alertes[bloc["cle"]]
         bloc["nb"] = qs.count()
         bloc["produits"] = list(qs.order_by("date_peremption", "nom")[:8]
                                 if bloc["mode"] == "date" else qs.order_by("quantite", "nom")[:8])
+    total_alertes = sum(b["nb"] for b in blocs)
+    parties = [f'{b["nb"]} {b["s"] if b["nb"] == 1 else b["p"]}' for b in blocs if b["nb"]]
+    resume = (f"{total_alertes} alerte{'s' if total_alertes > 1 else ''} de stock : " + ", ".join(parties) + "."
+              if total_alertes else "Aucune alerte de stock.")
+    # Texte lu à voix haute (Web Speech API) : résumé + noms des produits concernés
+    lecture = resume + " " + " ".join(
+        f'{b["titre"]} : ' + ", ".join(p.nom for p in b["produits"]) + "."
+        for b in blocs if b["nb"]
+    )
     return render(request, "stock/dashboard.html", {
-        "blocs": blocs,
+        "blocs": blocs, "total_alertes": total_alertes, "resume": resume, "lecture": lecture,
         "nb_produits": Produit.objects.actifs().count(),
         "derniers_mouvements": MouvementStock.objects.select_related("produit", "utilisateur")[:8],
         "seuil_jours": seuil_peremption_jours(),
@@ -154,7 +167,8 @@ def mouvement_create(request, pk, type_mouvement):
     type_m = types[type_mouvement]
     produit = get_object_or_404(Produit, pk=pk, actif=True)
 
-    form = MouvementForm(request.POST or None, type_mouvement=type_m)
+    form = MouvementForm(request.POST or None, type_mouvement=type_m,
+                         stock_max=produit.quantite if type_m == Type.SORTIE else None)
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
         try:

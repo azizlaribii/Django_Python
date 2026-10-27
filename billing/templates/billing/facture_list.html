@@ -1,28 +1,38 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block title %}Factures - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'billing/billing.css' %}">{% endblock %}
+
 {% block content %}
-<link rel="stylesheet" href="{% static 'billing/billing.css' %}">
 <div class="container billing-page">
     <div class="page-header">
         <div>
-            <h1>🧾 Factures</h1>
+            <h1><span aria-hidden="true">🧾</span> Factures</h1>
             <p>{{ factures|length }} facture{{ factures|length|pluralize }}</p>
         </div>
-        {% if user.is_admin_user or user.is_doctor %}
-<a href="{% url 'facture_create' %}" class="btn btn-primary">+ Nouvelle facture</a>
-        {% endif %}
-        {% if user.is_patient %}<a href="{% url 'mon_historique' %}" class="btn btn-light">Mon historique</a>{% endif %}
+        <div class="actions">
+            {% if user.is_admin_user or user.is_doctor %}
+            <a href="{% url 'facture_create' %}" class="btn btn-primary">+ Nouvelle facture</a>
+            {% endif %}
+            {% if user.is_patient %}
+            <a href="{% url 'mon_historique' %}" class="btn btn-light">Mon historique</a>
+            {% endif %}
+        </div>
     </div>
 
     <div class="card">
         <div class="table-wrap">
             <table>
+                <caption class="sr-only">Liste des factures</caption>
                 <thead>
                     <tr>
-                        <th>Numéro</th><th>Date</th><th>Patient</th>
-                        <th class="text-right">Total TTC</th><th>Statut</th>
-                        <th class="text-right">Actions</th>
+                        <th scope="col">Numéro</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Patient</th>
+                        <th scope="col" class="text-right">Total TTC</th>
+                        <th scope="col">Statut</th>
+                        <th scope="col" class="text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -30,12 +40,21 @@
                     <tr>
                         <td><strong>{{ f.numero }}</strong></td>
                         <td>{{ f.date_emission|date:"d/m/Y" }}</td>
-                        <td>{% if user.is_admin_user or user.is_doctor %}<a href="{% url 'patient_historique' f.patient.pk %}">{{ f.patient.get_full_name|default:f.patient.username }}</a>{% else %}{{ f.patient.get_full_name|default:f.patient.username }}{% endif %}</td>
+                        <td>
+                            {% if user.is_admin_user or user.is_doctor %}
+                            <a href="{% url 'patient_historique' f.patient.pk %}">{{ f.patient.get_full_name|default:f.patient.username }}</a>
+                            {% else %}
+                            {{ f.patient.get_full_name|default:f.patient.username }}
+                            {% endif %}
+                        </td>
                         <td class="text-right">{{ f.total_ttc|floatformat:3 }}</td>
                         <td><span class="badge badge-{{ f.statut|lower }}">{{ f.get_statut_display }}</span></td>
-                        <td><div class="actions">
-                            <a href="{% url 'facture_detail' f.pk %}" class="btn btn-light btn-sm">Voir</a>
-                        </div></td>
+                        <td>
+                            <div class="actions">
+                                <a href="{% url 'facture_detail' f.pk %}" class="btn btn-light btn-sm"
+                                   aria-label="Voir la facture {{ f.numero }}">Voir</a>
+                            </div>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr><td colspan="6" class="empty">Aucune facture pour le moment.</td></tr>

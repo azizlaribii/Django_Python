@@ -1,14 +1,13 @@
 import re
 import json
-import tempfile
+import socket
 from io import BytesIO
 from importlib import import_module
-from pathlib import Path
 from types import SimpleNamespace
 from decimal import Decimal
 from datetime import timedelta
 from unittest.mock import patch
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 from django.apps import apps
 from django.contrib.auth.models import AnonymousUser
@@ -1581,6 +1580,7 @@ class LaboratoireWorkflowTests(TestCase):
             f"unite_{analysis.pk}": "g/L",
             f"valeur_reference_{analysis.pk}": "0.70 – 1.10 g/L",
             f"observation_{analysis.pk}": "Valeur corrigée",
+            f"commentaire_patient_{analysis.pk}": "Résultat à revoir lors de votre prochain rendez-vous.",
             f"valeur_{second_analysis.pk}": "4.2",
             f"unite_{second_analysis.pk}": "mmol/L",
             f"valeur_reference_{second_analysis.pk}": "2.5 – 7.8 mmol/L",
@@ -1594,6 +1594,11 @@ class LaboratoireWorkflowTests(TestCase):
         draft.refresh_from_db()
         prelevement.refresh_from_db()
         self.assertEqual(draft.statut, Resultat.Statut.VALIDE)
+        self.assertEqual(draft.commentaire_interne, "Valeur corrigée")
+        self.assertEqual(
+            draft.commentaire_patient,
+            "Résultat à revoir lors de votre prochain rendez-vous.",
+        )
         self.assertIsNotNone(draft.date_validation)
         self.assertEqual(draft.valide_par, self.lab)
         self.assertEqual(prelevement.statut, Prelevement.Statut.TERMINE)
@@ -1819,7 +1824,9 @@ class LaboratoireWorkflowTests(TestCase):
         self.assertContains(result_form_response, sample.code_prelevement)
         self.assertContains(result_form_response, self.analyse_sang.nom)
         self.assertContains(result_form_response, f'name="valeur_{self.demande.analyses.get().pk}"')
-        self.assertContains(result_form_response, "Enregistrer le brouillon")
+        self.assertNotContains(result_form_response, "Enregistrer le brouillon")
+        self.assertContains(result_form_response, "Valider et publier les résultats")
+        self.assertContains(result_form_response, ">Annuler</a>")
         self.assertNotContains(result_form_response, "Aide à la vérification")
 
     def test_rejection_redirects_to_refused_list_and_keeps_sample_visible(self):
@@ -2064,19 +2071,16 @@ class LaboratoireWorkflowTests(TestCase):
         previous_sample = self.faire_avancer(
             creer_prelevements(previous_demand, self.doctor)[0],
         )
-        envoyer_resultats(
-            utilisateur=self.lab,
+        Resultat.objects.create(
+            analyse_demandee=previous_demand.analyses.get(),
             prelevement=previous_sample,
-            resultats={
-                previous_demand.analyses.get(): {
-                    "valeur": "0",
-                    "unite": "g/L",
-                },
-            },
+            valeur="0",
+            unite="g/L",
+            saisi_par=self.lab,
+            valide_par=self.lab,
+            statut=Resultat.Statut.VALIDE,
+            date_validation=timezone.now() - timedelta(days=1),
         )
-        Resultat.objects.filter(
-            analyse_demandee__demande=previous_demand,
-        ).update(date_validation=timezone.now() - timedelta(days=1))
 
         line = preparer_donnees(self.demande)[0]
 
@@ -2093,6 +2097,33 @@ class LaboratoireWorkflowTests(TestCase):
         self.assertEqual(incoherent_line["tendance"], "insuffisante")
         self.assertIsNone(incoherent_line["variation_pct"])
         self.assertEqual(incoherent_line["statut"], "non déterminé")
+
+    def test_result_submission_rejects_nonpositive_numeric_values(self):
+        sample = self.faire_avancer(
+            creer_prelevements(self.demande, self.doctor)[0],
+        )
+        analysis = self.demande.analyses.get()
+
+        for value in ("0", "-35.6"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "strictement supérieur à zéro",
+                ):
+                    envoyer_resultats(
+                        utilisateur=self.lab,
+                        prelevement=sample,
+                        resultats={
+                            analysis: {
+                                "valeur": value,
+                                "unite": "g/L",
+                            },
+                        },
+                    )
+
+        self.assertFalse(Resultat.objects.filter(
+            analyse_demandee=analysis,
+        ).exists())
 
     @override_settings(
         GOOGLE_API_KEY="test-google-api-key",
@@ -2197,6 +2228,97 @@ class LaboratoireWorkflowTests(TestCase):
         )
         self.assertNotContains(page, "Courbe d’évolution")
         self.assertNotContains(page, "lab-evolution-charts")
+
+    @override_settings(
+        GOOGLE_API_KEY="test-google-api-key",
+        GEMINI_MODEL="gemini-primary-test",
+        GEMINI_FALLBACK_MODEL="gemini-fallback-test",
+        ANTHROPIC_API_KEY="",
+    )
+    @patch("laboratoire.services_resume.urlopen")
+    def test_gemini_timeout_retries_with_configured_fallback_model(
+        self,
+        mock_urlopen,
+    ):
+        mock_urlopen.side_effect = [
+            URLError(socket.timeout("timed out")),
+            BytesIO(json.dumps({
+                "status": "completed",
+                "steps": [{
+                    "type": "model_output",
+                    "content": [{
+                        "type": "text",
+                        "text": "Résumé descriptif fictif.",
+                    }],
+                }],
+            }).encode("utf-8")),
+        ]
+
+        with self.assertLogs(
+            "laboratoire.services_resume",
+            level="WARNING",
+        ) as captured:
+            result = generer_resume([{
+                "analyse": "Glycémie",
+                "valeur": "0.95",
+                "unite": "g/L",
+            }])
+
+        sent_models = [
+            json.loads(call.args[0].data.decode("utf-8"))["model"]
+            for call in mock_urlopen.call_args_list
+        ]
+        self.assertEqual(
+            sent_models,
+            ["gemini-primary-test", "gemini-fallback-test"],
+        )
+        self.assertEqual(result.texte, "Résumé descriptif fictif.")
+        self.assertEqual(result.modele, "gemini-fallback-test")
+        self.assertIn("cause=timeout", captured.output[0])
+
+    @override_settings(
+        GOOGLE_API_KEY="test-google-api-key",
+        GEMINI_MODEL="gemini-primary-test",
+        GEMINI_FALLBACK_MODEL="gemini-fallback-test",
+        ANTHROPIC_API_KEY="",
+    )
+    @patch(
+        "laboratoire.services_resume.urlopen",
+        side_effect=[
+            URLError(socket.timeout("timed out")),
+            URLError(socket.timeout("timed out")),
+        ],
+    )
+    def test_summary_timeout_is_reported_without_saving_a_report(
+        self,
+        mock_urlopen,
+    ):
+        sample = self.faire_avancer(
+            creer_prelevements(self.demande, self.doctor)[0],
+        )
+        envoyer_resultats(
+            utilisateur=self.lab,
+            prelevement=sample,
+            resultats={
+                self.demande.analyses.get(): {
+                    "valeur": "0.95",
+                    "unite": "g/L",
+                },
+            },
+        )
+        self.client.force_login(self.doctor)
+
+        response = self.client.post(
+            reverse("laboratoire:generer_resume", args=[self.demande.pk]),
+            follow=True,
+        )
+
+        self.assertContains(response, "Le fournisseur IA n’a pas répondu")
+        self.assertContains(response, "Aucun résumé n’a été enregistré")
+        self.assertFalse(CompteRendu.objects.filter(
+            demande=self.demande,
+        ).exists())
+        self.assertEqual(mock_urlopen.call_count, 2)
 
     @override_settings(
         ANTHROPIC_API_KEY="summary-workflow-test-key",
@@ -2501,3 +2623,21 @@ class LaboratoireWorkflowTests(TestCase):
 
         self.assertContains(response, "Aucun fournisseur IA n’est configuré")
         self.assertFalse(CompteRendu.objects.filter(demande=self.demande).exists())
+
+
+class DoctorDemoGuideTests(TestCase):
+    def test_doctor_request_page_shows_safe_laboratory_demo_steps(self):
+        doctor = User.objects.create_user(
+            username="doctor-laboratory-demo-guide",
+            password="test-password",
+            role=User.Role.DOCTEUR,
+        )
+        self.client.force_login(doctor)
+
+        response = self.client.get(reverse("laboratoire:demande_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Tester le suivi médecin–laboratoire")
+        self.assertContains(response, "python manage.py seed_laboratory_demo")
+        self.assertContains(response, "ne calculent pas un risque d’AVC")
+        self.assertContains(response, "data-open-request-modal")

@@ -48,11 +48,11 @@ class LigneFactureForm(forms.ModelForm):
         model = LigneFacture
         fields = ['tarif', 'description', 'reference', 'quantite', 'prix_unitaire']
         widgets = {
-            'tarif': forms.Select(attrs={'class': 'form-input'}),
-            'description': forms.TextInput(attrs={'class': 'form-input'}),
-            'reference': forms.TextInput(attrs={'class': 'form-input'}),
-            'quantite': forms.NumberInput(attrs={'class': 'form-input', 'min': '1'}),
-            'prix_unitaire': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.001', 'min': '0'}),
+            'tarif': forms.Select(attrs={'class': 'form-input', 'aria-label': 'Tarif'}),
+            'description': forms.TextInput(attrs={'class': 'form-input', 'aria-label': 'Description'}),
+            'reference': forms.TextInput(attrs={'class': 'form-input', 'aria-label': 'Référence'}),
+            'quantite': forms.NumberInput(attrs={'class': 'form-input', 'min': '1', 'aria-label': 'Quantité'}),
+            'prix_unitaire': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.001', 'min': '0', 'aria-label': 'Prix unitaire'}),
         }
 
     def __init__(self, *args, **kwargs):

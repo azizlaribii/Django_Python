@@ -1,51 +1,104 @@
-{% extends "base.html" %}
-{% load static %}
-{% block title %}{{ titre }} — Laboratoire{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'laboratoire/laboratoire.css' %}">{% endblock %}
-{% block content %}
+{% extends "base.html" %} {% load static %} {% block title %}{{ titre }} —
+Laboratoire{% endblock %} {% block extra_css %}<link
+  rel="stylesheet"
+  href="{% static 'laboratoire/laboratoire.css' %}"
+/>{% endblock %} {% block content %}
 <div class="lab-shell">
   <div class="lab-form-card">
-    <p><a class="lab-btn lab-btn--soft lab-btn--small" href="javascript:history.back()">← Retour</a></p>
+    <p>
+      <a
+        class="lab-btn lab-btn--soft lab-btn--small"
+        href="javascript:history.back()"
+        >← Retour</a
+      >
+    </p>
     <header class="lab-hero">
       <div class="lab-hero__copy">
         <span class="lab-hero__eyebrow">🔬 Espace laboratoire</span>
         <h1>{{ titre }}</h1>
         {% if prelevement_form %}
-          <p>Le code est généré automatiquement. Les dates sont enregistrées lors de la confirmation des étapes du prélèvement.</p>
+        <p>
+          Le code est généré automatiquement. Les dates sont enregistrées lors
+          de la confirmation des étapes du prélèvement.
+        </p>
         {% else %}
-          <p>Les champs marqués comme obligatoires doivent être renseignés avant l’enregistrement.</p>
+        <p>
+          Les champs marqués comme obligatoires doivent être renseignés avant
+          l’enregistrement.
+        </p>
         {% endif %}
       </div>
     </header>
     <section class="lab-panel">
       <div class="lab-panel__head"><h2>Informations</h2></div>
       <div class="lab-panel__body">
-        <form method="post" class="lab-form" enctype="multipart/form-data" {% if prelevement_form %}data-prelevement-form{% endif %}>
-          {% csrf_token %}
-          {% if form.non_field_errors %}
-            <div class="lab-form__nonfield lab-form__field--wide" role="alert">{{ form.non_field_errors }}</div>
-          {% endif %}
-          {% for field in form %}
-            <div class="lab-form__field {% if field.name == 'analyses' or field.name == 'bilans' or field.name == 'commentaire' or field.name == 'description' or field.name == 'observation' or field.name == 'motif_rejet' or field.name == 'motifs_rejet' or field.name == 'entete_compte_rendu' or field.name == 'signature_compte_rendu' or field.name == 'remarque' %}lab-form__field--wide{% endif %}" {% if prelevement_form and field.name == "precision_type" %}data-prelevement-precision {% if form.type_prelevement.value != "AUTRE" %}hidden{% endif %}{% endif %}>
-              {{ field.label_tag }}
-              {% if field.field.required %}<span aria-hidden="true" style="color:#b42318;">*</span>{% endif %}
-              {% if field.name == "analyses" or field.name == "bilans" %}
-                <div class="lab-form__choices">{{ field }}</div>
-              {% else %}
-                {{ field }}
-                {% if field.name == "motif_rejet" and form.motifs_rejet %}
-                  <datalist id="motifs-rejet-options">
-                    {% for motif in form.motifs_rejet %}<option value="{{ motif }}">{% endfor %}
-                  </datalist>
-                {% endif %}
-              {% endif %}
-              {% if field.help_text %}<span class="lab-form__help">{{ field.help_text }}</span>{% endif %}
-              {% if field.errors %}<div class="lab-form__errors" role="alert">{{ field.errors }}</div>{% endif %}
-            </div>
+        <form
+          method="post"
+          class="lab-form"
+          enctype="multipart/form-data"
+          {%
+          if
+          prelevement_form
+          %}data-prelevement-form{%
+          endif
+          %}
+        >
+          {% csrf_token %} {% if form.warning_message %}
+          <div class="lab-form__errors" role="status">
+            {{ form.warning_message }}
+          </div>
+          {% endif %} {% if form.non_field_errors %}
+          <div class="lab-form__nonfield lab-form__field--wide" role="alert">
+            {{ form.non_field_errors }}
+          </div>
+          {% endif %} {% for field in form %}
+          <div
+            class="lab-form__field {% if field.name == 'analyses' or field.name == 'bilans' or field.name == 'commentaire' or field.name == 'description' or field.name == 'observation' or field.name == 'motif_rejet' or field.name == 'motifs_rejet' or field.name == 'entete_compte_rendu' or field.name == 'signature_compte_rendu' or field.name == 'remarque' %}lab-form__field--wide{% endif %}"
+            {%
+            if
+            prelevement_form
+            and
+            field.name=""
+            ="precision_type"
+            %}data-prelevement-precision
+            {%
+            if
+            form.type_prelevement.value
+            !="AUTRE"
+            %}hidden{%
+            endif
+            %}{%
+            endif
+            %}
+          >
+            {{ field.label_tag }} {% if field.field.required %}<span
+              aria-hidden="true"
+              style="color: #b42318"
+              >*</span
+            >{% endif %} {% if field.name == "analyses" or field.name ==
+            "bilans" %}
+            <div class="lab-form__choices">{{ field }}</div>
+            {% else %} {{ field }} {% if field.name == "motif_rejet" and
+            form.motifs_rejet %}
+            <datalist id="motifs-rejet-options">
+              {% for motif in form.motifs_rejet %}
+              <option value="{{ motif }}">{% endfor %}</option>
+            </datalist>
+            {% endif %} {% endif %} {% if field.help_text %}<span
+              class="lab-form__help"
+              >{{ field.help_text }}</span
+            >{% endif %} {% if field.errors %}
+            <div class="lab-form__errors" role="alert">{{ field.errors }}</div>
+            {% endif %}
+          </div>
           {% endfor %}
           <div class="lab-form__footer lab-form__field--wide">
-            <a class="lab-btn lab-btn--soft" href="javascript:history.back()">Annuler</a>
-            <button class="lab-btn lab-btn--primary" type="submit">Enregistrer</button>
+            <a class="lab-btn lab-btn--soft" href="javascript:history.back()"
+              >Annuler</a
+            >
+            <button class="lab-btn lab-btn--primary" type="submit">
+              Enregistrer
+            </button>
           </div>
         </form>
       </div>
@@ -57,7 +110,8 @@
   document.addEventListener("DOMContentLoaded", function () {
     var form = document.querySelector("[data-prelevement-form]");
     var typeField = form && form.querySelector('[name="type_prelevement"]');
-    var precisionField = form && form.querySelector("[data-prelevement-precision]");
+    var precisionField =
+      form && form.querySelector("[data-prelevement-precision]");
     if (!typeField || !precisionField) return;
     var updatePrecisionVisibility = function () {
       precisionField.hidden = typeField.value !== "AUTRE";
@@ -66,5 +120,4 @@
     updatePrecisionVisibility();
   });
 </script>
-{% endif %}
-{% endblock %}
+{% endif %} {% endblock %}

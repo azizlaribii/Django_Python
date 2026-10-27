@@ -1,8 +1,10 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block title %}Facture {{ facture.numero }} - SantéConnect{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'billing/billing.css' %}">{% endblock %}
+
 {% block content %}
-<link rel="stylesheet" href="{% static 'billing/billing.css' %}">
 <div class="container billing-page">
     <div class="page-header">
         <div>
@@ -20,8 +22,11 @@
                 <button type="submit" class="btn btn-light">Annuler la facture</button>
             </form>
             {% endif %}
-            <a href="{% url 'facture_pdf' facture.pk %}?apercu=1" target="_blank" rel="noopener" class="btn btn-light">Aperçu PDF</a>
-            <a href="{% url 'facture_pdf' facture.pk %}" class="btn btn-primary">Télécharger PDF</a>
+            <a href="{% url 'facture_pdf' facture.pk %}?apercu=1" target="_blank" rel="noopener"
+               class="btn btn-light"
+               aria-label="Aperçu PDF de la facture {{ facture.numero }} (nouvel onglet)">Aperçu PDF</a>
+            <a href="{% url 'facture_pdf' facture.pk %}" class="btn btn-primary"
+               aria-label="Télécharger le PDF de la facture {{ facture.numero }}">Télécharger PDF</a>
         </div>
     </div>
 
@@ -34,13 +39,22 @@
         <div class="table-wrap">
         <table>
             <caption class="sr-only">Lignes de la facture</caption>
-            <thead><tr><th scope="col">Description</th><th scope="col">Qté</th>
-                <th scope="col" class="text-right">Prix unitaire</th><th scope="col" class="text-right">Total</th></tr></thead>
+            <thead>
+                <tr>
+                    <th scope="col">Description</th>
+                    <th scope="col">Qté</th>
+                    <th scope="col" class="text-right">Prix unitaire</th>
+                    <th scope="col" class="text-right">Total</th>
+                </tr>
+            </thead>
             <tbody>
                 {% for l in facture.lignes.all %}
-                <tr><td>{{ l.description }}</td><td>{{ l.quantite }}</td>
+                <tr>
+                    <td>{{ l.description }}</td>
+                    <td>{{ l.quantite }}</td>
                     <td class="text-right">{{ l.prix_unitaire|floatformat:3 }}</td>
-                    <td class="text-right">{{ l.total|floatformat:3 }}</td></tr>
+                    <td class="text-right">{{ l.total|floatformat:3 }}</td>
+                </tr>
                 {% empty %}
                 <tr><td colspan="4" class="empty">Aucune ligne.</td></tr>
                 {% endfor %}
@@ -64,12 +78,23 @@
         <div class="table-wrap">
         <table>
             <caption class="sr-only">Paiements enregistrés</caption>
-            <thead><tr><th scope="col">Date</th><th scope="col">Mode</th><th scope="col" class="text-right">Montant</th></tr></thead>
+            <thead>
+                <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Mode</th>
+                    <th scope="col" class="text-right">Montant</th>
+                </tr>
+            </thead>
             <tbody>
-            {% for p in facture.paiements.all %}
-            <tr><td>{{ p.date_paiement|date:"d/m/Y H:i" }}</td><td>{{ p.get_mode_display }}</td>
-                <td class="text-right">{{ p.montant|floatformat:3 }}</td></tr>
-            {% empty %}<tr><td colspan="3" class="empty">Aucun paiement.</td></tr>{% endfor %}
+                {% for p in facture.paiements.all %}
+                <tr>
+                    <td>{{ p.date_paiement|date:"d/m/Y H:i" }}</td>
+                    <td>{{ p.get_mode_display }}</td>
+                    <td class="text-right">{{ p.montant|floatformat:3 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="empty">Aucun paiement.</td></tr>
+                {% endfor %}
             </tbody>
         </table>
         </div>

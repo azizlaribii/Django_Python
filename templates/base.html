@@ -15,13 +15,14 @@
       rel="stylesheet"
     />
     <!-- Main Style CSS -->
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20261022_1" />
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20261027_1" />
     {% block extra_css %}{% endblock %}
   </head>
 
   <body>
+    <a href="#contenu" class="sr-only">Aller au contenu</a>
     <!-- Navigation Bar -->
-    <nav class="navbar" id="main-navbar">
+    <nav class="navbar" id="main-navbar" aria-label="Navigation principale">
       <div class="container navbar-inner">
         <div class="navbar-brand-section">
           <a href="{% url 'home' %}" class="logo-brand" id="brand-logo-link">
@@ -153,7 +154,7 @@
     </div>
 
     <!-- Main Content Block -->
-    <main style="flex: 1; padding: 24px 0 60px">
+    <main id="contenu" style="flex: 1; padding: 24px 0 60px">
       {% block content %}{% endblock %}
     </main>
 

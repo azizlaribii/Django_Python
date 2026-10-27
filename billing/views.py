@@ -6,9 +6,11 @@ from .models import Tarif, Facture
 from .permissions import admin_required, staff_required, billing_access_required, factures_visibles
 from django.views.decorators.http import require_POST
 from decimal import Decimal
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.contrib.auth import get_user_model
 from .pdf import build_facture_pdf
+from .ai import suggerer_lignes
+
 # ───────────── TARIFS (admin seulement) ─────────────
 
 @admin_required
@@ -177,3 +179,21 @@ def facture_pdf(request, pk):
     response = HttpResponse(build_facture_pdf(facture).getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = f'{mode}; filename="{facture.numero}.pdf"'
     return response
+
+
+
+@staff_required
+@require_POST
+def ia_suggerer_lignes(request):
+    texte = request.POST.get('texte', '').strip()
+    if not texte or len(texte) > 500:
+        return JsonResponse({'erreur': "Texte vide ou trop long (500 caractères max)."}, status=400)
+    tarifs = [{'id': t.pk, 'code': t.code, 'libelle': t.libelle, 'prix': str(t.prix)}
+              for t in Tarif.objects.filter(actif=True)]
+    try:
+        lignes = suggerer_lignes(texte, tarifs)
+    except Exception:
+        return JsonResponse(
+            {'erreur': "Le service IA est indisponible. Ajoutez les lignes manuellement."},
+            status=502)
+    return JsonResponse({'lignes': lignes})    

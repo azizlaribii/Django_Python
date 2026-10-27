@@ -11,8 +11,7 @@
     <div class="lab-hero__copy">
       <span class="lab-hero__eyebrow">Espace laboratoire · {{ prelevement.code_prelevement }}</span>
       <h1>Saisie des résultats</h1>
-      <p>Renseignez les résultats du prélèvement reçu avant de les enregistrer ou de les valider.</p>
-      <p>Enregistrez un brouillon privé, puis validez et publiez les résultats après vérification.</p>
+      <p>Renseignez les résultats du prélèvement reçu, puis validez et publiez-les après vérification.</p>
     </div>
   </header>
 
@@ -25,6 +24,13 @@
 
   <form method="post" class="lab-form lab-result-form">
     {% csrf_token %}
+    {% if confirmation_ia %}
+      <input type="hidden" name="confirmation_ia" value="{{ confirmation_token }}">
+      <div class="lab-form__nonfield" role="alert">
+        <strong>Valeur inhabituelle, vérifiez la saisie.</strong>
+        {% if confirmation_expiree %}<p>La confirmation précédente est invalide. Vérifiez les valeurs puis confirmez à nouveau.</p>{% endif %}
+      </div>
+    {% endif %}
     {% if form.non_field_errors %}
       <div class="lab-form__nonfield" role="alert">{{ form.non_field_errors }}</div>
     {% endif %}
@@ -56,8 +62,12 @@
     {% endfor %}
 
     <div class="lab-actions lab-result-actions">
-      <button class="lab-btn lab-btn--soft" type="submit" name="action" value="brouillon">Enregistrer le brouillon</button>
-      <button class="lab-btn lab-btn--primary" type="submit" name="action" value="valider">Valider et publier les résultats</button>
+      {% if confirmation_ia %}
+        <button class="lab-btn lab-btn--soft" type="submit" name="action" value="corriger">Corriger</button>
+        <button class="lab-btn lab-btn--primary" type="submit" name="action" value="valider">Confirmer quand même</button>
+      {% else %}
+        <button class="lab-btn lab-btn--primary" type="submit" name="action" value="valider">Valider et publier les résultats</button>
+      {% endif %}
       <a class="lab-btn lab-btn--soft" href="{% url 'laboratoire:prelevement_list' %}?onglet=resultats&amp;statut=RECU">Annuler</a>
     </div>
   </form>

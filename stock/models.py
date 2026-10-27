@@ -138,6 +138,11 @@ class Produit(models.Model):
         return 0 < self.quantite <= self.seuil_alerte
 
     @property
+    def niveau_max(self):
+        """Borne haute de la jauge de stock (élément <meter>)."""
+        return max(self.seuil_alerte * 3, self.quantite, 1)
+
+    @property
     def valeur_stock(self):
         if self.prix_unitaire is None:
             return None
