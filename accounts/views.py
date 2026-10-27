@@ -1632,4 +1632,22 @@ def api_dossier_risques_ml(request, patient_id):
     ia_data = analyser_dossier_ia(patient, dossier)
     ml_data = evaluer_risques_machine_learning(patient, dossier, ia_data)
     return JsonResponse({'success': True, 'data': ml_data})
-    gestion-laboratoire
+
+
+
+@login_required
+def api_examen_ia_suggestion(request, examen_id):
+    """API endpoint retournant la suggestion IA de protocole pour un examen médical."""
+    examen = get_object_or_404(ExamenMedical, id=examen_id)
+
+    # Access control: doctor, admin, or the patient themselves
+    patient = examen.dossier.patient if examen.dossier else None
+    is_owner = patient and request.user.id == patient.id
+    if not (request.user.is_doctor or request.user.is_admin_user or is_owner):
+        return JsonResponse({'success': False, 'error': 'Non autorisé'}, status=403)
+
+    dossier = examen.dossier if examen.dossier else None
+    from .ml.ai_examen import analyser_examen_ia
+    ia_data = analyser_examen_ia(examen, dossier)
+    return JsonResponse({'success': True, 'ia': ia_data})
+
