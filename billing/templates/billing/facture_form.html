@@ -1,14 +1,26 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}{% if facture %}Modifier {{ facture.numero }}{% else %}Nouvelle facture{% endif %} - SantéConnect{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'billing/billing.css' %}">{% endblock %}
+{% block title %}
+    {% if facture %}Modifier {{ facture.numero }}{% else %}Nouvelle facture{% endif %} - SantéConnect
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'billing/billing.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="container billing-page">
+
     <div class="page-header">
         <div>
-            <h1>{% if facture %}Modifier {{ facture.numero }}{% else %}Nouvelle facture{% endif %}</h1>
+            <h1>
+                {% if facture %}
+                    Modifier {{ facture.numero }}
+                {% else %}
+                    Nouvelle facture
+                {% endif %}
+            </h1>
             <p>Renseignez le patient puis les lignes de la facture.</p>
         </div>
     </div>
@@ -16,76 +28,226 @@
     <form method="post">
         {% csrf_token %}
 
-        <div class="card" style="margin-bottom:20px;"><div class="card-body">
-            {% for field in form.visible_fields %}
-            <div class="form-group">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% for error in field.errors %}
-                <div class="field-error" role="alert">{{ error }}</div>
+        <!-- Informations de la facture -->
+        <div class="card" style="margin-bottom:20px;">
+            <div class="card-body">
+                {% for field in form.visible_fields %}
+                <div class="form-group">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+
+                    {% for error in field.errors %}
+                    <div class="field-error" role="alert">{{ error }}</div>
+                    {% endfor %}
+                </div>
                 {% endfor %}
             </div>
-            {% endfor %}
-        </div></div>
-
-        <div class="card"><div class="card-body">
-            <h2 style="margin-top:0;">Lignes</h2>
-            {{ formset.management_form }}
-            {% if formset.non_form_errors %}
-            <div class="field-error" role="alert">{{ formset.non_form_errors }}</div>
-            {% endif %}
-
-            <div class="table-wrap">
-            <table>
-                <caption class="sr-only">Lignes de la facture</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">Tarif</th>
-                        <th scope="col">Description</th>
-                        <th scope="col">Référence</th>
-                        <th scope="col">Qté</th>
-                        <th scope="col">Prix unitaire</th>
-                        <th scope="col">Supprimer</th>
-                    </tr>
-                </thead>
-                <tbody id="lignes-body">
-                    {% for lf in formset %}
-                    <tr class="ligne">
-                        {% for hidden in lf.hidden_fields %}{{ hidden }}{% endfor %}
-                        <td>{{ lf.tarif }}</td>
-                        <td>{{ lf.description }}{% for e in lf.description.errors %}<div class="field-error" role="alert">{{ e }}</div>{% endfor %}</td>
-                        <td>{{ lf.reference }}</td>
-                        <td>{{ lf.quantite }}{% for e in lf.quantite.errors %}<div class="field-error" role="alert">{{ e }}</div>{% endfor %}</td>
-                        <td>{{ lf.prix_unitaire }}{% for e in lf.prix_unitaire.errors %}<div class="field-error" role="alert">{{ e }}</div>{% endfor %}</td>
-                        <td><label>{{ lf.DELETE }}<span class="sr-only">Supprimer cette ligne</span></label></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            </div>
-
-            <button type="button" id="add-ligne" class="btn btn-light btn-sm" style="margin-top:12px;">+ Ajouter une ligne</button>
-
-            <template id="empty-ligne">
-            <tr class="ligne">
-                {% for hidden in formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
-                <td>{{ formset.empty_form.tarif }}</td>
-                <td>{{ formset.empty_form.description }}</td>
-                <td>{{ formset.empty_form.reference }}</td>
-                <td>{{ formset.empty_form.quantite }}</td>
-                <td>{{ formset.empty_form.prix_unitaire }}</td>
-                <td><label>{{ formset.empty_form.DELETE }}<span class="sr-only">Supprimer cette ligne</span></label></td>
-            </tr>
-            </template>
-            {{ tarifs_json|json_script:"tarifs-data" }}
-        </div></div>
-
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Enregistrer la facture</button>
-            <a href="{% url 'facture_list' %}" class="btn btn-light">Annuler</a>
         </div>
+
+        <!-- Suggestion IA -->
+        <div class="card" style="margin-bottom:20px;">
+            <div class="card-body">
+                <h2 style="margin-top:0;">Suggestion IA</h2>
+
+                <label for="ia-texte">
+                    Décrivez les actes réalisés
+                </label>
+
+                <textarea
+                    id="ia-texte"
+                    class="form-input"
+                    rows="2"
+                    maxlength="500"
+                    placeholder="consultation + ECG + prise de sang"
+                ></textarea>
+
+                <button
+                    type="button"
+                    id="ia-btn"
+                    class="btn btn-light btn-sm"
+                    style="margin-top:8px;"
+                    data-url="{% url 'ia_suggerer' %}"
+                >
+                    Suggérer les lignes
+                </button>
+
+                <p
+                    id="ia-status"
+                    role="status"
+                    aria-live="polite"
+                ></p>
+            </div>
+        </div>
+
+        <!-- Lignes de la facture -->
+        <div class="card">
+            <div class="card-body">
+
+                <h2 style="margin-top:0;">Lignes</h2>
+
+                {{ formset.management_form }}
+
+                {% if formset.non_form_errors %}
+                <div class="field-error" role="alert">
+                    {{ formset.non_form_errors }}
+                </div>
+                {% endif %}
+
+                <div class="table-wrap">
+                    <table>
+                        <caption class="sr-only">
+                            Lignes de la facture
+                        </caption>
+
+                        <thead>
+                            <tr>
+                                <th scope="col">Tarif</th>
+                                <th scope="col">Description</th>
+                                <th scope="col">Référence</th>
+                                <th scope="col">Qté</th>
+                                <th scope="col">Prix unitaire</th>
+                                <th scope="col">Supprimer</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="lignes-body">
+                            {% for lf in formset %}
+                            <tr class="ligne">
+
+                                {% for hidden in lf.hidden_fields %}
+                                    {{ hidden }}
+                                {% endfor %}
+
+                                <td>
+                                    {{ lf.tarif }}
+                                </td>
+
+                                <td>
+                                    {{ lf.description }}
+
+                                    {% for e in lf.description.errors %}
+                                    <div class="field-error" role="alert">
+                                        {{ e }}
+                                    </div>
+                                    {% endfor %}
+                                </td>
+
+                                <td>
+                                    {{ lf.reference }}
+                                </td>
+
+                                <td>
+                                    {{ lf.quantite }}
+
+                                    {% for e in lf.quantite.errors %}
+                                    <div class="field-error" role="alert">
+                                        {{ e }}
+                                    </div>
+                                    {% endfor %}
+                                </td>
+
+                                <td>
+                                    {{ lf.prix_unitaire }}
+
+                                    {% for e in lf.prix_unitaire.errors %}
+                                    <div class="field-error" role="alert">
+                                        {{ e }}
+                                    </div>
+                                    {% endfor %}
+                                </td>
+
+                                <td>
+                                    <label>
+                                        {{ lf.DELETE }}
+                                        <span class="sr-only">
+                                            Supprimer cette ligne
+                                        </span>
+                                    </label>
+                                </td>
+
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <button
+                    type="button"
+                    id="add-ligne"
+                    class="btn btn-light btn-sm"
+                    style="margin-top:12px;"
+                >
+                    + Ajouter une ligne
+                </button>
+
+                <!-- Modèle pour les nouvelles lignes -->
+                <template id="empty-ligne">
+                    <tr class="ligne">
+
+                        {% for hidden in formset.empty_form.hidden_fields %}
+                            {{ hidden }}
+                        {% endfor %}
+
+                        <td>
+                            {{ formset.empty_form.tarif }}
+                        </td>
+
+                        <td>
+                            {{ formset.empty_form.description }}
+                        </td>
+
+                        <td>
+                            {{ formset.empty_form.reference }}
+                        </td>
+
+                        <td>
+                            {{ formset.empty_form.quantite }}
+                        </td>
+
+                        <td>
+                            {{ formset.empty_form.prix_unitaire }}
+                        </td>
+
+                        <td>
+                            <label>
+                                {{ formset.empty_form.DELETE }}
+                                <span class="sr-only">
+                                    Supprimer cette ligne
+                                </span>
+                            </label>
+                        </td>
+
+                    </tr>
+                </template>
+
+                {{ tarifs_json|json_script:"tarifs-data" }}
+
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="form-actions">
+
+            <button
+                type="submit"
+                class="btn btn-primary"
+            >
+                Enregistrer la facture
+            </button>
+
+            <a
+                href="{% url 'facture_list' %}"
+                class="btn btn-light"
+            >
+                Annuler
+            </a>
+
+        </div>
+
     </form>
 </div>
 {% endblock %}
 
-{% block extra_js %}<script src="{% static 'billing/facture_form.js' %}"></script>{% endblock %}
+{% block extra_js %}
+<script src="{% static 'billing/facture_form.js' %}"></script>
+{% endblock %}

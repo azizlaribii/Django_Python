@@ -16,4 +16,5 @@ urlpatterns = [
     path('patients/<int:patient_id>/historique/', views.patient_historique, name='patient_historique'),
     path('mon-historique/', views.patient_historique, name='mon_historique'),
     path('factures/<int:pk>/pdf/', views.facture_pdf, name='facture_pdf'),
+    path('ia/suggerer/', views.ia_suggerer_lignes, name='ia_suggerer'),
 ]
