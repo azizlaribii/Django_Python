@@ -971,40 +971,78 @@ textarea.form-input:focus {
   }
 }
 
-/* Navbar : resserrer les liens entre 1251 et 1480 px (7 à 8 liens selon le rôle) */
-@media (min-width: 1251px) and (max-width: 1480px) {
+/* ==========================================================================
+   NAVBAR SUR DEUX LIGNES (au-dessus de 860 px)
+   Ligne 1 : logo + compte. Ligne 2 : liens, centrés, qui passent à la ligne
+   si besoin. Évite tout chevauchement quel que soit le rôle (7 à 9 liens),
+   la longueur du nom affiché ou le zoom du navigateur.
+   ========================================================================== */
+@media (min-width: 861px) {
   .navbar-inner {
-    gap: 10px !important;
+    height: auto !important;
+    flex-wrap: wrap !important;
+    row-gap: 4px !important;
+    padding-top: 10px !important;
+    padding-bottom: 6px !important;
   }
-  .nav-item-link {
-    font-size: 0.8rem !important;
-    padding: 6px 6px !important;
-  }
+  .navbar-brand-section { order: 1; }
+  .navbar-user-actions { order: 2; margin-left: auto !important; }
   .nav-links {
-    gap: 2px !important;
+    order: 3 !important;
+    flex: 1 0 100% !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 2px 4px !important;
+    padding-top: 6px !important;
+    border-top: 1px solid #f1f5f9;
   }
-  .nav-user-name-link {
-    max-width: 110px !important;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+}
+.nav-user-name-link {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
-/* Navbar : sous 1350 px, on garde seulement l'icône du logo pour laisser la place aux liens */
-@media (min-width: 861px) and (max-width: 1350px) {
-  .logo-text {
-    display: none !important;
-  }
+@media (max-width: 860px) {
+  .navbar-user-actions { flex-wrap: wrap !important; gap: 8px !important; max-width: 100%; }
+  .nav-user-name-link { max-width: 130px; }
 }
-@media (min-width: 861px) and (max-width: 1250px) {
-  .nav-user-badge .badge-role {
-    display: none !important;
-  }
-  .nav-links {
-    justify-content: safe center !important;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
+@media (max-width: 480px) {
+  .nav-user-badge .badge-role { display: none !important; }
+}
+
+/* Lien d'évitement « Aller au contenu » : caché, il apparaît au premier Tab */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+a.sr-only:focus,
+a.sr-only:focus-visible {
+  position: fixed !important;
+  top: 8px;
+  left: 8px;
+  z-index: 2000;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 10px 16px !important;
+  clip: auto !important;
+  overflow: visible !important;
+  background: #0f172a;
+  color: #ffffff !important;
+  border-radius: 8px;
+  font-weight: 700;
+  outline: 3px solid #38bdf8;
 }
 
 /* Accessibilité : contrastes conformes WCAG AA (≥ 4.5:1), vérifiés avec axe-core */
