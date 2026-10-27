@@ -1,13 +1,11 @@
-{% extends 'base.html' %}
-{% load static %}
+{% extends 'stock/base_stock.html' %}
 {% block title %}Mouvements - Stocks médicaux{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
 
 {% block content %}
 <div class="container">
     {% include 'stock/_header.html' with active='mouvements' %}
 
-    <form method="get" class="filters-bar">
+    <form method="get" class="filters-bar" role="search" aria-label="Filtrer les mouvements">
         <div class="form-group"><label class="form-label" for="m-q">Produit</label>
             <input type="text" id="m-q" name="q" value="{{ q }}" class="form-input" placeholder="Nom ou référence"></div>
         <div class="form-group"><label class="form-label" for="m-type">Type</label>
@@ -21,14 +19,14 @@
     </form>
 
     <div class="table-responsive">
-        <table class="data-table">
-            <thead><tr><th>Date</th><th>Produit</th><th>Mouvement</th><th>Motif</th><th>Lot</th><th>Stock après</th><th>Par</th><th>Commentaire</th></tr></thead>
+        <table class="data-table"><caption class="sr-only">Historique des mouvements de stock</caption>
+            <thead><tr><th scope="col">Date</th><th scope="col">Produit</th><th scope="col">Mouvement</th><th scope="col">Motif</th><th scope="col">Lot</th><th scope="col">Stock après</th><th scope="col">Par</th><th scope="col">Commentaire</th></tr></thead>
             <tbody>
             {% for m in page_obj %}
                 <tr>
                     <td style="white-space:nowrap;">{{ m.date|date:"d/m/Y H:i" }}</td>
                     <td><a href="{% url 'stock:produit_detail' m.produit.pk %}">{{ m.produit.nom }}</a></td>
-                    <td><span class="status-pill {% if m.type == 'ENTREE' %}verified{% else %}info{% endif %}">{% if m.type == 'ENTREE' %}+{% else %}−{% endif %}{{ m.quantite }}</span></td>
+                    <td><span class="status-pill {% if m.type == 'ENTREE' %}verified{% else %}info{% endif %}"><span aria-hidden="true">{% if m.type == 'ENTREE' %}+{% else %}−{% endif %}{{ m.quantite }}</span><span class="sr-only">{{ m.get_type_display }} de {{ m.quantite }}</span></span></td>
                     <td>{{ m.get_motif_display }}</td>
                     <td>{{ m.numero_lot|default:"—" }}</td>
                     <td>{{ m.stock_apres }}</td>

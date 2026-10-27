@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% load static %}
+{# Incrémenter ?v= à chaque modification du CSS/JS pour forcer le rechargement dans les navigateurs #}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}?v=3">{% endblock %}
+{% block extra_js %}<script src="{% static 'stock/a11y.js' %}?v=3" defer></script>{% endblock %}

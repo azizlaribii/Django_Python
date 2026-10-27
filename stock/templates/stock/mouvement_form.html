@@ -1,9 +1,9 @@
-{% extends 'base.html' %}
-{% load static %}
+{% extends 'stock/base_stock.html' %}
 {% block title %}{{ type_m.label }} de stock - {{ produit.nom }}{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
 
 {% block content %}
+{% include 'stock/_a11y_toolbar.html' %}
+<div id="contenu-stock" tabindex="-1"></div>
 <div class="container" style="max-width: 720px;">
     <div class="glass-card" style="margin-bottom:40px;">
         <h1 style="font-size:1.5rem; margin-bottom:6px;">{% if is_entree %}+ Entrée{% else %}− Sortie{% endif %} de stock</h1>
@@ -12,9 +12,9 @@
             Stock actuel : <strong>{{ produit.quantite }}</strong> {{ produit.get_unite_display|lower }}(s)
             {% if produit.date_peremption %}• Péremption : {{ produit.date_peremption|date:"d/m/Y" }}{% endif %}
         </p>
-        <form method="post" novalidate>
+        <form method="post">
             {% csrf_token %}
-            {% if form.non_field_errors %}<div class="alert alert-error">{{ form.non_field_errors }}</div>{% endif %}
+            {% include 'stock/_error_summary.html' %}
             {% for field in form %}{% include 'stock/_field.html' %}{% endfor %}
             <div style="display:flex; gap:10px;">
                 <button type="submit" class="btn {% if is_entree %}btn-success{% else %}btn-primary{% endif %}">Enregistrer l’{{ type_m.label|lower }}</button>

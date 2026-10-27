@@ -1,14 +1,12 @@
-{% extends 'base.html' %}
-{% load static %}
+{% extends 'stock/base_stock.html' %}
 {% block title %}Catégories - Stocks médicaux{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
 
 {% block content %}
 <div class="container">
     {% include 'stock/_header.html' with active='categories' %}
 
     {% if can_manage %}
-    <form method="post" action="{% url 'stock:categorie_create' %}" class="filters-bar">
+    <form method="post" action="{% url 'stock:categorie_create' %}" class="filters-bar" aria-label="Ajouter une catégorie">
         {% csrf_token %}
         <div class="form-group">{{ form.nom }}</div>
         <div class="form-group" style="flex:2 1 280px;">{{ form.description }}</div>
@@ -17,8 +15,8 @@
     {% endif %}
 
     <div class="table-responsive" style="margin-bottom:40px;">
-        <table class="data-table">
-            <thead><tr><th>Catégorie</th><th>Description</th><th>Produits</th>{% if can_manage %}<th></th>{% endif %}</tr></thead>
+        <table class="data-table"><caption class="sr-only">Catégories de produits</caption>
+            <thead><tr><th scope="col">Catégorie</th><th scope="col">Description</th><th scope="col">Produits</th>{% if can_manage %}<th scope="col"><span class="sr-only">Actions</span></th>{% endif %}</tr></thead>
             <tbody>
             {% for c in categories %}
                 <tr>
@@ -28,7 +26,7 @@
                     {% if can_manage %}
                     <td style="text-align:right;">
                         <form method="post" action="{% url 'stock:categorie_delete' c.pk %}" onsubmit="return confirm('Supprimer cette catégorie ? Les produits associés resteront sans catégorie.');">
-                            {% csrf_token %}<button type="submit" class="btn-table-delete">Supprimer</button>
+                            {% csrf_token %}<button type="submit" class="btn-table-delete" aria-label="Supprimer la catégorie {{ c.nom }}">Supprimer</button>
                         </form>
                     </td>
                     {% endif %}

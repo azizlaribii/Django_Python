@@ -1,18 +1,18 @@
-{% extends 'base.html' %}
-{% load static %}
+{% extends 'stock/base_stock.html' %}
 {% block title %}{{ titre }} - Stocks médicaux{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'stock/stock.css' %}">{% endblock %}
 
 {% block content %}
+{% include 'stock/_a11y_toolbar.html' %}
+<div id="contenu-stock" tabindex="-1"></div>
 <div class="container" style="max-width: 900px;">
     <div class="glass-card" style="margin-bottom: 40px;">
         <h1 style="font-size:1.6rem; margin-bottom:6px;">{{ titre }}</h1>
         <p style="color:var(--text-muted); margin-bottom:24px;">
             {% if produit %}La quantité en stock se modifie uniquement via les entrées et sorties.{% else %}Renseignez la fiche du produit, sa date de péremption et le stock de départ.{% endif %}
         </p>
-        <form method="post" novalidate>
+        <form method="post">
             {% csrf_token %}
-            {% if form.non_field_errors %}<div class="alert alert-error">{{ form.non_field_errors }}</div>{% endif %}
+            {% include 'stock/_error_summary.html' %}
             <div class="form-grid">
                 {% for field in form %}
                     <div {% if field.name == 'description' %}class="full"{% endif %}>{% include 'stock/_field.html' %}</div>

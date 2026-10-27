@@ -1,6 +1,6 @@
 <div class="form-group">
-    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span aria-hidden="true">*</span><span class="sr-only">(obligatoire)</span>{% endif %}</label>
     {{ field }}
-    {% if field.help_text %}<div class="form-help">{{ field.help_text }}</div>{% endif %}
-    {% for e in field.errors %}<div class="form-error">{{ e }}</div>{% endfor %}
+    {% if field.help_text %}<div class="form-help" id="{{ field.id_for_label }}_help">{{ field.help_text }}</div>{% endif %}
+    {% if field.errors %}<div class="form-error" id="{{ field.id_for_label }}_error">{% for e in field.errors %}<span class="sr-only">Erreur : </span>{{ e }} {% endfor %}</div>{% endif %}
 </div>
