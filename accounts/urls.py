@@ -78,5 +78,6 @@ urlpatterns = [
     # ── IA & ML MÉDICAL ─────────────────────────────────────────
     path('api/dossier/<int:patient_id>/analyse-ia/', views.api_dossier_analyse_ia, name='api_dossier_analyse_ia'),
     path('api/dossier/<int:patient_id>/risques-ml/', views.api_dossier_risques_ml, name='api_dossier_risques_ml'),
+    path('api/examen/<int:examen_id>/ia-suggestion/', views.api_examen_ia_suggestion, name='api_examen_ia_suggestion'),
 ]
 
