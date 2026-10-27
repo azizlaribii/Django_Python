@@ -28,6 +28,22 @@
     </div>
   </header>
   {% if user.is_doctor %}
+  <section class="lab-workflow-dashboard lab-doctor-demo" aria-labelledby="lab-doctor-demo-title">
+    <div class="lab-workflow-dashboard__heading">
+      <div>
+        <span class="lab-summary-kicker">Parcours de démonstration</span>
+        <h2 id="lab-doctor-demo-title">Tester le suivi médecin–laboratoire</h2>
+      </div>
+      <button type="button" class="lab-btn lab-btn--primary" data-open-request-modal
+        data-request-title="Nouvelle demande d’analyse">＋ Créer une demande</button>
+    </div>
+    <ol class="lab-doctor-demo__steps">
+      <li><strong>Préparer les données fictives</strong><span>Dans le terminal du projet, exécutez <code>python manage.py seed_laboratory_demo</code>. La commande crée trois demandes de démonstration associées au médecin et au patient de test.</span></li>
+      <li><strong>Consulter les demandes</strong><span>Actualisez cette page et ouvrez une demande pour voir les prélèvements en attente, les résultats à saisir et un exemple de résultat publié.</span></li>
+      <li><strong>Tester le parcours réel</strong><span>Créez une demande pour un patient qui vous est associé. Le laboratoire saisit puis valide le résultat ; revenez ensuite ici pour le consulter.</span></li>
+    </ol>
+    <p class="lab-doctor-demo__notice" role="note">Les demandes et résultats de démonstration sont fictifs. Ils ne calculent pas un risque d’AVC et ne constituent pas un avis médical.</p>
+  </section>
   <p class="lab-ai-note" role="note">
     {% if ia_resume_configuree %}
     Comparez les résultats publiés et leur historique ; l’IA peut rédiger un résumé descriptif à vérifier et approuver. Seules les données d’analyse pseudonymisées sont envoyées au fournisseur configuré.

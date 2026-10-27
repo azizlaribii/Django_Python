@@ -1604,6 +1604,7 @@ def get_protocole_details(request, protocole_id):
         return JsonResponse({'success': False, 'error': 'Protocole non trouvé.'}, status=404)
     return JsonResponse({'success': True, 'protocole': proto})
 
+
 # ─────────────────────────────────────────────────────────────
 # API — IA & ML MÉDICAL
 # ─────────────────────────────────────────────────────────────
@@ -1631,4 +1632,4 @@ def api_dossier_risques_ml(request, patient_id):
     ia_data = analyser_dossier_ia(patient, dossier)
     ml_data = evaluer_risques_machine_learning(patient, dossier, ia_data)
     return JsonResponse({'success': True, 'data': ml_data})
-
+    gestion-laboratoire

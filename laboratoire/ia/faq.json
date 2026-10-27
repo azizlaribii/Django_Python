@@ -1,0 +1,107 @@
+[
+  {
+    "id": "sample-tracking-general",
+    "questions": {"fr": "Comment fonctionne la traçabilité d'un prélèvement ?", "ar": "كيف تتم متابعة العينة في المختبر؟", "en": "How is a sample tracked in the laboratory?", "tn": "kifech yetba3ou el prelevement fi laboratoire?"},
+    "answers": {"fr": "Le suivi général d’un prélèvement passe par des étapes de statut dans la demande, par exemple à effectuer, prélevé, reçu puis terminé. Je ne peux pas consulter une demande individuelle depuis le chatbot ; vérifiez son avancement dans votre espace.", "ar": "تتم متابعة العينة عبر مراحل الحالة في الطلب، مثل مطلوب، تم أخذ العينة، تم الاستلام ثم مكتمل. لا أستطيع الاطلاع على طلب فردي من خلال المساعد؛ راجع تقدمه في حسابك.", "en": "A sample is generally tracked through request statuses such as to be collected, collected, received and completed. I cannot inspect an individual request in this chatbot; check its progress in your account.", "tn": "Suivi el prelevement yaaddi b marahil statut fel demande: à effectuer, prélevé, reçu baad terminé. Ma najjemch nchouf demande individuelle mel chatbot; chouf ta9addomha fi espace mte3ek."}
+  },
+  {
+    "id": "glycemia",
+    "questions": {"fr": "C'est quoi une analyse de glycémie ?", "ar": "ما هو تحليل سكر الدم؟", "en": "What is a blood glucose test?", "tn": "Chnouwa analyse glycémie ?"},
+    "answers": {"fr": "Une analyse de glycémie mesure la quantité de glucose dans le sang à un moment donné. Les consignes de préparation dépendent de la prescription ; vérifiez votre demande ou demandez au laboratoire.", "ar": "يقيس تحليل سكر الدم كمية الغلوكوز في الدم في وقت معين. تعتمد تعليمات التحضير على الوصفة؛ راجع طلبك أو اسأل المختبر.", "en": "A blood glucose test measures the amount of glucose in the blood at a given time. Preparation instructions depend on the prescription; check your request or ask the laboratory.", "tn": "Analyse glycémie t9is 9addech fama glucose fi dem fi wa9t mo3ayyen. Talimat el préparation yetbadelou 7asb el prescription; chouf demande wala es2el el laboratoire."}
+  },
+  {
+    "id": "laboratory-info",
+    "questions": {"fr": "Quelles informations générales sur le laboratoire ?", "ar": "ما هي المعلومات العامة عن المختبر؟", "en": "What general information can I get about the laboratory?", "tn": "chnowa ma3loumet el laboratoire?"},
+    "answers": {"fr": "Je peux fournir des informations générales sur les analyses, les prélèvements et l’utilisation de cet espace. Pour une consigne propre à votre demande, consultez-la ou contactez le laboratoire.", "ar": "يمكنني تقديم معلومات عامة عن التحاليل والعينات واستخدام هذه الصفحة. للتعليمات الخاصة بطلبك، راجعه أو اتصل بالمختبر.", "en": "I can provide general information about tests, samples and using this page. For instructions specific to your request, check it or contact the laboratory.", "tn": "Najjem na3tik ma3loumet 3amma 3al analyses, prélèvements w kifech testa3mel el espace. Lel talimat elli تخص demande mte3ek, choufha wala es2el el laboratoire."}
+  },
+  {
+    "id": "audit-history",
+    "questions": {"fr": "Qui a modifié le résultat de cette analyse ?", "ar": "من قام بتعديل نتيجة هذا التحليل؟", "en": "Who changed this test result?", "tn": "chkoun badel resultat el analyse?"},
+    "answers": {"fr": "Je n’ai pas accès à l’historique de traçabilité vérifié et autorisé, et ne peux pas identifier l’auteur d’une validation ou d’une modification. Contactez le service du laboratoire compétent, habilité à consulter cet historique.", "ar": "لا أستطيع الاطلاع على سجل تتبع موثوق ومصرح به، ولا يمكنني تحديد من قام بالاعتماد أو التعديل. اتصل بخدمة المختبر المختصة والمخولة بمراجعة السجل.", "en": "I cannot access a verified, authorized audit history or identify who validated or changed a result. Contact the appropriate laboratory service authorized to review it.", "tn": "Ma 3andich accès lel historique mta3 traçabilité vérifié w autorisé, w ma najjemch na3ref chkoun valide wala badel resultat. Ettasel bel service laboratoire compétent elli 3andou autorisation ychouf el historique."}
+  },
+  {
+    "id": "hdl",
+    "questions": {"fr": "Que mesure le cholestérol HDL ?", "ar": "ماذا يقيس كوليسترول HDL؟", "en": "What does HDL cholesterol measure?", "tn": "chmaaneha HDL fil cholesterol?"},
+    "answers": {"fr": "Le HDL désigne les lipoprotéines de haute densité, une fraction mesurée dans certains bilans lipidiques. Cette information générale ne permet pas d’interpréter un résultat individuel ; parlez-en à votre médecin.", "ar": "يشير HDL إلى البروتينات الدهنية عالية الكثافة، وهي جزء يُقاس في بعض تحاليل الدهون. هذه معلومة عامة ولا تفسر نتيجة فردية؛ ناقشها مع طبيبك.", "en": "HDL refers to high-density lipoproteins, a fraction measured in some lipid panels. This general information does not interpret an individual result; discuss it with your doctor.", "tn": "HDL yaani lipoprotéines de haute densité, fraction tet9as fi baadh bilans lipidiques. Hethi ma3louma 3amma w ma tfasserch resultat mte3ek; es2el tbibek."}
+  },
+  {
+    "id": "tracking",
+    "questions": {"fr": "Comment suivre mes résultats ?", "ar": "كيف أتابع نتائج تحاليلي؟", "en": "How can I track my results?", "tn": "kifech netba3 les resultats mte3i?"},
+    "answers": {"fr": "Dans « Avancement de mes demandes », consultez le statut de chaque demande. Les résultats s’affichent dans « Historique de mes résultats » après validation et publication par le laboratoire.", "ar": "في قسم «تقدم طلباتي»، يمكنك مراجعة حالة كل طلب. تظهر النتائج في «سجل نتائجي» بعد اعتمادها ونشرها من المختبر.", "en": "Check each request in “Progress of my requests”. Results appear in “My results history” after the laboratory validates and publishes them.", "tn": "Fi «Avancement de mes demandes» chouf statut kol demande. Les resultats yodh'hrou fi «Historique de mes résultats» baad ma laboratoire yvalidi w ypublishihom."}
+  },
+  {
+    "id": "fasting",
+    "questions": {"fr": "Dois-je être à jeun ?", "ar": "هل يجب أن أكون صائما قبل التحليل؟", "en": "Do I need to fast before my test?", "tn": "lezemni nsoum 9bal analyse?"},
+    "answers": {"fr": "Le jeûne dépend de l’analyse prescrite. Vérifiez les consignes de votre demande ou demandez conseil au laboratoire.", "ar": "الصيام يعتمد على نوع التحليل. راجع تعليمات طلبك أو اسأل المختبر.", "en": "Fasting depends on the prescribed test. Check your request instructions or ask the laboratory.", "tn": "Es-siyem yetbadel 7asb ennaw3 mta3 analyse. Chouf talimat el demande wala es2el el laboratoire."}
+  },
+  {
+    "id": "delay",
+    "questions": {"fr": "Quel est le délai des résultats ?", "ar": "متى تظهر نتائج التحاليل؟", "en": "When will my results be ready?", "tn": "wa9tech ykounou les resultats?"},
+    "answers": {"fr": "Le délai varie selon les analyses. Consultez l’avancement de votre demande dans cet espace ou contactez le laboratoire.", "ar": "تختلف المدة حسب التحاليل. يمكنك متابعة الطلب في هذه الصفحة أو الاتصال بالمختبر.", "en": "Timing varies by test. Check your request progress here or contact the laboratory.", "tn": "El wa9t yetbadel 7asb el analyses. Tnajem tchouf ta9addom demande houni wala tes2el el laboratoire."}
+  },
+  {
+    "id": "ldl",
+    "questions": {"fr": "Que veut dire LDL ?", "ar": "ماذا يعني LDL؟", "en": "What does LDL mean?", "tn": "chmaaneha LDL?"},
+    "answers": {"fr": "LDL est le nom d’une fraction du cholestérol mesurée dans certaines analyses. Votre médecin peut expliquer ce résultat selon votre dossier.", "ar": "LDL هو نوع من أجزاء الكوليسترول التي قد تُقاس في التحاليل. يمكن لطبيبك شرح النتيجة حسب ملفك.", "en": "LDL is one fraction of cholesterol measured in some tests. Your doctor can explain the result in the context of your record.", "tn": "LDL naw3 men anwe3 el cholesterol elli yet9as fi baadh el analyses. Tbiblek ynajem yfassar el resultat 7asb dossier mteek."}
+  },
+  {
+    "id": "pdf",
+    "questions": {"fr": "Comment télécharger mon PDF ?", "ar": "كيف أنزل تقرير التحاليل بصيغة PDF؟", "en": "How can I download my PDF report?", "tn": "kifech nhabet compte rendu PDF?"},
+    "answers": {"fr": "Dans l’historique de vos résultats, utilisez le bouton « Télécharger le compte rendu PDF » associé à la demande.", "ar": "من سجل النتائج، اضغط على زر «تنزيل التقرير PDF» الخاص بالطلب.", "en": "In your results history, select “Download PDF report” for the relevant request.", "tn": "Fi historique mta3 les resultats, اضغط على زر «Télécharger le compte rendu PDF» mta3 el demande."}
+  },
+  {
+    "id": "normal-range",
+    "questions": {"fr": "Que signifie la plage de référence ?", "ar": "ماذا تعني القيم المرجعية؟", "en": "What is a reference range?", "tn": "chmaaneha valeurs de référence?"},
+    "answers": {"fr": "La plage de référence est une indication fournie par le laboratoire. Son interprétation dépend notamment de votre situation médicale; parlez-en à votre médecin.", "ar": "القيم المرجعية إرشادات يحددها المختبر. تفسيرها يعتمد على حالتك الصحية؛ ناقشها مع طبيبك.", "en": "A reference range is guidance provided by the laboratory. Its interpretation depends on your medical context; discuss it with your doctor.", "tn": "Valeurs de référence houma indications men laboratoire. Tafsirehom yetbadel 7asb 7aletek; احكي مع tbibek."}
+  },
+  {
+    "id": "high-low",
+    "questions": {"fr": "Mon résultat est en dehors de la plage, que faire ?", "ar": "نتيجتي خارج القيم المرجعية، ماذا أفعل؟", "en": "My result is outside the range, what should I do?", "tn": "resultat mte3i barra valeurs de référence, chnaamel?"},
+    "answers": {"fr": "Un résultat hors plage ne suffit pas à établir un diagnostic. Demandez à votre médecin de l’interpréter avec vous.", "ar": "النتيجة خارج القيم المرجعية لا تكفي وحدها للتشخيص. اطلب من طبيبك تفسيرها معك.", "en": "A result outside the range is not enough to make a diagnosis. Ask your doctor to interpret it with you.", "tn": "Resultat barra el plage wa7dou ma yaamelch tashkhis. Es2el tbibek yfassarhoulek."}
+  },
+  {
+    "id": "units",
+    "questions": {"fr": "Pourquoi les unités sont différentes ?", "ar": "لماذا تختلف وحدات القياس؟", "en": "Why are the measurement units different?", "tn": "aleh les unités yetbadelou?"},
+    "answers": {"fr": "Les unités dépendent de l’analyse et des méthodes du laboratoire. Comparez des résultats avec prudence et demandez conseil à votre médecin.", "ar": "تعتمد الوحدات على نوع التحليل وطريقة المختبر. قارن النتائج بحذر واسأل طبيبك.", "en": "Units depend on the test and laboratory method. Compare results carefully and ask your doctor for guidance.", "tn": "Les unités yetbadelou 7asb analyse w tari9et el laboratoire. 9aren b 7ذر w es2el tbibek."}
+  },
+  {
+    "id": "doctor",
+    "questions": {"fr": "Qui peut m’expliquer mes résultats ?", "ar": "من يمكنه شرح نتائج تحاليلي؟", "en": "Who can explain my results?", "tn": "chkoun ynajem yfassarli les resultats?"},
+    "answers": {"fr": "Votre médecin prescripteur est la personne la mieux placée pour interpréter vos résultats dans leur contexte.", "ar": "الطبيب الذي طلب التحاليل هو الأنسب لتفسير النتائج ضمن حالتك الصحية.", "en": "Your prescribing doctor is best placed to interpret your results in context.", "tn": "Tbib elli talab el analyses howa elli ynajem yfassar les resultats 7asb 7aletek."}
+  },
+  {
+    "id": "missing",
+    "questions": {"fr": "Pourquoi un résultat n’apparaît-il pas ?", "ar": "لماذا لا تظهر إحدى النتائج؟", "en": "Why is one result missing?", "tn": "aleh resultat ma yodhherch?"},
+    "answers": {"fr": "Un résultat apparaît ici après validation et publication par le laboratoire. Consultez l’avancement de la demande.", "ar": "تظهر النتيجة هنا بعد اعتمادها ونشرها من المختبر. راجع تقدم الطلب.", "en": "A result appears here after the laboratory validates and publishes it. Check the request progress.", "tn": "Resultat yodhher houni baad ma laboratoire yvalidih w yenshrou. Chouf ta9addom demande."}
+  },
+  {
+    "id": "privacy",
+    "questions": {"fr": "Qui peut voir mes résultats ?", "ar": "من يستطيع الاطلاع على نتائجي؟", "en": "Who can see my results?", "tn": "chkoun ynajem ychouf les resultats mte3i?"},
+    "answers": {"fr": "Cet espace affiche vos résultats publiés. L’accès aux données est réservé aux personnes autorisées selon les règles du service.", "ar": "تعرض هذه الصفحة نتائجك المنشورة. الوصول إلى البيانات محصور بالمصرح لهم وفق قواعد الخدمة.", "en": "This page displays your published results. Data access is limited to authorized people under the service rules.", "tn": "Espace hedha ywarri les resultats elli tpublaw. El accès lel données lel personnes elli andhom autorisation."}
+  },
+  {
+    "id": "trend",
+    "questions": {"fr": "Comment lire l’évolution de mes résultats ?", "ar": "كيف أقرأ تطور نتائج التحاليل؟", "en": "How do I read the trend in my results?", "tn": "kifech na9ra évolution mta3 les resultats?"},
+    "answers": {"fr": "Le graphique présente les valeurs publiées au fil du temps. Il ne pose pas de diagnostic; demandez à votre médecin de les interpréter.", "ar": "يعرض الرسم النتائج المنشورة مع مرور الوقت. لا يقدم تشخيصا؛ اطلب من طبيبك تفسيرها.", "en": "The chart shows published values over time. It does not provide a diagnosis; ask your doctor to interpret them.", "tn": "Graphique ywarri les valeurs elli tpublaw m3a el wa9t. Ma yaamelch tashkhis; es2el tbibek yfassarhom."}
+  },
+  {
+    "id": "blood-draw",
+    "questions": {"fr": "Comment se déroule une prise de sang ?", "ar": "كيف يتم سحب عينة الدم؟", "en": "What happens during a blood draw?", "tn": "kifech tsir prise de sang?"},
+    "answers": {"fr": "Le prélèvement est réalisé par un professionnel du laboratoire. Pour toute consigne particulière, vérifiez votre demande ou contactez le laboratoire.", "ar": "يقوم مختص في المختبر بسحب العينة. للتعليمات الخاصة، راجع طلبك أو اتصل بالمختبر.", "en": "A laboratory professional collects the sample. Check your request or contact the laboratory for specific instructions.", "tn": "Prélèvement yaamlou professionnel mel laboratoire. Lel talimat el khassa, chouf demande wala es2el el laboratoire."}
+  },
+  {
+    "id": "appointment",
+    "questions": {"fr": "Dois-je prendre rendez-vous ?", "ar": "هل يجب أن أحجز موعدا؟", "en": "Do I need to book an appointment?", "tn": "lezemni naamel rendez-vous?"},
+    "answers": {"fr": "Les modalités dépendent du laboratoire et du prélèvement. Consultez les informations de votre laboratoire avant de vous déplacer.", "ar": "تختلف الإجراءات حسب المختبر ونوع العينة. تحقق من معلومات المختبر قبل الذهاب.", "en": "Arrangements depend on the laboratory and sample. Check your laboratory's information before visiting.", "tn": "El modalités yetbadelou 7asb el laboratoire w ennaw3 mta3 prélèvement. Chouf ma3loumet el laboratoire 9bal ma temchi."}
+  },
+  {
+    "id": "correction",
+    "questions": {"fr": "Que faire si mes informations sont incorrectes ?", "ar": "ماذا أفعل إذا كانت معلوماتي غير صحيحة؟", "en": "What if my information is incorrect?", "tn": "chnaamel ken ma3loumeti ghalta?"},
+    "answers": {"fr": "Contactez le laboratoire pour signaler une erreur dans vos informations ou votre compte rendu.", "ar": "اتصل بالمختبر للإبلاغ عن خطأ في معلوماتك أو تقريرك.", "en": "Contact the laboratory to report an error in your information or report.", "tn": "Ettasel bel laboratoire bech taamel signalement ken fama ghalta fi ma3loumetek wala compte rendu."}
+  },
+  {
+    "id": "contact",
+    "questions": {"fr": "Comment contacter le laboratoire ?", "ar": "كيف أتواصل مع المختبر؟", "en": "How can I contact the laboratory?", "tn": "kifech netwasel maa el laboratoire?"},
+    "answers": {"fr": "Les coordonnées disponibles sont indiquées dans la section « Contacter le laboratoire » de cette page.", "ar": "تجد بيانات الاتصال المتاحة في قسم «الاتصال بالمختبر» في هذه الصفحة.", "en": "Available contact details are shown in the “Contact the laboratory” section on this page.", "tn": "Les coordonnées tal9ahom fi section «Contacter le laboratoire» fi page hedhi."}
+  }
+]
